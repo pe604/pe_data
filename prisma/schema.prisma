@@ -8,12 +8,14 @@
 // - Enum values are UPPER_SNAKE in the DB; UI labels live in src/lib/domain/labels.ts.
 
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
 }
 
+// Connection URL lives in prisma.config.ts (Prisma 7).
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
