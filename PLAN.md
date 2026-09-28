@@ -1,6 +1,6 @@
 # Build plan (Prompt 0)
 
-Status: **open questions answered 2026-09-28; awaiting go-ahead for Phase 1.** Decisions marked **Proposed** are what I'll do unless you say otherwise.
+Status: **Phases 1–8 built 2026-09-28.** Outstanding: a paid `GEMINI_API_KEY` and the two sample decks to tune the prompt (Prompt 6 check), Entra ID app registration, and CREATE rights on the RDS database (see README). Decisions marked **Proposed** are what I'll do unless you say otherwise.
 
 ## Phases
 

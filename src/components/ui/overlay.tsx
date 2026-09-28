@@ -26,16 +26,27 @@ export function Popover({
     close.current = onClose;
   }, [onClose]);
 
+  // Position below the anchor (or above if there's no room); re-run when the content grows.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const r = anchor.getBoundingClientRect();
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    const left = Math.max(12, Math.min(r.left, innerWidth - w - 12));
-    let top = r.bottom + 6;
-    if (top + h > innerHeight - 12) top = Math.max(12, r.top - h - 6);
-    setPos({ left, top });
+    const place = () => {
+      const r = anchor.getBoundingClientRect();
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const left = Math.max(12, Math.min(r.left, innerWidth - w - 12));
+      let top = r.bottom + 6;
+      if (top + h > innerHeight - 12) top = Math.max(12, Math.min(r.top - h - 6, innerHeight - h - 12));
+      setPos((p) => (p && p.left === left && p.top === top ? p : { left, top }));
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    window.addEventListener("resize", place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", place);
+    };
   }, [anchor]);
 
   useEffect(() => {

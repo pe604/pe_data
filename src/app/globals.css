@@ -382,7 +382,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
   .dh-name{font-size:24px}
   .grid2{grid-template-columns:1fr}
   .hist li{grid-template-columns:1fr;gap:2px}
-  .grid .c-co{position:static}
+  /* SPEC §11: Company stays pinned on phones (the prototype un-pinned it); narrower so data shows. */
+  .grid .c-co{min-width:150px;max-width:170px}
 }
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{transition:none!important;animation-duration:0s!important}

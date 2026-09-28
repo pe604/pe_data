@@ -18,7 +18,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
 | Excel / zip | `exceljs` / `archiver`, in route handlers |
 | Validation | `zod` on every input |
-| Styling | CSS variables for the SPEC §11 tokens (`src/styles/tokens.css`), CSS Modules. IBM Plex Sans + Source Serif 4 via `next/font` |
+| Styling | `src/app/globals.css`: the prototype's stylesheet ported as-is (SPEC §11 tokens as CSS variables, same class names), plus a small "additions" block at the end. IBM Plex Sans + Source Serif 4 via `next/font` |
 | Tests | Vitest (unit), Playwright (E2E) |
 | Deploy | `Dockerfile` + `docker-compose.prod.yml` (app, Postgres, files volume) |
 
@@ -27,19 +27,23 @@ Package manager: npm.
 ## Commands
 
 ```bash
-docker compose up -d            # local Postgres
+npm run db:local                # local Postgres on :5433 via embedded-postgres (or: docker compose up -d)
 npm install
-npx prisma migrate dev          # apply migrations (dev)
-npx prisma db seed              # sectors + sample companies
-npm run dev                     # http://localhost:3000
+npx prisma migrate dev          # apply/create migrations (dev)
+npm run db:seed                 # sectors + team + 3 sample companies
+npm run dev                     # http://localhost:3000 (DEV_LOGIN=true → "Developer login")
 npm run lint                    # ESLint
-npm run format                  # Prettier
 npm run typecheck               # tsc --noEmit
 npm test                        # Vitest unit tests
-npm run test:e2e                # Playwright (needs DEV_LOGIN=true and a seeded DB)
+npm run test:e2e                # Playwright (needs dev server, DEV_LOGIN=true and a seeded DB)
+npm run verify:export           # checks the Excel export formatting
 ```
 
-(Scripts are created in Phase 1. Update this section if they change.)
+On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Programs\nodejs` and `...\mingit\cmd`; prefix shell commands with `$env:Path="$env:LOCALAPPDATA\Programs\nodejs;$env:LOCALAPPDATA\Programs\mingit\cmd;$env:Path"` if they aren't found.
+
+**Prisma 7:** generator `prisma-client` outputs to `src/generated/prisma` (git-ignored, regenerated on `npm install`); the DB URL lives in `prisma.config.ts`; the client uses the `@prisma/adapter-pg` driver adapter (`src/lib/db.ts`).
+
+**Next 16:** read `node_modules/next/dist/docs/` before using unfamiliar APIs (see `AGENTS.md`). Middleware is now `proxy.ts` (not used here); route `params`/`searchParams` are Promises.
 
 ## Folder structure
 
@@ -47,47 +51,36 @@ npm run test:e2e                # Playwright (needs DEV_LOGIN=true and a seeded 
 .
 ├── CLAUDE.md  SPEC.md  BUILD_PROMPTS.md  README.md
 ├── reference/                      # v1.3 prototype (read only)
-├── prisma/
-│   ├── schema.prisma
-│   ├── migrations/
-│   └── seed.ts
+├── prisma/                         # schema.prisma, migrations/, seed.ts  (+ prisma.config.ts at root)
+├── scripts/                        # dev-db.mjs (local Postgres), verify-export.mjs
 ├── src/
+│   ├── auth.ts                     # Auth.js config: Entra ID + dev login, domain check, User upsert
+│   ├── instrumentation.ts          # starts the summary job worker
 │   ├── app/
-│   │   ├── layout.tsx  page.tsx    # the single dashboard page
+│   │   ├── layout.tsx  page.tsx    # the single dashboard page (server loads everything)
+│   │   ├── globals.css             # prototype CSS
 │   │   ├── signin/                 # sign-in screen
 │   │   └── api/
 │   │       ├── auth/[...nextauth]/
-│   │       ├── files/              # upload, [id] view/download
-│   │       ├── companies/[id]/files.zip/
-│   │       ├── summary-jobs/[id]/  # poll status, cancel
+│   │       ├── files/              # POST upload (staged or attached); [id] GET view/download
+│   │       ├── companies/[id]/download-all/  # zip grouped Deck/ Model/ Other/
 │   │       └── export/             # Excel
-│   ├── actions/                    # server actions, one file per area (companies, people, comments, files, summaries, team, sectors, exits)
+│   ├── actions/                    # server actions: companies.ts, files.ts (files + summaries), misc.ts (comments, team, sectors), auth.ts
 │   ├── components/
-│   │   ├── shell/                  # header, tabs
-│   │   ├── bars/                   # stages bar, PE team bar, manage modal
-│   │   ├── toolbar/                # search, filters, sort
-│   │   ├── table/                  # grid + cells
-│   │   ├── drawer/                 # company file drawer + tabs
-│   │   ├── add-company/            # modal steps
-│   │   └── ui/                     # button, popover, modal, toast, chip picker
-│   ├── lib/
-│   │   ├── auth/                   # auth config, session, requireRole()
-│   │   ├── db.ts                   # Prisma client singleton
-│   │   ├── env.ts                  # zod-validated env, the only reader of process.env
-│   │   ├── storage/                # StorageDriver, local driver, factory
-│   │   ├── ai/                     # AiProvider, Gemini provider, prompt, schema, pptx, job runner
-│   │   ├── summary/                # JSON → markdown builder
-│   │   ├── domain/                 # stages, labels, dates/days, names (normalise, Levenshtein, rankNames), duplicate check, sort, filters, onedrive URL check
-│   │   ├── audit.ts                # audit log writer
-│   │   ├── upload.ts               # extension + MIME sniff + size checks
-│   │   └── excel/                  # export workbook builder
-│   ├── styles/                     # tokens.css, globals.css
-│   └── instrumentation.ts          # starts the summary job worker
-├── tests/
-│   ├── unit/                       # Vitest
-│   ├── e2e/                        # Playwright
-│   └── fixtures/                   # non-confidential sample files only
-├── docker-compose.yml  docker-compose.prod.yml  Dockerfile
+│   │   ├── Dashboard.tsx store.tsx # client state, optimistic mutate() with rollback, URL sync
+│   │   ├── shell/ bars/ toolbar/ table/ cells/ drawer/ add/ ui/
+│   ├── generated/prisma/           # Prisma client (generated, git-ignored)
+│   └── lib/
+│       ├── auth/session.ts         # currentUser(), requireRole()
+│       ├── db.ts  env.ts           # Prisma client; zod-validated env (the only reader of process.env)
+│       ├── storage/                # StorageDriver + LocalDiskDriver (the only fs access)
+│       ├── ai/                     # AiProvider (Gemini), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
+│       ├── summary/                # JSON → markdown builder, markdown → safe HTML renderer
+│       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types
+│       ├── server/                 # row loading/serialising, audit(), action wrapper, upload sniffing, HTTP errors
+│       └── excel/                  # export workbook builder
+├── tests/  unit/ e2e/ fixtures/    # fixtures are non-confidential only
+├── Dockerfile  docker-compose.yml  docker-compose.prod.yml
 └── .env.example
 ```
 
@@ -104,7 +97,8 @@ npm run test:e2e                # Playwright (needs DEV_LOGIN=true and a seeded 
 - Rendered markdown (summaries) goes through a renderer with raw HTML disabled.
 
 **Data**
-- Every field change, status change, file upload/remove and summary generate/edit writes an `AuditLog` row in the same transaction (`src/lib/audit.ts`).
+- Every field change, status change, file upload/remove and summary generate/edit writes an `AuditLog` row in the same transaction (`audit()` in `src/lib/server/company.ts`).
+- Server actions return `ActionResult` via `run()` (`src/lib/server/action.ts`); throw `UserError` for messages the user should see. The client applies changes through `store.mutate()` so failures roll back with a toast.
 - "Today" and day counts use the Asia/Kolkata calendar date, not the server's timezone. Date maths lives in `src/lib/domain/dates.ts` and is unit-tested.
 - Days = today − dateReceived, frozen at exitAt for Rejected/Invested, "–" when no date.
 - Auto stage rule (SPEC §7.5) is applied server-side whenever PE/Research changes.
