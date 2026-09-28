@@ -1,0 +1,43 @@
+# Secrets: never commit. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js / build
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Uploaded files (local StorageDriver). Confidential decks, never commit.
+storage/
+uploads/
+
+# Tests
+playwright-report/
+test-results/
+blob-report/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Sample decks used for manual AI testing (NDA material)
+*.pdf
+*.pptx
+!tests/fixtures/**/*.pdf
+!tests/fixtures/**/*.pptx

@@ -1,0 +1,314 @@
+// Niveshaay Deal Pipeline: data model (SPEC §4).
+// Status: proposed in Prompt 0, pending approval. Migrations are created in Phase 1.
+//
+// Conventions
+// - ids are cuid strings.
+// - Calendar dates (dateReceived, exitAt) are @db.Date and mean the date in Asia/Kolkata.
+// - Timestamps are timestamptz.
+// - Enum values are UPPER_SNAKE in the DB; UI labels live in src/lib/domain/labels.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+/// No Viewer role for now (decided 2026-09-28): every signed-in domain user is at least an Editor.
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+/// Order matters: it is the pipeline order (SPEC §4).
+enum Stage {
+  NOT_ASSIGNED
+  CALL_PENDING
+  INTERNAL_DISCUSSION
+  SCUTTLEBUTT
+  ALLOCATION
+  DUE_DILIGENCE
+}
+
+enum CompanyStatus {
+  PIPELINE
+  REJECTED
+  INVESTED
+}
+
+enum PersonRole {
+  PE
+  RESEARCH
+  VIA
+}
+
+enum FileKind {
+  DECK
+  MODEL
+  OTHER
+}
+
+enum SummaryJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+  CANCELLED
+}
+
+enum SummaryJobStep {
+  READING
+  WRITING
+}
+
+// ─── People ──────────────────────────────────────────────────────────────────
+
+/// A signed-in person. Created or updated on each sign-in (JWT sessions, no Auth.js adapter tables).
+/// `role` is re-derived on sign-in: ADMIN_EMAILS → ADMIN, otherwise EDITOR.
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique // stored lower-case
+  role      Role     @default(EDITOR)
+  createdAt DateTime @default(now())
+
+  companiesCreated  Company[]      @relation("CompanyCreatedBy")
+  comments          Comment[]
+  filesUploaded     File[]
+  summariesCreated  Summary[]      @relation("SummaryCreatedBy")
+  summariesEdited   Summary[]      @relation("SummaryEditedBy")
+  summaryJobs       SummaryJob[]
+  rejections        Rejection[]
+  auditLogs         AuditLog[]
+  deletionLogs      DeletionLog[]
+}
+
+/// Names used in PE / Research / Via chips. Not necessarily app users.
+model TeamMember {
+  id      String @id @default(cuid())
+  name    String // Title Case, as displayed
+  /// lower-case, trimmed, single-spaced copy of `name`. Enforces case-insensitive uniqueness.
+  nameKey String @unique
+  /// Non-null = shown in the PE team bar, ascending.
+  peRank  Int?
+
+  assignments CompanyPerson[]
+
+  @@index([peRank])
+}
+
+// ─── Companies ───────────────────────────────────────────────────────────────
+
+model Company {
+  id String @id @default(cuid())
+
+  // Core
+  name      String
+  sectorId  String?
+  sector    Sector? @relation(fields: [sectorId], references: [id], onDelete: SetNull)
+  subSector String?
+  stage     Stage   @default(NOT_ASSIGNED)
+  /// 1–5, null = unset. CHECK (priority BETWEEN 1 AND 5) added in the migration SQL.
+  priority  Int?
+
+  // Status and dates
+  status         CompanyStatus @default(PIPELINE)
+  dateReceived   DateTime?     @db.Date
+  exitAt         DateTime?     @db.Date
+  exitStage      Stage?
+  directInvested Boolean       @default(false)
+
+  // Other
+  rejectReason    String?
+  oneDriveUrl     String? // only http/https, validated on write
+  activeSummaryId String?  @unique
+  activeSummary   Summary? @relation("ActiveSummary", fields: [activeSummaryId], references: [id], onDelete: SetNull)
+
+  // Edit flags: true once a person has changed the AI-filled value
+  nameEdited      Boolean @default(false)
+  sectorEdited    Boolean @default(false)
+  subSectorEdited Boolean @default(false)
+
+  // Audit
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+  createdBy   User     @relation("CompanyCreatedBy", fields: [createdById], references: [id])
+
+  people      CompanyPerson[]
+  comments    Comment[]
+  files       File[]
+  summaries   Summary[]       @relation("CompanySummaries")
+  summaryJobs SummaryJob[]
+  rejections  Rejection[]
+  auditLogs   AuditLog[]
+
+  @@index([status])
+  @@index([status, priority, dateReceived])
+}
+
+/// PE / Research / Via assignments. Order within (company, role) is `position`.
+model CompanyPerson {
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  teamMemberId String
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Restrict)
+  role         PersonRole
+  position     Int
+
+  @@id([companyId, role, teamMemberId])
+  @@index([teamMemberId, role])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  text      String
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  @@index([companyId, createdAt])
+}
+
+/// Stored via StorageDriver under a random `storageKey`; the original name is never used on disk.
+/// `companyId` is null only while a deck is staged in the Add company modal (see phase plan, risk R3).
+model File {
+  id           String   @id @default(cuid())
+  companyId    String?
+  company      Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  originalName String
+  kind         FileKind
+  mime         String   // sniffed, not client-supplied
+  sizeBytes    Int
+  storageKey   String   @unique
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime @default(now())
+
+  summaries   Summary[]
+  summaryJobs SummaryJob[]
+
+  @@index([companyId, uploadedAt])
+  @@index([companyId, kind])
+}
+
+// ─── AI summaries ────────────────────────────────────────────────────────────
+
+/// One row per successful generation. Failed or cancelled runs never create a version.
+model Summary {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation("CompanySummaries", fields: [companyId], references: [id], onDelete: Cascade)
+  version        Int
+  sourceFileId   String?
+  sourceFile     File?    @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  /// Kept so "Version N, from <file>" still reads correctly after the file is removed.
+  sourceFileName String?
+  json           Json? // raw validated AI output; null for a hand-written summary
+  markdown       String
+  edited         Boolean   @default(false)
+  editedById     String?
+  editedBy       User?     @relation("SummaryEditedBy", fields: [editedById], references: [id])
+  editedAt       DateTime?
+  createdById    String
+  createdBy      User      @relation("SummaryCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+
+  activeFor Company? @relation("ActiveSummary")
+
+  @@unique([companyId, version])
+}
+
+/// Background generation job (SPEC §9.1). Survives a closed tab and a server restart.
+/// `companyId` is null while running for a deck staged in the Add company modal.
+model SummaryJob {
+  id           String           @id @default(cuid())
+  companyId    String?
+  company      Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sourceFileId String?
+  sourceFile   File?            @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  status       SummaryJobStatus @default(QUEUED)
+  step         SummaryJobStep?
+  attempts     Int              @default(0)
+  /// User-facing error message only. Never deck text.
+  error        String?
+  /// Validated AI JSON, kept for the Add company review step (prefill) before a company exists.
+  resultJson   Json?
+  resultMarkdown String?
+  /// Set when the result was written as a Summary version.
+  summaryId    String?
+  createdById  String
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  createdAt    DateTime         @default(now())
+  startedAt    DateTime?
+  heartbeatAt  DateTime?
+  finishedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([companyId, status])
+}
+
+// ─── History ─────────────────────────────────────────────────────────────────
+
+/// Kept across restores.
+model Rejection {
+  id               String   @id @default(cuid())
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reason           String
+  stageAtRejection Stage
+  byId             String
+  by               User     @relation(fields: [byId], references: [id])
+  at               DateTime @default(now())
+
+  @@index([companyId, at])
+}
+
+/// Every field change, status change, file upload/remove and summary generate/edit (SPEC §13).
+/// companyId null = global change (for example PE team order, sector list).
+/// from/to hold display strings, e.g. "P2", "Keyur, Arjun", "12 Mar 2026", or null for empty.
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id])
+  field     String?
+  fromValue String?
+  toValue   String?
+  note      String?
+  at        DateTime @default(now())
+
+  @@index([companyId, at])
+  @@index([field, at])
+}
+
+// ─── Master data ─────────────────────────────────────────────────────────────
+
+model Sector {
+  id        String @id @default(cuid())
+  name      String @unique
+  /// "Other" is seeded with a high value so it always sorts last.
+  sortOrder Int
+
+  companies Company[]
+
+  @@index([sortOrder])
+}
+
+/// Written before a hard delete; survives the delete.
+model DeletionLog {
+  id          String   @id @default(cuid())
+  companyName String
+  reason      String
+  byId        String
+  by          User     @relation(fields: [byId], references: [id])
+  at          DateTime @default(now())
+}
