@@ -92,6 +92,20 @@ curl -fsS http://127.0.0.1:3000/api/health   # {"ok":true} once it is up
 - Put it behind HTTPS (reverse proxy such as Caddy, nginx or IIS/ARR). Auth cookies are secure in production.
 - Uploaded files live in the `files` volume; the database in `pgdata`.
 
+### Easypanel (deploy from GitHub)
+
+1. **Keep the GitHub repository private.** Connect Easypanel to GitHub (Settings → GitHub) so it can read private repos.
+2. Create a **Postgres** service in the same Easypanel project (or use an external database) and copy its internal connection URL.
+3. Create an **App** service:
+   - Source: GitHub → this repo, branch `main`. Build: **Dockerfile** (path `Dockerfile`).
+   - **Environment:** every variable in `.env.example`. At minimum set `DATABASE_URL`, `AUTH_URL=https://<your-domain>`, a fresh `AUTH_SECRET` (`openssl rand -base64 32`), the Entra ID values, `ALLOWED_EMAIL_DOMAIN`, `ADMIN_EMAILS`, `OPENROUTER_API_KEY`, and the `EVOLUTION_*` values. Do **not** set `DEV_LOGIN`.
+   - **Mounts:** add a volume mounted at **`/data/files`**. Without it, uploaded decks are lost on every redeploy.
+   - **Domains:** add your domain, proxy port **3000**, HTTPS on (Easypanel issues the certificate).
+   - Replicas: 1.
+4. Deploy. The container applies database migrations and adds the sector list on start. Check `https://<your-domain>/api/health` shows `{"ok":true}`.
+5. In the Entra app registration, add the redirect URI `https://<your-domain>/api/auth/callback/microsoft-entra-id`.
+6. Back up both the Postgres service and the `/data/files` volume (Easypanel → service → Backups, or `pg_dump` + a volume archive).
+
 ### Using an existing Postgres (e.g. AWS RDS)
 
 Point `DATABASE_URL` at it and remove the `db` service. The database user needs to create tables the first time:
