@@ -23,7 +23,7 @@ The app must be portable to Niveshaay's own servers later.
 | Layer | Choice |
 |---|---|
 | App | Next.js (App Router), TypeScript, React Server Components where useful |
-| DB | PostgreSQL + Prisma. Local dev via `docker-compose` |
+| DB | PostgreSQL (the firm's AWS RDS server, `DB_*` credentials) + Prisma. TLS with certificate verification against the bundled RDS CA by default. No local database |
 | Auth | Auth.js with the **Microsoft Entra ID** provider (the firm uses Microsoft 365 / OneDrive). Restrict sign-in to `ALLOWED_EMAIL_DOMAIN` |
 | File storage | A `StorageDriver` interface backed by an **S3-compatible bucket** (no local file storage). Every file is **encrypted client-side (AES-256-GCM) before upload** with `STORAGE_ENCRYPTION_KEY`, so bucket access alone never exposes a deck. Files are only ever served through the app's authorised routes, never via public bucket URLs. Nothing outside the driver may touch storage or the filesystem |
 | AI | **OpenRouter** (OpenAI-compatible chat completions API), server-side only, behind an `AiProvider` interface so the model can be swapped later. Model from env `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`, which reads PDFs natively). Requests set `provider.data_collection = "deny"` (see §13) |
@@ -31,11 +31,12 @@ The app must be portable to Niveshaay's own servers later.
 | Zip | `archiver` or `jszip` (server route) |
 | Styling | CSS variables for design tokens (section 11). Tailwind is fine if tokens map to CSS variables |
 | Tests | Playwright end-to-end for the main flows; unit tests for summary markdown building and date/day maths |
-| Deploy | Dockerfile + `docker-compose.prod.yml` (app + Postgres + volume for files) |
+| Deploy | Dockerfile (Easypanel from GitHub), or `docker-compose.prod.yml` (app only; DB and files are external) |
 
 Env vars:
 
-- `DATABASE_URL`
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` (or a single `DATABASE_URL`)
+- `DB_SSL` (`verify-full` default, `require`, `disable`), `DB_SSL_CA`, `DB_SCHEMA` (optional)
 - `AUTH_SECRET`
 - `AUTH_MICROSOFT_ENTRA_ID_ID`
 - `AUTH_MICROSOFT_ENTRA_ID_SECRET`

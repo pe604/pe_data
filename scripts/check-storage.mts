@@ -3,8 +3,10 @@
 import "dotenv/config";
 import pg from "pg";
 import { storage } from "../src/lib/storage";
+import { dbConfig, pgSsl } from "../src/lib/db-config";
 
-const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
+const cfg = dbConfig(process.env);
+const db = new pg.Client({ connectionString: cfg.url, ssl: pgSsl(cfg) });
 await db.connect();
 const { rows } = await db.query(`select "storageKey", "sizeBytes", mime from "File"`);
 await db.end();

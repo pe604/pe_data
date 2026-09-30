@@ -11,7 +11,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | Layer | Choice |
 |---|---|
 | App | Next.js (App Router), TypeScript `strict`, React Server Components for reads, server actions for mutations, route handlers for files/export/jobs |
-| DB | PostgreSQL + Prisma (`prisma/schema.prisma`). Local Postgres via `docker-compose.yml` |
+| DB | PostgreSQL on AWS RDS (`DB_*` in `.env`) + Prisma (`prisma/schema.prisma`). Connection settings built in `src/lib/db-config.ts` (shared by the app, `prisma.config.ts` and scripts); TLS verified against `certs/rds-ap-south-1-bundle.pem`. No local database |
 | Auth | Auth.js, Microsoft Entra ID provider, JWT sessions (no adapter tables). Sign-in restricted to `ALLOWED_EMAIL_DOMAIN`. `DEV_LOGIN=true` bypass for local dev only |
 | Files | `StorageDriver` backed by an S3-compatible bucket (`AWS_S3_*`), every object AES-256-GCM encrypted client-side with `STORAGE_ENCRYPTION_KEY` (the bucket is publicly readable, so it must only ever hold ciphertext). No local file storage |
 | AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`). Every request sets `provider.data_collection = "deny"` |
@@ -20,22 +20,21 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | Validation | `zod` on every input |
 | Styling | `src/app/globals.css`: the prototype's stylesheet ported as-is (SPEC §11 tokens as CSS variables, same class names), plus a small "additions" block at the end. IBM Plex Sans + Source Serif 4 via `next/font` |
 | Tests | Vitest (unit), Playwright (E2E) |
-| Deploy | `Dockerfile` + `docker-compose.prod.yml` (app, Postgres) |
+| Deploy | `Dockerfile` on Easypanel (from GitHub, container port 3000), or `docker-compose.prod.yml` (app only) |
 
 Package manager: npm.
 
 ## Commands
 
 ```bash
-npm run db:local                # local Postgres on :5433 via embedded-postgres (or: docker compose up -d)
 npm install
-npx prisma migrate dev          # apply/create migrations (dev)
-npm run db:seed                 # sector list only (never sample data: the DB holds real deals)
-npm run dev                     # http://localhost:3000 (DEV_LOGIN=true → "Developer login")
+npx prisma migrate deploy       # apply migrations to the configured DB (it holds real deals: never `migrate reset`)
+npm run dev                     # http://localhost:3000 (DEV_LOGIN=true → "Developer login"), uses the RDS database
 npm run lint                    # ESLint
 npm run typecheck               # tsc --noEmit
 npm test                        # Vitest unit tests
-npm run test:e2e                # Playwright on its own server (:3100) + auto-reset pipeline_test DB; never touches real data
+npm run test:e2e                # Playwright on :3100 against E2E_DATABASE_URL (a disposable *_test DB, wiped each run); never real data
+npx tsx scripts/db-data.mts export|import <file.json>   # move rows between databases
 npm run verify:export           # checks the Excel export formatting
 ```
 
@@ -52,7 +51,8 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 ├── CLAUDE.md  SPEC.md  BUILD_PROMPTS.md  README.md
 ├── reference/                      # v1.3 prototype (read only)
 ├── prisma/                         # schema.prisma, migrations/, seed.ts  (+ prisma.config.ts at root)
-├── scripts/                        # dev-db.mjs (local Postgres), verify-export.mjs
+├── certs/                          # public AWS RDS CA bundle (DB_SSL=verify-full)
+├── scripts/                        # db-data.mts (export/import rows), check-storage.mts, verify-export.mjs, try-summary.mts
 ├── src/
 │   ├── auth.ts                     # Auth.js config: Entra ID + dev login, domain check, User upsert
 │   ├── instrumentation.ts          # starts the summary job worker
@@ -73,6 +73,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │   └── lib/
 │       ├── auth/session.ts         # currentUser(), requireRole()
 │       ├── db.ts  env.ts           # Prisma client; zod-validated env (the only reader of process.env)
+│       ├── db-config.ts            # DB_* → connection URL + SSL/CA + schema (pure; also used by prisma.config.ts)
 │       ├── storage/                # StorageDriver (S3 + encryption), crypto.ts, tmp.ts (OS temp dir for LibreOffice only)
 │       ├── ai/                     # AiProvider (OpenRouter), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
 │       ├── summary/                # JSON → markdown builder, markdown → safe HTML renderer
@@ -81,7 +82,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │       ├── server/                 # row loading/serialising, audit(), action wrapper, upload sniffing, HTTP errors
 │       └── excel/                  # export workbook builder
 ├── tests/  unit/ e2e/ fixtures/    # fixtures are non-confidential only
-├── Dockerfile  docker-compose.yml  docker-compose.prod.yml
+├── Dockerfile  docker-compose.prod.yml
 └── .env.example
 ```
 

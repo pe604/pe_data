@@ -17,9 +17,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Build-time placeholders only; real values come from the runtime environment.
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate \
- && DATABASE_URL="postgresql://build:build@localhost:5432/build" AUTH_SECRET=build ALLOWED_EMAIL_DOMAIN=build.invalid npm run build
+# Build-time placeholders only (nothing connects during the build); real values come from the runtime environment.
+ENV BUILD_ENV="DB_HOST=build.invalid DB_USER=build DB_PASS=build DB_NAME=build DB_SSL=disable AUTH_SECRET=build ALLOWED_EMAIL_DOMAIN=build.invalid AWS_S3_ENDPOINT_URL=https://build.invalid AWS_S3_BUCKET_NAME=build AWS_S3_FOLDER=build AWS_ACCESS_KEY_ID=build AWS_SECRET_ACCESS_KEY=build STORAGE_ENCRYPTION_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+RUN env $BUILD_ENV npx prisma generate && env $BUILD_ENV npm run build
 
 # ─── Migrator: Prisma CLI with all its dependencies, isolated from the app ───
 FROM ${NODE_IMAGE} AS migrator
@@ -31,6 +31,8 @@ RUN npm init -y >/dev/null \
 COPY prisma/schema.prisma ./prisma/schema.prisma
 COPY prisma/migrations ./prisma/migrations
 COPY prisma.config.ts ./
+COPY src/lib/db-config.ts ./src/lib/db-config.ts
+COPY certs ./certs
 
 # ─── Runtime ─────────────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS runner
@@ -45,6 +47,8 @@ RUN apt-get update \
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
+# Public AWS RDS CA bundle for DB_SSL=verify-full.
+COPY --chown=app:app certs ./certs
 COPY --from=migrator --chown=app:app /migrate /migrate
 USER app
 EXPOSE 3000

@@ -1,9 +1,19 @@
 import "server-only";
 import { z } from "zod";
+import { dbConfig } from "@/lib/db-config";
 
 // The only place that reads process.env. Never log these values.
 const schema = z.object({
-  DATABASE_URL: z.string().min(1),
+  // Postgres (SPEC §2): DB_* parts, or one DATABASE_URL. Checked by dbConfig() below.
+  DB_HOST: z.string().optional(),
+  DB_PORT: z.string().optional(),
+  DB_USER: z.string().optional(),
+  DB_PASS: z.string().optional(),
+  DB_NAME: z.string().optional(),
+  DB_SSL: z.enum(["disable", "require", "verify-full"]).default("verify-full"),
+  DB_SSL_CA: z.string().optional(),
+  DB_SCHEMA: z.string().regex(/^[A-Za-z0-9_-]+$/).optional(),
+  DATABASE_URL: z.string().optional(),
   AUTH_SECRET: z.string().min(1),
   AUTH_MICROSOFT_ENTRA_ID_ID: z.string().optional().default(""),
   AUTH_MICROSOFT_ENTRA_ID_SECRET: z.string().optional().default(""),
@@ -40,6 +50,9 @@ const blankToUndefined = Object.fromEntries(
 );
 
 export const env = schema.parse(blankToUndefined);
+
+/** Resolved Postgres connection settings (throws at startup when the database isn't configured). */
+export const dbSettings = dbConfig(env);
 
 export const adminEmails = new Set(
   env.ADMIN_EMAILS.split(",")

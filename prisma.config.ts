@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
+import { dbConfig, prismaCliUrl } from "./src/lib/db-config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -8,6 +9,7 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME (+ DB_SSL, DB_SCHEMA); see src/lib/db-config.ts.
+    url: prismaCliUrl(dbConfig(process.env)),
   },
 });

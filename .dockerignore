@@ -5,6 +5,7 @@ node_modules
 .env.*
 .data
 storage
+backup
 test-results
 playwright-report
 tests/e2e/.auth.json

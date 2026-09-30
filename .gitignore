@@ -15,8 +15,10 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 
-# Local dev database (scripts/dev-db.mjs) and generated Prisma client
+# Data exports (scripts/db-data.mts): deal metadata, never commit. Old local DB folder.
+/backup/
 /.data/
+# Generated Prisma client
 src/generated/
 
 # Uploaded files (local StorageDriver). Confidential decks, never commit.

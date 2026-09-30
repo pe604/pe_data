@@ -4,17 +4,16 @@ Internal, login-only deal tracker for Niveshaay's PE team. It replaces the Excel
 
 ## Local setup
 
-Requirements: Node.js 22+. Docker is optional.
+Requirements: Node.js 22+. There is no local database: the app uses the Postgres server in `DB_*` (AWS RDS).
 
 ```bash
 npm install
 cp .env.example .env          # fill in, see "Environment variables"
-npm run db:local              # terminal 1: local Postgres on :5433 (no Docker or admin rights needed)
-                              #   or: docker compose up -d
-npx prisma migrate deploy     # create tables
-npm run db:seed               # sector list only (the app also adds it on startup)
-npm run dev                   # terminal 2: http://localhost:3000
+npx prisma migrate deploy     # create/update tables on the configured database (the app's Docker image does this on start)
+npm run dev                   # http://localhost:3000
 ```
+
+Your IP must be allowed in the RDS security group to connect from your machine.
 
 With `DEV_LOGIN=true` the sign-in page shows **Developer login**, which signs you in as the first address in `ADMIN_EMAILS`. It is ignored in production builds.
 
@@ -24,7 +23,7 @@ With `DEV_LOGIN=true` the sign-in page shows **Developer login**, which signs yo
 npm run typecheck
 npm run lint
 npm test                      # unit tests (dates, names, markdown, sorting)
-npm run test:e2e              # Playwright: starts its own server on :3100 against a separate, auto-reset "pipeline_test" DB (never real data)
+npm run test:e2e              # Playwright on :3100; needs E2E_DATABASE_URL = an empty, disposable DB named *_test (wiped every run; refuses the real DB)
 npm run verify:export         # downloads the Excel export from the running dev server and checks its formatting (read-only)
 ```
 
@@ -32,7 +31,10 @@ npm run verify:export         # downloads the Excel export from the running dev 
 
 | Variable | Notes |
 |---|---|
-| `DATABASE_URL` | Postgres connection string. Local: `postgresql://postgres:postgres@localhost:5433/pipeline` |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` | Postgres server (AWS RDS). `DB_PORT` defaults to 5432. A single `DATABASE_URL` also works when `DB_HOST` is unset |
+| `DB_SSL` | `verify-full` (default: TLS, certificate checked against `DB_SSL_CA`), `require` (TLS, no certificate check) or `disable` |
+| `DB_SSL_CA` | CA bundle for `verify-full`. Default `certs/rds-ap-south-1-bundle.pem` (public AWS RDS Mumbai CA, shipped in the repo and image) |
+| `DB_SCHEMA` | Optional Postgres schema (default `public`) |
 | `AUTH_SECRET` | Random 32+ bytes, e.g. `openssl rand -base64 32` |
 | `AUTH_MICROSOFT_ENTRA_ID_ID` | Application (client) ID of the Entra app registration |
 | `AUTH_MICROSOFT_ENTRA_ID_SECRET` | Client secret value |
@@ -81,42 +83,42 @@ Decks are received under NDA, so:
 ## Production (Docker)
 
 ```bash
-cp .env.example .env.production   # fill in; also set POSTGRES_PASSWORD (and optionally POSTGRES_USER / POSTGRES_DB)
+cp .env.example .env.production   # fill in (DB_*, AWS_S3_*, STORAGE_ENCRYPTION_KEY, auth, ...)
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 curl -fsS http://127.0.0.1:3000/api/health   # {"ok":true} once it is up
 ```
 
-- The app applies migrations on start (`prisma migrate deploy`) and adds the sector list if it's missing. No seed step, and no sample data.
+- **The app listens on port 3000** inside the container.
+- The app applies migrations on start (`prisma migrate deploy`) and adds the sector list if it's missing. No seed step, and no sample data. If migrations fail (e.g. the DB user can't create tables), the container exits and the proxy shows **502**: check the logs.
 - `GET /api/health` is a public up/down probe for the host (the Docker image's HEALTHCHECK uses it).
 - Run a single replica: summary jobs and WhatsApp polling are safe with more, but there's no need.
 - The image includes LibreOffice so PowerPoint decks are converted to PDF before summarising. Without it, only slide text is used.
 - Put it behind HTTPS (reverse proxy such as Caddy, nginx or IIS/ARR). Auth cookies are secure in production.
-- Uploaded files live in the S3 bucket (encrypted); the database in `pgdata`. No file volume is needed.
+- Uploaded files live in the S3 bucket (encrypted); the data in the RDS database. No volumes are needed.
 
 ### Easypanel (deploy from GitHub)
 
-1. **Keep the GitHub repository private.** Connect Easypanel to GitHub (Settings → GitHub) so it can read private repos.
-2. Create a **Postgres** service in the same Easypanel project (or use an external database) and copy its internal connection URL.
-3. Create an **App** service:
+1. The repository holds no secrets; all of them go in Easypanel's environment settings.
+2. Create an **App** service:
    - Source: GitHub → this repo, branch `main`. Build: **Dockerfile** (path `Dockerfile`).
-   - **Environment:** every variable in `.env.example`. At minimum set `DATABASE_URL`, `AUTH_URL=https://<your-domain>`, a fresh `AUTH_SECRET` (`openssl rand -base64 32`), the Entra ID values, `ALLOWED_EMAIL_DOMAIN`, `ADMIN_EMAILS`, `OPENROUTER_API_KEY`, and the `EVOLUTION_*` values. Do **not** set `DEV_LOGIN`.
-   - **Mounts:** none needed; files go to the S3 bucket.
-   - **Domains:** add your domain, proxy port **3000**, HTTPS on (Easypanel issues the certificate).
+   - **Environment:** every variable in `.env.example`: `DB_*`, `AWS_S3_*`, `STORAGE_ENCRYPTION_KEY` (the **same** value as before, or existing files can't be read), `AUTH_URL=https://<your-domain>`, a fresh `AUTH_SECRET` (`openssl rand -base64 32`), the Entra ID values, `ALLOWED_EMAIL_DOMAIN`, `ADMIN_EMAILS`, `OPENROUTER_API_KEY`, and the `EVOLUTION_*` values. Do **not** set `DEV_LOGIN`. No Postgres service is needed.
+   - **Mounts:** none.
+   - **Domains:** add your domain, **port 3000**, HTTPS on (Easypanel issues the certificate). Ports 80/8000 give 502: nothing listens there.
    - Replicas: 1.
+3. In AWS, allow the Easypanel server's IP in the RDS security group (port 5432).
 4. Deploy. The container applies database migrations and adds the sector list on start. Check `https://<your-domain>/api/health` shows `{"ok":true}`.
 5. In the Entra app registration, add the redirect URI `https://<your-domain>/api/auth/callback/microsoft-entra-id`.
-6. Back up the Postgres service (Easypanel → service → Backups, or `pg_dump`). Files are in the bucket; keep a copy of `STORAGE_ENCRYPTION_KEY` somewhere safe.
 
-### Using an existing Postgres (e.g. AWS RDS)
+### Database user rights (AWS RDS)
 
-Point `DATABASE_URL` at it and remove the `db` service. The database user needs to create tables the first time:
+The first deploy creates the tables, so the `DB_USER` needs to be able to create them. As the RDS master user:
 
 ```sql
-GRANT USAGE, CREATE ON SCHEMA public TO <app_user>;
--- or create a dedicated schema owned by the app user and add ?schema=<name> to DATABASE_URL
+GRANT USAGE, CREATE ON SCHEMA public TO <DB_USER>;
+-- or a dedicated schema: CREATE SCHEMA pipeline AUTHORIZATION <DB_USER>;  then set DB_SCHEMA=pipeline
 ```
 
-For RDS over SSL add `?sslmode=require` to `DATABASE_URL`.
+To move existing rows from another database: `npx tsx scripts/db-data.mts export data.json --from <old-url>`, then (after `npx prisma migrate deploy` on the new one) `npx tsx scripts/db-data.mts import data.json`. The import refuses a database that already has companies. Delete the JSON afterwards.
 
 ## Security checklist (production)
 
@@ -136,14 +138,13 @@ What you need to do:
 2. Set `AUTH_URL=https://<your-host>` and a fresh random `AUTH_SECRET`. Leave `DEV_LOGIN` unset.
 3. Set `AUTH_MICROSOFT_ENTRA_ID_ISSUER` to `https://login.microsoftonline.com/<tenant-id>/v2.0`. The app refuses `/common`.
 4. Consider Entra **Assignment required = Yes**, so only the PE team can sign in.
-5. Encrypt the disk holding the database, and encrypt backups. **Make the S3 bucket (or at least `AWS_S3_FOLDER`) private.** Files are encrypted, but a public bucket still reveals how many files exist and when.
+5. Keep RDS storage encryption on, keep `DB_SSL=verify-full`, restrict the RDS security group to the app server's IP, and encrypt backups. **Make the S3 bucket (or at least `AWS_S3_FOLDER`) private.** Files are encrypted, but a public bucket still reveals how many files exist and when.
 6. Rotate the OpenRouter and Evolution API keys if they were ever shared in chat or email, and keep `.env` readable only by the service account.
 7. Run `npm audit` before each release.
 
 ## Backups
 
-- **Database:** `pg_dump -Fc "$DATABASE_URL" > pipeline-$(date +%F).dump` daily; restore with `pg_restore -d "$DATABASE_URL" --clean pipeline-YYYY-MM-DD.dump`.
-  In Docker: `docker compose -f docker-compose.prod.yml exec db pg_dump -U pipeline -Fc pipeline > backup.dump`.
+- **Database:** turn on RDS automated backups (and snapshots before big changes). For a manual copy: `pg_dump -Fc "host=$DB_HOST user=$DB_USER dbname=$DB_NAME sslmode=require" > pipeline-$(date +%F).dump`.
 - **Files:** they live in the S3 bucket under `AWS_S3_FOLDER/files/`. Use the bucket provider's versioning or replication, and keep `STORAGE_ENCRYPTION_KEY` safe (a password manager or vault): the files are useless without it.
 - The two must be restored together: file rows in the DB point at stored files by random key.
 - Keep backups encrypted and access-controlled; they contain NDA material.

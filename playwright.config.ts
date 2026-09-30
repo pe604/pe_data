@@ -1,8 +1,16 @@
+import "dotenv/config";
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E runs against its OWN database (pipeline_test) and its own dev server on :3100, never real data.
-// tests/e2e/auth.setup.ts wipes and re-creates the test database before every run.
-export const E2E_DB = "postgresql://postgres:postgres@localhost:5433/pipeline_test";
+// E2E runs against its OWN disposable database and its own dev server on :3100, never real data.
+// Set E2E_DATABASE_URL to an empty Postgres database whose name ends in "_test" (E2E_DB_SSL: disable|require|verify-full,
+// default require). tests/e2e/auth.setup.ts wipes it before every run.
+export const E2E_DB = process.env.E2E_DATABASE_URL ?? "";
+export const E2E_DB_ENV = {
+  DB_HOST: " ", // blank, so the app uses DATABASE_URL below instead of the real DB_* server
+  DATABASE_URL: E2E_DB,
+  DB_SSL: process.env.E2E_DB_SSL || "require",
+  DB_SCHEMA: "",
+};
 const PORT = 3100;
 
 export default defineConfig({
@@ -31,7 +39,7 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       NEXT_DIST_DIR: ".next-e2e",
-      DATABASE_URL: E2E_DB,
+      ...E2E_DB_ENV,
       // Uploads go to the real bucket under a separate, test-only sub-folder.
       STORAGE_NAMESPACE: "e2e-tests",
       DEV_LOGIN: "true",

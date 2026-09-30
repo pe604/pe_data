@@ -1,23 +1,23 @@
 import { expect, test as setup } from "@playwright/test";
 import { execSync } from "node:child_process";
 import { Client } from "pg";
-import { E2E_DB } from "../../playwright.config";
+import { E2E_DB, E2E_DB_ENV } from "../../playwright.config";
+import { dbConfig, pgSsl } from "../../src/lib/db-config";
 
-// Fresh test database for every run: create it if needed, migrate, wipe, and add the fixtures the tests use.
+// Fresh test database for every run: migrate, wipe, and add the fixtures the tests use.
 async function resetTestDb() {
+  if (!E2E_DB) throw new Error("Set E2E_DATABASE_URL to a disposable *_test database to run the E2E tests");
   const url = new URL(E2E_DB);
-  if (!["localhost", "127.0.0.1"].includes(url.hostname) || !url.pathname.endsWith("_test")) {
-    throw new Error("Refusing to reset a database that isn't a local *_test database");
+  if (!url.pathname.endsWith("_test")) throw new Error("Refusing to reset a database whose name doesn't end in _test");
+  const real = process.env.DB_HOST?.trim() ? process.env : undefined;
+  if (real && url.hostname === real.DB_HOST?.trim() && url.pathname.slice(1) === real.DB_NAME) {
+    throw new Error("E2E_DATABASE_URL points at the production database");
   }
-  const admin = new Client({ connectionString: E2E_DB.replace(/\/[^/]+$/, "/postgres") });
-  await admin.connect();
-  const exists = await admin.query("select 1 from pg_database where datname = $1", [url.pathname.slice(1)]);
-  if (!exists.rowCount) await admin.query(`create database ${url.pathname.slice(1)}`);
-  await admin.end();
 
-  execSync("npx prisma migrate deploy", { env: { ...process.env, DATABASE_URL: E2E_DB }, stdio: "ignore" });
+  execSync("npx prisma migrate deploy", { env: { ...process.env, ...E2E_DB_ENV }, stdio: "ignore" });
 
-  const db = new Client({ connectionString: E2E_DB });
+  const cfg = dbConfig(E2E_DB_ENV);
+  const db = new Client({ connectionString: cfg.url, ssl: pgSsl(cfg) });
   await db.connect();
   const tables = (await db.query(`select tablename from pg_tables where schemaname = 'public' and tablename <> '_prisma_migrations'`)).rows
     .map((r) => `"${r.tablename}"`)

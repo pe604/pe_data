@@ -2,11 +2,15 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { SEED_SECTORS } from "../src/lib/domain/constants";
+import { dbConfig, pgSsl } from "../src/lib/db-config";
 
 // Seeds only the sector master list (SPEC §8). No sample companies or people: this runs against real data.
 // Safe to re-run. The app also does this on startup (src/lib/server/bootstrap.ts), so production needs no seed step.
 
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+const cfg = dbConfig(process.env);
+const db = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: cfg.url, ssl: pgSsl(cfg) }, cfg.schema ? { schema: cfg.schema } : undefined),
+});
 
 async function main() {
   for (const name of SEED_SECTORS) {
