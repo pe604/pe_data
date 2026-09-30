@@ -30,12 +30,12 @@ Package manager: npm.
 npm run db:local                # local Postgres on :5433 via embedded-postgres (or: docker compose up -d)
 npm install
 npx prisma migrate dev          # apply/create migrations (dev)
-npm run db:seed                 # sectors + team + 3 sample companies
+npm run db:seed                 # sector list only (never sample data: the DB holds real deals)
 npm run dev                     # http://localhost:3000 (DEV_LOGIN=true → "Developer login")
 npm run lint                    # ESLint
 npm run typecheck               # tsc --noEmit
 npm test                        # Vitest unit tests
-npm run test:e2e                # Playwright (needs dev server, DEV_LOGIN=true and a seeded DB)
+npm run test:e2e                # Playwright on its own server (:3100) + auto-reset pipeline_test DB; never touches real data
 npm run verify:export           # checks the Excel export formatting
 ```
 

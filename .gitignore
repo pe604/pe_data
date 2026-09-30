@@ -46,3 +46,6 @@ Thumbs.db
 *.pptx
 !tests/fixtures/**/*.pdf
 !tests/fixtures/**/*.pptx
+
+# E2E dev server build output
+.next-e2e/

@@ -11,3 +11,7 @@ tests/e2e/.auth.json
 reference
 *.pdf
 *.pptx
+src/generated
+tests
+.claude
+*.log

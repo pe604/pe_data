@@ -1,10 +1,15 @@
 // Downloads the Excel export as the dev user and checks its formatting (SPEC §12).
-// Usage: node scripts/verify-export.mjs   (dev server running, DEV_LOGIN=true, E2E auth state present)
+// Usage: node scripts/verify-export.mjs   (dev server running with DEV_LOGIN=true; read-only)
 import ExcelJS from "exceljs";
-import { request } from "playwright";
+import { chromium } from "playwright";
 
 const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
-const ctx = await request.newContext({ baseURL: base, storageState: "tests/e2e/.auth.json" });
+const browser = await chromium.launch();
+const page = await browser.newPage({ baseURL: base });
+await page.goto("/signin");
+await page.getByRole("button", { name: /Developer login/ }).click();
+await page.waitForURL(base + "/");
+const ctx = page.request;
 const res = await ctx.get("/api/export");
 if (!res.ok()) throw new Error("Export failed: " + res.status());
 const cd = res.headers()["content-disposition"];
@@ -51,7 +56,7 @@ for (const ws of wb.worksheets) {
   console.log(`${ws.name}: ${Math.max(0, ws.rowCount - 3)} data rows`);
 }
 
-await ctx.dispose();
+await browser.close();
 if (problems.length) {
   console.error("FAILED:\n- " + problems.join("\n- "));
   process.exit(1);

@@ -17,6 +17,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The E2E server runs alongside the normal dev server, so it builds into its own folder.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   // exceljs, archiver and the Prisma pg adapter are Node-only.
   serverExternalPackages: ["exceljs", "archiver", "@prisma/adapter-pg", "pg"],

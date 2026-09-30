@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E needs a seeded database and DEV_LOGIN=true (see README).
+// E2E runs against its OWN database (pipeline_test) and its own dev server on :3100, never real data.
+// tests/e2e/auth.setup.ts wipes and re-creates the test database before every run.
+export const E2E_DB = "postgresql://postgres:postgres@localhost:5433/pipeline_test";
+const PORT = 3100;
+
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
@@ -9,7 +13,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   reporter: [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000",
+    baseURL: `http://127.0.0.1:${PORT}`,
     trace: "retain-on-failure",
   },
   projects: [
@@ -21,9 +25,18 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
-    url: "http://127.0.0.1:3000/signin",
-    reuseExistingServer: true,
+    command: `npx next dev -H 127.0.0.1 -p ${PORT}`,
+    url: `http://127.0.0.1:${PORT}/signin`,
+    reuseExistingServer: false,
     timeout: 180_000,
+    env: {
+      NEXT_DIST_DIR: ".next-e2e",
+      DATABASE_URL: E2E_DB,
+      STORAGE_DIR: "./.data/e2e-storage",
+      DEV_LOGIN: "true",
+      // No WhatsApp polling or paid AI calls during tests.
+      EVOLUTION_API_URL: "",
+      OPENROUTER_API_KEY: "",
+    },
   },
 });

@@ -1,40 +1,51 @@
-# Niveshaay Deal Pipeline: production image (Next.js standalone + LibreOffice for PPTX decks).
+# Niveshaay Deal Pipeline: production image.
+# Next.js standalone server + LibreOffice (PPTX → PDF) + a self-contained Prisma CLI for migrations.
 
-FROM node:22-bookworm-slim AS deps
+ARG NODE_IMAGE=node:22-bookworm-slim
+
+# ─── Dependencies (incl. dev deps needed to build) ───────────────────────────
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY prisma ./prisma
-COPY prisma.config.ts ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
-FROM node:22-bookworm-slim AS build
+# ─── Build ───────────────────────────────────────────────────────────────────
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# prisma generate needs a syntactically valid URL at build time only.
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" AUTH_SECRET=build ALLOWED_EMAIL_DOMAIN=build.invalid npm run build
+# Build-time placeholders only; real values come from the runtime environment.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate \
+ && DATABASE_URL="postgresql://build:build@localhost:5432/build" AUTH_SECRET=build ALLOWED_EMAIL_DOMAIN=build.invalid npm run build
 
-FROM node:22-bookworm-slim AS runner
+# ─── Migrator: Prisma CLI with all its dependencies, isolated from the app ───
+FROM ${NODE_IMAGE} AS migrator
+WORKDIR /migrate
+RUN npm init -y >/dev/null \
+ && npm pkg set overrides.mysql2=^3.24.5 overrides.deepmerge-ts=^8.0.2 \
+ && npm install --no-audit --no-fund prisma@7.10.0 dotenv@18 \
+ && npm cache clean --force
+COPY prisma/schema.prisma ./prisma/schema.prisma
+COPY prisma/migrations ./prisma/migrations
+COPY prisma.config.ts ./
+
+# ─── Runtime ─────────────────────────────────────────────────────────────────
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TZ=Asia/Kolkata
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TZ=Asia/Kolkata STORAGE_DIR=/data/files
 # LibreOffice (headless) converts PPTX decks to PDF so the model can read charts and images (SPEC §9.1).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libreoffice-impress fonts-dejavu-core ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-RUN groupadd -r app && useradd -r -g app -m -d /home/app app
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
-# Migrations run on start (prisma migrate deploy).
-COPY --from=build /app/prisma ./prisma
-COPY --from=build /app/prisma.config.ts ./prisma.config.ts
-COPY --from=build /app/node_modules/prisma ./node_modules/prisma
-COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=build /app/node_modules/dotenv ./node_modules/dotenv
-RUN mkdir -p /data/files && chown -R app:app /data /app
+ && apt-get install -y --no-install-recommends libreoffice-impress fonts-dejavu-core ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd -r app && useradd -r -g app -m -d /home/app app \
+ && mkdir -p /data/files && chown -R app:app /data
+COPY --from=build --chown=app:app /app/.next/standalone ./
+COPY --from=build --chown=app:app /app/.next/static ./.next/static
+COPY --from=build --chown=app:app /app/public ./public
+COPY --from=migrator --chown=app:app /migrate /migrate
 USER app
-ENV STORAGE_DIR=/data/files
 EXPOSE 3000
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1
+# Apply pending migrations, then start. `exec` makes node PID 1's child receive SIGTERM for a clean shutdown.
+CMD ["sh", "-c", "cd /migrate && node node_modules/prisma/build/index.js migrate deploy && cd /app && exec node server.js"]

@@ -12,7 +12,7 @@ cp .env.example .env          # fill in, see "Environment variables"
 npm run db:local              # terminal 1: local Postgres on :5433 (no Docker or admin rights needed)
                               #   or: docker compose up -d
 npx prisma migrate deploy     # create tables
-npm run db:seed               # sectors, a small team, 3 sample companies
+npm run db:seed               # sector list only (the app also adds it on startup)
 npm run dev                   # terminal 2: http://localhost:3000
 ```
 
@@ -24,8 +24,8 @@ With `DEV_LOGIN=true` the sign-in page shows **Developer login**, which signs yo
 npm run typecheck
 npm run lint
 npm test                      # unit tests (dates, names, markdown, sorting)
-npm run test:e2e              # Playwright; needs the dev server, a seeded DB and DEV_LOGIN=true
-npm run verify:export         # downloads the Excel export and checks its formatting
+npm run test:e2e              # Playwright: starts its own server on :3100 against a separate, auto-reset "pipeline_test" DB (never real data)
+npm run verify:export         # downloads the Excel export from the running dev server and checks its formatting (read-only)
 ```
 
 ## Environment variables
@@ -82,10 +82,12 @@ Decks are received under NDA, so:
 ```bash
 cp .env.example .env.production   # fill in; also set POSTGRES_PASSWORD (and optionally POSTGRES_USER / POSTGRES_DB)
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-docker compose -f docker-compose.prod.yml exec app node node_modules/prisma/build/index.js db seed   # first run only, optional
+curl -fsS http://127.0.0.1:3000/api/health   # {"ok":true} once it is up
 ```
 
-- The app runs migrations on start (`prisma migrate deploy`).
+- The app applies migrations on start (`prisma migrate deploy`) and adds the sector list if it's missing. No seed step, and no sample data.
+- `GET /api/health` is a public up/down probe for the host (the Docker image's HEALTHCHECK uses it).
+- Run a single replica: summary jobs and WhatsApp polling are safe with more, but there's no need.
 - The image includes LibreOffice so PowerPoint decks are converted to PDF before summarising. Without it, only slide text is used.
 - Put it behind HTTPS (reverse proxy such as Caddy, nginx or IIS/ARR). Auth cookies are secure in production.
 - Uploaded files live in the `files` volume; the database in `pgdata`.
