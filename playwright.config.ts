@@ -34,7 +34,7 @@ export default defineConfig({
   ],
   webServer: {
     command: `npx next dev -H 127.0.0.1 -p ${PORT}`,
-    url: `http://127.0.0.1:${PORT}/signin`,
+    url: `http://127.0.0.1:${PORT}/robots.txt`,
     reuseExistingServer: false,
     timeout: 180_000,
     env: {
@@ -42,7 +42,6 @@ export default defineConfig({
       ...E2E_DB_ENV,
       // Uploads go to the real bucket under a separate, test-only sub-folder.
       STORAGE_NAMESPACE: "e2e-tests",
-      DEV_LOGIN: "true",
       // No WhatsApp polling or paid AI calls during tests.
       EVOLUTION_API_URL: "",
       OPENROUTER_API_KEY: "",

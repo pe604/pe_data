@@ -24,7 +24,7 @@ The app must be portable to Niveshaay's own servers later.
 |---|---|
 | App | Next.js (App Router), TypeScript, React Server Components where useful |
 | DB | PostgreSQL (the firm's AWS RDS server, `DB_*` credentials) + Prisma. TLS with certificate verification against the bundled RDS CA by default. No local database |
-| Auth | Auth.js with the **Microsoft Entra ID** provider (the firm uses Microsoft 365 / OneDrive). Restrict sign-in to `ALLOWED_EMAIL_DOMAIN` |
+| Auth | **None for now (open access, the firm's decision on 2026-09-30).** Every visitor acts as one shared "Team" user with Editor rights. The site sends `X-Robots-Tag: noindex` and `robots.txt` disallows crawling. A login will be designed later; it plugs into `currentUser()` / `requireRole()` |
 | File storage | A `StorageDriver` interface backed by an **S3-compatible bucket** (no local file storage). Every file is **encrypted client-side (AES-256-GCM) before upload** with `STORAGE_ENCRYPTION_KEY`, so bucket access alone never exposes a deck. Files are only ever served through the app's authorised routes, never via public bucket URLs. Nothing outside the driver may touch storage or the filesystem |
 | AI | **OpenRouter** (OpenAI-compatible chat completions API), server-side only, behind an `AiProvider` interface so the model can be swapped later. Model from env `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`, which reads PDFs natively). Requests set `provider.data_collection = "deny"` (see §13) |
 | Excel | `exceljs` (server route) |
@@ -37,12 +37,6 @@ Env vars:
 
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME` (or a single `DATABASE_URL`)
 - `DB_SSL` (`verify-full` default, `require`, `disable`), `DB_SSL_CA`, `DB_SCHEMA` (optional)
-- `AUTH_SECRET`
-- `AUTH_MICROSOFT_ENTRA_ID_ID`
-- `AUTH_MICROSOFT_ENTRA_ID_SECRET`
-- `AUTH_MICROSOFT_ENTRA_ID_ISSUER`
-- `ALLOWED_EMAIL_DOMAIN`
-- `ADMIN_EMAILS` (comma list)
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
 - `AWS_S3_ENDPOINT_URL`, `AWS_S3_BUCKET_NAME`, `AWS_S3_FOLDER`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (optional `AWS_REGION`, default `us-east-1`)
@@ -54,10 +48,11 @@ Env vars:
 
 | Role | Can |
 |---|---|
-| Admin (emails in `ADMIN_EMAILS`) | Everything, plus hard delete, plus manage the sector master list |
-| Editor (every other signed-in user on the allowed domain) | Add and edit companies, upload files, comment, reject, invest, restore, manage the PE team list |
+| Admin | Everything, plus hard delete, plus manage the sector master list |
+| Editor | Add and edit companies, upload files, comment, reject, invest, restore, manage the PE team list |
 
 - There is no read-only Viewer role for now.
+- **While there is no login, everyone is an Editor** (the shared "Team" user). Admin actions are unavailable until a login exists.
 
 - Enforce roles on **every** API route and server action, not just in the UI.
 

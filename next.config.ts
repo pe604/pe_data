@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  // Open-access portal (no login yet): keep it out of search engines.
+  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "same-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },

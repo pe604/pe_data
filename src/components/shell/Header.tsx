@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { signOutAction } from "@/actions/auth";
 import { useStore } from "../store";
 import { IconDownload, IconPlus } from "../ui/icons";
 import { saveBlob } from "../ui/download";
 
 export function Header() {
-  const { me, openAdd, toast } = useStore();
+  const { openAdd, toast } = useStore();
   const [busy, setBusy] = useState(false);
 
   const exportExcel = async () => {
@@ -39,12 +38,6 @@ export function Header() {
           <IconPlus />
           Add company
         </button>
-        <form action={signOutAction} className="me">
-          <button className="btn-ghost sm" type="submit" title={`Signed in as ${me.email}. Click to sign out.`}>
-            {me.name}
-            <span className="me-out">Sign out</span>
-          </button>
-        </form>
       </div>
     </header>
   );

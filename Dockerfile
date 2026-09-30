@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Build-time placeholders only (nothing connects during the build); real values come from the runtime environment.
-ENV BUILD_ENV="DB_HOST=build.invalid DB_USER=build DB_PASS=build DB_NAME=build DB_SSL=disable AUTH_SECRET=build ALLOWED_EMAIL_DOMAIN=build.invalid AWS_S3_ENDPOINT_URL=https://build.invalid AWS_S3_BUCKET_NAME=build AWS_S3_FOLDER=build AWS_ACCESS_KEY_ID=build AWS_SECRET_ACCESS_KEY=build STORAGE_ENCRYPTION_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+ENV BUILD_ENV="DB_HOST=build.invalid DB_USER=build DB_PASS=build DB_NAME=build DB_SSL=disable AWS_S3_ENDPOINT_URL=https://build.invalid AWS_S3_BUCKET_NAME=build AWS_S3_FOLDER=build AWS_ACCESS_KEY_ID=build AWS_SECRET_ACCESS_KEY=build STORAGE_ENCRYPTION_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 RUN env $BUILD_ENV npx prisma generate && env $BUILD_ENV npm run build
 
 # ─── Migrator: Prisma CLI with all its dependencies, isolated from the app ───

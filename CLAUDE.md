@@ -12,7 +12,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 |---|---|
 | App | Next.js (App Router), TypeScript `strict`, React Server Components for reads, server actions for mutations, route handlers for files/export/jobs |
 | DB | PostgreSQL on AWS RDS (`DB_*` in `.env`) + Prisma (`prisma/schema.prisma`). Connection settings built in `src/lib/db-config.ts` (shared by the app, `prisma.config.ts` and scripts); TLS verified against `certs/rds-ap-south-1-bundle.pem`. No local database |
-| Auth | Auth.js, Microsoft Entra ID provider, JWT sessions (no adapter tables). Sign-in restricted to `ALLOWED_EMAIL_DOMAIN`. `DEV_LOGIN=true` bypass for local dev only |
+| Auth | **None for now (open access).** `src/lib/auth/session.ts` returns one shared "Team" user (Editor) for every request. A future login replaces only that file. `noindex` header + `robots.txt` keep it out of search engines |
 | Files | `StorageDriver` backed by an S3-compatible bucket (`AWS_S3_*`), every object AES-256-GCM encrypted client-side with `STORAGE_ENCRYPTION_KEY` (the bucket is publicly readable, so it must only ever hold ciphertext). No local file storage |
 | AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`). Every request sets `provider.data_collection = "deny"` |
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
@@ -29,7 +29,7 @@ Package manager: npm.
 ```bash
 npm install
 npx prisma migrate deploy       # apply migrations to the configured DB (it holds real deals: never `migrate reset`)
-npm run dev                     # http://localhost:3000 (DEV_LOGIN=true → "Developer login"), uses the RDS database
+npm run dev                     # http://localhost:3000, uses the RDS database
 npm run lint                    # ESLint
 npm run typecheck               # tsc --noEmit
 npm test                        # Vitest unit tests
@@ -54,12 +54,10 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 ├── certs/                          # public AWS RDS CA bundle (DB_SSL=verify-full)
 ├── scripts/                        # db-data.mts (export/import rows), check-storage.mts, verify-export.mjs, try-summary.mts
 ├── src/
-│   ├── auth.ts                     # Auth.js config: Entra ID + dev login, domain check, User upsert
 │   ├── instrumentation.ts          # starts the summary job worker
 │   ├── app/
 │   │   ├── layout.tsx  page.tsx    # the single dashboard page (server loads everything)
 │   │   ├── globals.css             # prototype CSS
-│   │   ├── signin/                 # sign-in screen
 │   │   └── api/
 │   │       ├── auth/[...nextauth]/
 │   │       ├── files/              # POST upload (staged or attached); [id] GET view/download
@@ -89,7 +87,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 ## Coding rules
 
 **Security (non-negotiable)**
-- Every route handler and server action starts with `requireRole(...)` and parses its input with a zod schema. UI hiding is not enforcement. Roles are Admin (`ADMIN_EMAILS`) and Editor (everyone else on the domain); there is no Viewer role. Admin-only: hard delete, adding sectors.
+- Every route handler and server action starts with `requireRole(...)` and parses its input with a zod schema. UI hiding is not enforcement. Roles are Admin and Editor; there is no Viewer role. Admin-only: hard delete, adding sectors. With no login yet, every visitor is the shared Editor "Team" user; keep the `requireRole()` calls so a login can be added in one place.
 - `StorageDriver` (`src/lib/storage`) is the only code that stores or reads files, and the only `fs` use (a temp dir for LibreOffice). Never upload unencrypted bytes, never link to bucket URLs; serve files only via the authorised routes.
 - Uploads: check extension, sniff MIME from bytes, enforce `MAX_UPLOAD_MB`, store under a random key. Serve only through the authorised file routes with `Content-Disposition`.
 - OneDrive URLs: only `http:`/`https:`, validated on write and again before rendering. Never render a `javascript:` URL.

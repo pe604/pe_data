@@ -14,12 +14,6 @@ const schema = z.object({
   DB_SSL_CA: z.string().optional(),
   DB_SCHEMA: z.string().regex(/^[A-Za-z0-9_-]+$/).optional(),
   DATABASE_URL: z.string().optional(),
-  AUTH_SECRET: z.string().min(1),
-  AUTH_MICROSOFT_ENTRA_ID_ID: z.string().optional().default(""),
-  AUTH_MICROSOFT_ENTRA_ID_SECRET: z.string().optional().default(""),
-  AUTH_MICROSOFT_ENTRA_ID_ISSUER: z.string().optional().default(""),
-  ALLOWED_EMAIL_DOMAIN: z.string().min(1),
-  ADMIN_EMAILS: z.string().optional().default(""),
   OPENROUTER_API_KEY: z.string().optional().default(""),
   OPENROUTER_MODEL: z.string().optional().default(""),
   // S3-compatible file storage (SPEC §2). All files are encrypted before upload.
@@ -34,7 +28,6 @@ const schema = z.object({
     .refine((s) => Buffer.from(s, "base64").length === 32, "must be 32 random bytes, base64-encoded"),
   STORAGE_NAMESPACE: z.string().regex(/^[a-z0-9-]+$/).default("files"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(50),
-  DEV_LOGIN: z.string().optional().default(""),
   SOFFICE_PATH: z.string().optional().default(""),
   // WhatsApp intake via Evolution API (SPEC §14)
   EVOLUTION_API_URL: z.string().optional().default(""),
@@ -53,33 +46,6 @@ export const env = schema.parse(blankToUndefined);
 
 /** Resolved Postgres connection settings (throws at startup when the database isn't configured). */
 export const dbSettings = dbConfig(env);
-
-export const adminEmails = new Set(
-  env.ADMIN_EMAILS.split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean),
-);
-
-/** DEV_LOGIN is ignored in production builds. */
-export const devLoginEnabled = env.DEV_LOGIN === "true" && env.NODE_ENV !== "production";
-
-/**
- * Tenant GUID from AUTH_MICROSOFT_ENTRA_ID_ISSUER (https://login.microsoftonline.com/<tenant-id>/v2.0).
- * Multi-tenant issuers (/common, /organizations) are refused: they would let other organisations sign in.
- */
-export const entraTenantId =
-  /^https:\/\/login\.microsoftonline\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/v2\.0\/?$/i
-    .exec(env.AUTH_MICROSOFT_ENTRA_ID_ISSUER)?.[1]
-    ?.toLowerCase() ?? null;
-
-export const entraConfigured = Boolean(
-  env.AUTH_MICROSOFT_ENTRA_ID_ID && env.AUTH_MICROSOFT_ENTRA_ID_SECRET && entraTenantId,
-);
-if (env.AUTH_MICROSOFT_ENTRA_ID_ID && !entraTenantId) {
-  console.error(
-    "[auth] Microsoft sign-in is disabled: AUTH_MICROSOFT_ENTRA_ID_ISSUER must be https://login.microsoftonline.com/<tenant-id>/v2.0",
-  );
-}
 
 export const maxUploadBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
 

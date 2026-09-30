@@ -70,7 +70,7 @@ enum SummaryJobStep {
 // ─── People ──────────────────────────────────────────────────────────────────
 
 /// A signed-in person. Created or updated on each sign-in (JWT sessions, no Auth.js adapter tables).
-/// `role` is re-derived on sign-in: ADMIN_EMAILS → ADMIN, otherwise EDITOR.
+/// `role` is informational; the effective role comes from src/lib/auth/session.ts (no login yet: shared "Team" Editor).
 model User {
   id        String   @id @default(cuid())
   name      String

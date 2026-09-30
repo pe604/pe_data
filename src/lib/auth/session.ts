@@ -1,7 +1,5 @@
 import "server-only";
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { adminEmails, devLoginEnabled, env } from "@/lib/env";
 import type { Me } from "@/lib/domain/types";
 
 export type AppRole = "ADMIN" | "EDITOR";
@@ -15,28 +13,34 @@ export class AuthError extends Error {
   }
 }
 
-/** The signed-in user, or null. Role comes from the DB (re-checked against ADMIN_EMAILS). */
-export async function currentUser(): Promise<Me | null> {
-  const session = await auth();
-  const uid = session?.user?.id;
-  if (!uid) return null;
-  const u = await db.user.findUnique({ where: { id: uid } });
-  // Re-check the domain on every request (e.g. the bot user or a changed ALLOWED_EMAIL_DOMAIN).
-  if (!u || !u.email.endsWith("@" + env.ALLOWED_EMAIL_DOMAIN.toLowerCase())) return null;
-  // Admin follows ADMIN_EMAILS on every request, so removing someone takes effect immediately.
-  // (Dev login with no ADMIN_EMAILS set is the only other admin.)
-  const role: AppRole =
-    adminEmails.has(u.email) || (devLoginEnabled && adminEmails.size === 0 && u.role === "ADMIN") ? "ADMIN" : "EDITOR";
-  return { id: u.id, name: u.name, email: u.email, role };
+// OPEN ACCESS (temporary, by decision of the firm): there is no login. Every visitor acts as one shared
+// "Team" user with Editor rights, so admin-only actions (hard delete, adding sectors) are unavailable.
+// When a login is added, only this file needs to change: every route and action already calls requireRole().
+const TEAM_EMAIL = "team@portal.invalid";
+let teamUser: Promise<Me> | null = null;
+
+async function loadTeamUser(): Promise<Me> {
+  const u = await db.user.upsert({
+    where: { email: TEAM_EMAIL },
+    create: { email: TEAM_EMAIL, name: "Team", role: "EDITOR" },
+    update: {},
+  });
+  return { id: u.id, name: u.name, email: u.email, role: "EDITOR" };
 }
 
-/**
- * Every route handler and server action calls this first.
- * EDITOR = any signed-in user; ADMIN = ADMIN_EMAILS only.
- */
+/** The current user: always the shared Team user while the portal is open access. */
+export async function currentUser(): Promise<Me | null> {
+  teamUser ??= loadTeamUser().catch((err) => {
+    teamUser = null; // retry on the next request (e.g. the DB was briefly unreachable)
+    throw err;
+  });
+  return teamUser;
+}
+
+/** Every route handler and server action calls this first. */
 export async function requireRole(min: AppRole = "EDITOR"): Promise<Me> {
   const me = await currentUser();
-  if (!me) throw new AuthError(401, "Your session has ended. Sign in again.");
+  if (!me) throw new AuthError(401, "Your session has ended. Reload the page.");
   if (min === "ADMIN" && me.role !== "ADMIN") throw new AuthError(403, "Only an admin can do that.");
   return me;
 }

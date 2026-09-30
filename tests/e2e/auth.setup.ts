@@ -40,12 +40,10 @@ async function resetTestDb() {
   await db.end();
 }
 
-setup("reset the test database and sign in with the dev login", async ({ page }) => {
+setup("reset the test database and open the dashboard", async ({ page }) => {
   setup.setTimeout(180_000);
   await resetTestDb();
   await page.goto("/");
-  await expect(page).toHaveURL(/\/signin/);
-  await page.getByRole("button", { name: /Developer login/ }).click();
   await expect(page.locator("table.grid, .empty").first()).toBeVisible();
   await page.context().storageState({ path: "tests/e2e/.auth.json" });
 });

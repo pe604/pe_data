@@ -19,7 +19,7 @@ export function proxy(request: NextRequest) {
     "frame-ancestors 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self' https://login.microsoftonline.com",
+    "form-action 'self'",
     ...(isDev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 

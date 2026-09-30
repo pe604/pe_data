@@ -20,20 +20,14 @@ test("pages send a nonce-based CSP and the dashboard runs without CSP violations
   expect(violations).toEqual([]);
 });
 
-test.describe("signed out", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
+test("the open-access portal asks search engines not to index it", async ({ request }) => {
+  const r = await request.get("/");
+  expect(r.headers()["x-robots-tag"]).toContain("noindex");
+  expect(await (await request.get("/robots.txt")).text()).toContain("Disallow: /");
+});
 
-  test("API routes refuse requests without a session", async ({ request }) => {
-    for (const path of ["/api/export", "/api/files/abc", "/api/companies/abc/download-all"]) {
-      const r = await request.get(path);
-      expect(r.status(), path).toBe(401);
-    }
-    const up = await request.post("/api/files", { multipart: { kind: "OTHER", file: { name: "a.csv", mimeType: "text/csv", buffer: Buffer.from("a,b") } } });
-    expect(up.status()).toBe(401);
-  });
-
-  test("the dashboard redirects to sign-in", async ({ page }) => {
-    await page.goto("/");
-    await expect(page).toHaveURL(/\/signin/);
-  });
+test("file routes reject unknown ids", async ({ request }) => {
+  for (const path of ["/api/files/abc", "/api/companies/abc/download-all"]) {
+    expect([400, 404], path).toContain((await request.get(path)).status());
+  }
 });
