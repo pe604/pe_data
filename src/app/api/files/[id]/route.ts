@@ -9,9 +9,11 @@ export const runtime = "nodejs";
 /** View (inline, PDFs and images only) or download a stored file. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole();
+    const me = await requireRole();
     const { id } = await params;
     const f = await db.file.findUniqueOrThrow({ where: { id: id.slice(0, 40) } });
+    // A deck staged in someone's Add company flow is theirs until the company is saved.
+    if (!f.companyId && f.uploadedById !== me.id) return Response.json({ error: "Not found." }, { status: 404 });
     const download = new URL(req.url).searchParams.get("download") === "1";
     const inline = !download && INLINE_MIME.has(f.mime);
     return new Response(storage().stream(f.storageKey), {

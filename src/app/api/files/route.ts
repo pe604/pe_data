@@ -28,6 +28,12 @@ const fields = z.object({
 export async function POST(req: Request) {
   try {
     const me = await requireRole();
+    // Refuse oversized bodies before reading them into memory (browsers always send Content-Length).
+    const len = Number(req.headers.get("content-length"));
+    if (!Number.isFinite(len) || len <= 0) return Response.json({ error: "Upload size is missing." }, { status: 411 });
+    if (len > maxUploadBytes + 1024 * 1024) {
+      return Response.json({ error: `That file is over ${env.MAX_UPLOAD_MB} MB. Compress it and try again.` }, { status: 413 });
+    }
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) throw new UserError("Choose a file to upload.");

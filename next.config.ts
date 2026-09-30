@@ -6,7 +6,14 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "same-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Other sites can't embed or fetch our files/images.
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  // Production is served over HTTPS only (behind the reverse proxy). Not sent in dev (plain http://localhost).
+  ...(process.env.NODE_ENV === "production"
+    ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]
+    : []),
 ];
+// The Content-Security-Policy (with a per-request nonce) is set in src/proxy.ts.
 
 const nextConfig: NextConfig = {
   output: "standalone",

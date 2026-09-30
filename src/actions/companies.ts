@@ -185,7 +185,7 @@ export async function createCompany(input: z.input<typeof createSchema>) {
       let fileName: string | null = null;
       if (p.stagedFileId) {
         const f = await tx.file.findUnique({ where: { id: p.stagedFileId } });
-        if (f && f.companyId === null) {
+        if (f && f.companyId === null && f.uploadedById === me.id) {
           await tx.file.update({ where: { id: f.id }, data: { companyId: c.id } });
           fileName = f.originalName;
         }
@@ -199,7 +199,11 @@ export async function createCompany(input: z.input<typeof createSchema>) {
       ]);
       return c.id;
     });
-    if (p.jobId) await attachJobToCompany(p.jobId, cid, me.id);
+    if (p.jobId) {
+      // Only the creator's own job for their staged deck.
+      const job = await db.summaryJob.findUnique({ where: { id: p.jobId }, select: { createdById: true, companyId: true } });
+      if (job && !job.companyId && job.createdById === me.id) await attachJobToCompany(p.jobId, cid, me.id);
+    }
     return getRow(cid);
   });
 }

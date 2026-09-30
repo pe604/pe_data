@@ -101,6 +101,28 @@ GRANT USAGE, CREATE ON SCHEMA public TO <app_user>;
 
 For RDS over SSL add `?sslmode=require` to `DATABASE_URL`.
 
+## Security checklist (production)
+
+What the app enforces:
+- **Sign-in:** Microsoft sign-in only from Niveshaay's own Entra tenant. The issuer must be tenant-specific, and the `tid` claim is checked on every sign-in, so other tenants can't get in by setting an @niveshaay.com email ("nOAuth"). The email domain is re-checked on every request. Sessions last 12 hours.
+- **Developer login** is off in production builds, and even in development it only works from `localhost`. `npm run dev` binds to `127.0.0.1`, so the dev server isn't reachable from the network.
+- **Admin rights** follow `ADMIN_EMAILS` on every request; removing an email takes effect immediately.
+- **Every server action and API route** checks the session and role and validates input with zod.
+- **Uploads:** extension allow-list, MIME sniffed from the bytes, size limit checked before the body is read, random storage keys, and served only via authorised routes with `Content-Disposition` and `nosniff`. Staged Add company decks are visible only to their uploader.
+- **Headers:** a nonce-based Content-Security-Policy (`src/proxy.ts`), HSTS in production, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Cross-Origin-Opener-Policy` / `-Resource-Policy`.
+- **Summaries** are rendered with all HTML escaped. OneDrive links must be `http(s)`.
+- **AI:** OpenRouter with `data_collection: deny`. Deck text is never logged.
+- **Dependencies:** `npm audit` is clean. `overrides` in package.json pin patched `mysql2`, `deepmerge-ts` and `uuid`.
+
+What you need to do:
+1. Serve over **HTTPS** only, via a reverse proxy. The compose file publishes the app on `127.0.0.1:3000` for that proxy.
+2. Set `AUTH_URL=https://<your-host>` and a fresh random `AUTH_SECRET`. Leave `DEV_LOGIN` unset.
+3. Set `AUTH_MICROSOFT_ENTRA_ID_ISSUER` to `https://login.microsoftonline.com/<tenant-id>/v2.0`. The app refuses `/common`.
+4. Consider Entra **Assignment required = Yes**, so only the PE team can sign in.
+5. Encrypt the disk holding the database and the files volume (e.g. BitLocker or LUKS), and encrypt backups.
+6. Rotate the OpenRouter and Evolution API keys if they were ever shared in chat or email, and keep `.env` readable only by the service account.
+7. Run `npm audit` before each release.
+
 ## Backups
 
 - **Database:** `pg_dump -Fc "$DATABASE_URL" > pipeline-$(date +%F).dump` daily; restore with `pg_restore -d "$DATABASE_URL" --clean pipeline-YYYY-MM-DD.dump`.

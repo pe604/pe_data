@@ -48,10 +48,12 @@ export async function removeFile(fileId: string) {
 /** Add company was cancelled: drop the staged deck and stop its job. */
 export async function discardStaged(fileId: string, jobId: string | null) {
   return run<null>(async () => {
-    await requireRole();
+    const me = await requireRole();
+    if (jobId) await assertJobAccess(id.parse(jobId), me.id);
     if (jobId) await cancelJob(id.parse(jobId));
     const f = await db.file.findUnique({ where: { id: id.parse(fileId) } });
-    if (f && f.companyId === null) {
+    // Only the uploader's own staged deck (not another person's upload in progress).
+    if (f && f.companyId === null && f.uploadedById === me.id) {
       await db.file.delete({ where: { id: f.id } });
       await storage().delete(f.storageKey).catch(() => undefined);
     }
@@ -67,13 +69,26 @@ export async function attachStagedToCompany(fileId: string, companyId: string, j
     await db.$transaction(async (tx) => {
       const f = await tx.file.findUniqueOrThrow({ where: { id: id.parse(fileId) } });
       if (f.companyId) throw new UserError("That file is already attached to a company.");
+      if (f.uploadedById !== me.id) throw new UserError("That upload belongs to someone else.");
       await tx.company.findUniqueOrThrow({ where: { id: cid }, select: { id: true } });
       await tx.file.update({ where: { id: f.id }, data: { companyId: cid } });
       await audit(tx, cid, me.id, [{ note: `Uploaded ${f.originalName} (Deck)` }]);
     });
-    if (jobId) await attachJobToCompany(id.parse(jobId), cid, me.id);
+    if (jobId) {
+      await assertJobAccess(id.parse(jobId), me.id);
+      await attachJobToCompany(id.parse(jobId), cid, me.id);
+    }
     return getRow(cid);
   });
+}
+
+/**
+ * Jobs for a staged deck (no company yet) belong to whoever started them; company jobs are open to
+ * any signed-in user, like the company itself.
+ */
+async function assertJobAccess(jobId: string, userId: string) {
+  const j = await db.summaryJob.findUniqueOrThrow({ where: { id: jobId }, select: { companyId: true, createdById: true } });
+  if (!j.companyId && j.createdById !== userId) throw new UserError("That summary belongs to someone else's upload.");
 }
 
 // ─── Summaries ───────────────────────────────────────────────────────────────
@@ -98,7 +113,8 @@ export interface JobPoll extends JobItem {
 
 export async function getJob(jobId: string) {
   return run<JobPoll>(async () => {
-    await requireRole();
+    const me = await requireRole();
+    await assertJobAccess(id.parse(jobId), me.id);
     const j = await db.summaryJob.findUniqueOrThrow({
       where: { id: id.parse(jobId) },
       include: { sourceFile: { select: { originalName: true } } },
@@ -125,7 +141,8 @@ export async function getJob(jobId: string) {
 
 export async function stopJob(jobId: string) {
   return run<null>(async () => {
-    await requireRole();
+    const me = await requireRole();
+    await assertJobAccess(id.parse(jobId), me.id);
     await cancelJob(id.parse(jobId));
     return null;
   });

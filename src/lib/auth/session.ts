@@ -1,7 +1,7 @@
 import "server-only";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { adminEmails } from "@/lib/env";
+import { adminEmails, devLoginEnabled, env } from "@/lib/env";
 import type { Me } from "@/lib/domain/types";
 
 export type AppRole = "ADMIN" | "EDITOR";
@@ -21,8 +21,12 @@ export async function currentUser(): Promise<Me | null> {
   const uid = session?.user?.id;
   if (!uid) return null;
   const u = await db.user.findUnique({ where: { id: uid } });
-  if (!u) return null;
-  const role: AppRole = u.role === "ADMIN" || adminEmails.has(u.email) ? "ADMIN" : "EDITOR";
+  // Re-check the domain on every request (e.g. the bot user or a changed ALLOWED_EMAIL_DOMAIN).
+  if (!u || !u.email.endsWith("@" + env.ALLOWED_EMAIL_DOMAIN.toLowerCase())) return null;
+  // Admin follows ADMIN_EMAILS on every request, so removing someone takes effect immediately.
+  // (Dev login with no ADMIN_EMAILS set is the only other admin.)
+  const role: AppRole =
+    adminEmails.has(u.email) || (devLoginEnabled && adminEmails.size === 0 && u.role === "ADMIN") ? "ADMIN" : "EDITOR";
   return { id: u.id, name: u.name, email: u.email, role };
 }
 

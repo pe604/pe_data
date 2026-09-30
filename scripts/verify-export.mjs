@@ -3,7 +3,7 @@
 import ExcelJS from "exceljs";
 import { request } from "playwright";
 
-const base = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
 const ctx = await request.newContext({ baseURL: base, storageState: "tests/e2e/.auth.json" });
 const res = await ctx.get("/api/export");
 if (!res.ok()) throw new Error("Export failed: " + res.status());

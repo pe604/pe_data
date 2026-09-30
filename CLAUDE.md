@@ -43,7 +43,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 
 **Prisma 7:** generator `prisma-client` outputs to `src/generated/prisma` (git-ignored, regenerated on `npm install`); the DB URL lives in `prisma.config.ts`; the client uses the `@prisma/adapter-pg` driver adapter (`src/lib/db.ts`).
 
-**Next 16:** read `node_modules/next/dist/docs/` before using unfamiliar APIs (see `AGENTS.md`). Middleware is now `proxy.ts` (not used here); route `params`/`searchParams` are Promises.
+**Next 16:** read `node_modules/next/dist/docs/` before using unfamiliar APIs (see `AGENTS.md`). Middleware is now `proxy.ts`: `src/proxy.ts` sets the nonce-based CSP for pages; route `params`/`searchParams` are Promises.
 
 ## Folder structure
 

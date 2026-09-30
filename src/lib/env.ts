@@ -41,9 +41,23 @@ export const adminEmails = new Set(
 /** DEV_LOGIN is ignored in production builds. */
 export const devLoginEnabled = env.DEV_LOGIN === "true" && env.NODE_ENV !== "production";
 
+/**
+ * Tenant GUID from AUTH_MICROSOFT_ENTRA_ID_ISSUER (https://login.microsoftonline.com/<tenant-id>/v2.0).
+ * Multi-tenant issuers (/common, /organizations) are refused: they would let other organisations sign in.
+ */
+export const entraTenantId =
+  /^https:\/\/login\.microsoftonline\.com\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/v2\.0\/?$/i
+    .exec(env.AUTH_MICROSOFT_ENTRA_ID_ISSUER)?.[1]
+    ?.toLowerCase() ?? null;
+
 export const entraConfigured = Boolean(
-  env.AUTH_MICROSOFT_ENTRA_ID_ID && env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
+  env.AUTH_MICROSOFT_ENTRA_ID_ID && env.AUTH_MICROSOFT_ENTRA_ID_SECRET && entraTenantId,
 );
+if (env.AUTH_MICROSOFT_ENTRA_ID_ID && !entraTenantId) {
+  console.error(
+    "[auth] Microsoft sign-in is disabled: AUTH_MICROSOFT_ENTRA_ID_ISSUER must be https://login.microsoftonline.com/<tenant-id>/v2.0",
+  );
+}
 
 export const maxUploadBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
 

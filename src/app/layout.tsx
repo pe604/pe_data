@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { connection } from "next/server";
 import "./globals.css";
 
 const plex = IBM_Plex_Sans({
@@ -29,7 +30,9 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Render every page per request so the CSP nonce from src/proxy.ts is applied (static pages can't get one).
+  await connection();
   return (
     // suppressHydrationWarning: browser extensions (QuillBot, Grammarly) add attributes to <html> before React loads.
     // It only affects this element's attributes, not the app below it.

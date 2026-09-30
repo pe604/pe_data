@@ -62,9 +62,22 @@ export async function pptxText(data: Buffer): Promise<string> {
     .sort((a, b) => Number(a[1]) - Number(b[1]));
   const decode = (s: string) =>
     s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  // Zip-bomb guard: refuse decks whose slide XML would expand to an unreasonable size.
+  const MAX_SLIDE_BYTES = 5 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
+  const sizeOf = (name: string) =>
+    (zip.files[name] as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0;
+  if (slides.length > 500) throw new Error("no_text");
+  let total = 0;
+  for (const m of slides) {
+    const s = sizeOf(m[0]);
+    total += s;
+    if (s > MAX_SLIDE_BYTES || total > MAX_TOTAL_BYTES) throw new Error("no_text");
+  }
   const out: string[] = [];
   for (const m of slides) {
     const xml = await zip.files[m[0]].async("string");
+    if (xml.length > MAX_SLIDE_BYTES) throw new Error("no_text");
     const paras = xml.split(/<\/a:p>/).map((p) =>
       [...p.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((x) => decode(x[1])).join(""),
     );

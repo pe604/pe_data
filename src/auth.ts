@@ -2,7 +2,7 @@ import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { db } from "@/lib/db";
-import { adminEmails, devLoginEnabled, entraConfigured, env } from "@/lib/env";
+import { adminEmails, devLoginEnabled, entraConfigured, entraTenantId, env } from "@/lib/env";
 
 const allowedDomain = env.ALLOWED_EMAIL_DOMAIN.toLowerCase();
 
@@ -21,10 +21,13 @@ if (entraConfigured) {
     MicrosoftEntraID({
       clientId: env.AUTH_MICROSOFT_ENTRA_ID_ID,
       clientSecret: env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
-      issuer: env.AUTH_MICROSOFT_ENTRA_ID_ISSUER || undefined,
+      // Always the tenant-specific issuer (validated in env.ts), never /common.
+      issuer: env.AUTH_MICROSOFT_ENTRA_ID_ISSUER,
     }),
   );
 }
+
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
 if (devLoginEnabled) {
   providers.push(
@@ -33,7 +36,10 @@ if (devLoginEnabled) {
       name: "Developer login",
       credentials: {},
       // Local development only: signs in as the first admin (a fake admin if none is set).
-      authorize: async () => {
+      // Refused unless the request came to localhost, so it can't be used from another machine.
+      authorize: async (_credentials, request) => {
+        const host = new URL(request.url).hostname;
+        if (!LOOPBACK.has(host)) return null;
         const email = [...adminEmails][0] ?? `dev.admin@${allowedDomain}`;
         return { id: email, email, name: "Dev Admin" };
       },
@@ -56,11 +62,19 @@ async function upsertUser(email: string, name: string | null | undefined) {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
-  session: { strategy: "jwt" },
+  // Short sessions: someone removed from Microsoft 365 loses access within 12 hours.
+  session: { strategy: "jwt", maxAge: 12 * 60 * 60, updateAge: 60 * 60 },
   trustHost: true,
   pages: { signIn: "/signin", error: "/signin" },
   callbacks: {
-    signIn({ user, profile }) {
+    signIn({ user, account, profile }) {
+      if (account?.provider === "microsoft-entra-id") {
+        // Only accounts from Niveshaay's own tenant. Without this, a user in another tenant could set
+        // their email to @niveshaay.com and get in ("nOAuth").
+        if (!entraTenantId || String(profile?.tid ?? "").toLowerCase() !== entraTenantId) return false;
+      } else if (account?.provider !== "dev") {
+        return false;
+      }
       const email = user.email ?? (profile?.preferred_username as string | undefined);
       return emailAllowed(email);
     },
