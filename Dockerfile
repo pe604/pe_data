@@ -13,6 +13,8 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Prisma needs OpenSSL to pick its engine.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Build-time placeholders only; real values come from the runtime environment.
@@ -36,10 +38,10 @@ WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TZ=Asia/Kolkata STORAGE_DIR=/data/files
 # LibreOffice (headless) converts PPTX decks to PDF so the model can read charts and images (SPEC §9.1).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libreoffice-impress fonts-dejavu-core ca-certificates curl \
+ && apt-get install -y --no-install-recommends libreoffice-impress fonts-dejavu-core ca-certificates curl openssl \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd -r app && useradd -r -g app -m -d /home/app app \
- && mkdir -p /data/files && chown -R app:app /data
+ && mkdir -p /data/files && chown -R app:app /data /app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public

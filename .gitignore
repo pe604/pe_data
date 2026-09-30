@@ -16,12 +16,13 @@ dist/
 next-env.d.ts
 
 # Local dev database (scripts/dev-db.mjs) and generated Prisma client
-.data/
+/.data/
 src/generated/
 
 # Uploaded files (local StorageDriver). Confidential decks, never commit.
-storage/
-uploads/
+# Anchored to the repo root with "/": an unanchored "storage/" also matched src/lib/storage (the code).
+/storage/
+/uploads/
 
 # Tests
 tests/e2e/.auth.json
