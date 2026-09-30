@@ -25,7 +25,7 @@ The app must be portable to Niveshaay's own servers later.
 | App | Next.js (App Router), TypeScript, React Server Components where useful |
 | DB | PostgreSQL + Prisma. Local dev via `docker-compose` |
 | Auth | Auth.js with the **Microsoft Entra ID** provider (the firm uses Microsoft 365 / OneDrive). Restrict sign-in to `ALLOWED_EMAIL_DOMAIN` |
-| File storage | A `StorageDriver` interface with a `local` disk driver now; an S3-compatible driver added later. Nothing outside the driver may touch the filesystem |
+| File storage | A `StorageDriver` interface backed by an **S3-compatible bucket** (no local file storage). Every file is **encrypted client-side (AES-256-GCM) before upload** with `STORAGE_ENCRYPTION_KEY`, so bucket access alone never exposes a deck. Files are only ever served through the app's authorised routes, never via public bucket URLs. Nothing outside the driver may touch storage or the filesystem |
 | AI | **OpenRouter** (OpenAI-compatible chat completions API), server-side only, behind an `AiProvider` interface so the model can be swapped later. Model from env `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`, which reads PDFs natively). Requests set `provider.data_collection = "deny"` (see §13) |
 | Excel | `exceljs` (server route) |
 | Zip | `archiver` or `jszip` (server route) |
@@ -44,8 +44,9 @@ Env vars:
 - `ADMIN_EMAILS` (comma list)
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_MODEL`
-- `STORAGE_DRIVER` (`local`)
-- `STORAGE_DIR`
+- `AWS_S3_ENDPOINT_URL`, `AWS_S3_BUCKET_NAME`, `AWS_S3_FOLDER`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (optional `AWS_REGION`, default `us-east-1`)
+- `STORAGE_ENCRYPTION_KEY` (32 random bytes, base64; losing it makes stored files unreadable)
+- `STORAGE_NAMESPACE` (optional sub-folder, default `files`; tests use their own)
 - `MAX_UPLOAD_MB` (default 50)
 
 ## 3. Roles

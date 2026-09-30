@@ -41,8 +41,9 @@ npm run verify:export         # downloads the Excel export from the running dev 
 | `ADMIN_EMAILS` | Comma list. Admins can hard-delete and add sectors; everyone else is an Editor |
 | `OPENROUTER_API_KEY` | Paid OpenRouter key with credits (see below). Leave blank to run without AI summaries |
 | `OPENROUTER_MODEL` | Must read PDFs, e.g. `google/gemini-2.5-flash` (default) or `google/gemini-2.5-pro` |
-| `STORAGE_DRIVER` | `local` |
-| `STORAGE_DIR` | Where uploaded files are kept, e.g. `./storage` (Docker: `/data/files`) |
+| `AWS_S3_ENDPOINT_URL`, `AWS_S3_BUCKET_NAME`, `AWS_S3_FOLDER`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | S3-compatible bucket for uploaded files (`AWS_REGION` optional, default `us-east-1`) |
+| `STORAGE_ENCRYPTION_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Every file is encrypted with it before upload. **Back it up**: without it, stored decks can't be read |
+| `STORAGE_NAMESPACE` | Optional sub-folder inside `AWS_S3_FOLDER` (default `files`; E2E tests use `e2e-tests`) |
 | `MAX_UPLOAD_MB` | Default 50 |
 | `DEV_LOGIN` | `true` for local development only |
 | `SOFFICE_PATH` | Optional path to LibreOffice `soffice` if it isn't on PATH |
@@ -90,7 +91,7 @@ curl -fsS http://127.0.0.1:3000/api/health   # {"ok":true} once it is up
 - Run a single replica: summary jobs and WhatsApp polling are safe with more, but there's no need.
 - The image includes LibreOffice so PowerPoint decks are converted to PDF before summarising. Without it, only slide text is used.
 - Put it behind HTTPS (reverse proxy such as Caddy, nginx or IIS/ARR). Auth cookies are secure in production.
-- Uploaded files live in the `files` volume; the database in `pgdata`.
+- Uploaded files live in the S3 bucket (encrypted); the database in `pgdata`. No file volume is needed.
 
 ### Easypanel (deploy from GitHub)
 
@@ -99,12 +100,12 @@ curl -fsS http://127.0.0.1:3000/api/health   # {"ok":true} once it is up
 3. Create an **App** service:
    - Source: GitHub → this repo, branch `main`. Build: **Dockerfile** (path `Dockerfile`).
    - **Environment:** every variable in `.env.example`. At minimum set `DATABASE_URL`, `AUTH_URL=https://<your-domain>`, a fresh `AUTH_SECRET` (`openssl rand -base64 32`), the Entra ID values, `ALLOWED_EMAIL_DOMAIN`, `ADMIN_EMAILS`, `OPENROUTER_API_KEY`, and the `EVOLUTION_*` values. Do **not** set `DEV_LOGIN`.
-   - **Mounts:** add a volume mounted at **`/data/files`**. Without it, uploaded decks are lost on every redeploy.
+   - **Mounts:** none needed; files go to the S3 bucket.
    - **Domains:** add your domain, proxy port **3000**, HTTPS on (Easypanel issues the certificate).
    - Replicas: 1.
 4. Deploy. The container applies database migrations and adds the sector list on start. Check `https://<your-domain>/api/health` shows `{"ok":true}`.
 5. In the Entra app registration, add the redirect URI `https://<your-domain>/api/auth/callback/microsoft-entra-id`.
-6. Back up both the Postgres service and the `/data/files` volume (Easypanel → service → Backups, or `pg_dump` + a volume archive).
+6. Back up the Postgres service (Easypanel → service → Backups, or `pg_dump`). Files are in the bucket; keep a copy of `STORAGE_ENCRYPTION_KEY` somewhere safe.
 
 ### Using an existing Postgres (e.g. AWS RDS)
 
@@ -135,7 +136,7 @@ What you need to do:
 2. Set `AUTH_URL=https://<your-host>` and a fresh random `AUTH_SECRET`. Leave `DEV_LOGIN` unset.
 3. Set `AUTH_MICROSOFT_ENTRA_ID_ISSUER` to `https://login.microsoftonline.com/<tenant-id>/v2.0`. The app refuses `/common`.
 4. Consider Entra **Assignment required = Yes**, so only the PE team can sign in.
-5. Encrypt the disk holding the database and the files volume (e.g. BitLocker or LUKS), and encrypt backups.
+5. Encrypt the disk holding the database, and encrypt backups. **Make the S3 bucket (or at least `AWS_S3_FOLDER`) private.** Files are encrypted, but a public bucket still reveals how many files exist and when.
 6. Rotate the OpenRouter and Evolution API keys if they were ever shared in chat or email, and keep `.env` readable only by the service account.
 7. Run `npm audit` before each release.
 
@@ -143,7 +144,7 @@ What you need to do:
 
 - **Database:** `pg_dump -Fc "$DATABASE_URL" > pipeline-$(date +%F).dump` daily; restore with `pg_restore -d "$DATABASE_URL" --clean pipeline-YYYY-MM-DD.dump`.
   In Docker: `docker compose -f docker-compose.prod.yml exec db pg_dump -U pipeline -Fc pipeline > backup.dump`.
-- **Files:** back up the `files` volume (or `STORAGE_DIR`) at the same time, e.g. `docker run --rm -v <project>_files:/data -v $PWD:/backup alpine tar czf /backup/files-$(date +%F).tgz -C /data .`
+- **Files:** they live in the S3 bucket under `AWS_S3_FOLDER/files/`. Use the bucket provider's versioning or replication, and keep `STORAGE_ENCRYPTION_KEY` safe (a password manager or vault): the files are useless without it.
 - The two must be restored together: file rows in the DB point at stored files by random key.
 - Keep backups encrypted and access-controlled; they contain NDA material.
 

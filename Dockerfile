@@ -35,13 +35,13 @@ COPY prisma.config.ts ./
 # ─── Runtime ─────────────────────────────────────────────────────────────────
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TZ=Asia/Kolkata STORAGE_DIR=/data/files
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TZ=Asia/Kolkata
 # LibreOffice (headless) converts PPTX decks to PDF so the model can read charts and images (SPEC §9.1).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libreoffice-impress fonts-dejavu-core ca-certificates curl openssl \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd -r app && useradd -r -g app -m -d /home/app app \
- && mkdir -p /data/files && chown -R app:app /data /app
+ && chown -R app:app /app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public

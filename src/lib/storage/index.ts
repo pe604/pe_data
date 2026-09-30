@@ -1,66 +1,102 @@
 import "server-only";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  NoSuchKey,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { Readable } from "node:stream";
 import { env } from "@/lib/env";
+import { decrypt, encrypt } from "./crypto";
 
 /**
- * The only code allowed to touch the filesystem for stored files (SPEC §2).
- * Keys are random; original filenames never reach the disk.
+ * The only code allowed to store or read files (SPEC §2). Backed by an S3-compatible bucket.
+ * - Keys are random UUIDs; original filenames never reach storage.
+ * - Every object is encrypted with AES-256-GCM before upload, so the bucket (which may be
+ *   publicly readable) only ever holds ciphertext. Files are served through the app's
+ *   authorised routes, never via bucket URLs.
  */
 export interface StorageDriver {
   put(data: Buffer): Promise<string>;
-  /** Web stream of the stored bytes. */
+  /** Web stream of the decrypted bytes. */
   stream(key: string): ReadableStream<Uint8Array>;
-  /** Node stream, for zipping. */
+  /** Node stream of the decrypted bytes, for zipping. */
   nodeStream(key: string): Readable;
   read(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
 }
 
-class LocalDiskDriver implements StorageDriver {
-  constructor(private root: string) {}
+class S3Driver implements StorageDriver {
+  private s3 = new S3Client({
+    endpoint: env.AWS_S3_ENDPOINT_URL,
+    region: env.AWS_REGION,
+    forcePathStyle: true, // S3-compatible servers (MinIO etc.) use path-style URLs
+    credentials: { accessKeyId: env.AWS_ACCESS_KEY_ID, secretAccessKey: env.AWS_SECRET_ACCESS_KEY },
+  });
+  private bucket = env.AWS_S3_BUCKET_NAME;
+  private key = Buffer.from(env.STORAGE_ENCRYPTION_KEY, "base64");
 
-  private pathFor(key: string) {
+  private objectKey(key: string) {
     if (!/^[a-f0-9-]{36}$/.test(key)) throw new Error("Invalid storage key");
-    return path.join(this.root, key.slice(0, 2), key);
+    return `${env.AWS_S3_FOLDER}/${env.STORAGE_NAMESPACE}/${key}`;
   }
 
   async put(data: Buffer) {
     const key = randomUUID();
-    const p = this.pathFor(key);
-    await mkdir(path.dirname(p), { recursive: true });
-    await writeFile(p, data, { flag: "wx" });
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: this.objectKey(key),
+        Body: encrypt(data, this.key),
+        ContentType: "application/octet-stream",
+      }),
+    );
     return key;
   }
 
-  nodeStream(key: string) {
-    return createReadStream(this.pathFor(key));
+  async read(key: string) {
+    const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.objectKey(key) }));
+    if (!res.Body) throw new Error("storage_empty");
+    return decrypt(Buffer.from(await res.Body.transformToByteArray()), this.key);
   }
 
   stream(key: string) {
-    return Readable.toWeb(this.nodeStream(key)) as ReadableStream<Uint8Array>;
+    return new ReadableStream<Uint8Array>({
+      start: async (controller) => {
+        try {
+          controller.enqueue(new Uint8Array(await this.read(key)));
+          controller.close();
+        } catch (e) {
+          controller.error(e);
+        }
+      },
+    });
   }
 
-  async read(key: string) {
-    const chunks: Buffer[] = [];
-    for await (const c of this.nodeStream(key)) chunks.push(c as Buffer);
-    return Buffer.concat(chunks);
+  nodeStream(key: string) {
+    const read = () => this.read(key);
+    return Readable.from(
+      (async function* () {
+        yield await read();
+      })(),
+    );
   }
 
   async delete(key: string) {
-    await rm(this.pathFor(key), { force: true });
+    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.objectKey(key) }));
   }
 
   async exists(key: string) {
     try {
-      await stat(this.pathFor(key));
+      await this.s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key: this.objectKey(key) }));
       return true;
-    } catch {
-      return false;
+    } catch (e) {
+      if (e instanceof NoSuchKey || (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return false;
+      throw e;
     }
   }
 }
@@ -68,38 +104,8 @@ class LocalDiskDriver implements StorageDriver {
 let driver: StorageDriver | null = null;
 
 export function storage(): StorageDriver {
-  if (!driver) {
-    switch (env.STORAGE_DRIVER) {
-      case "local":
-        driver = new LocalDiskDriver(path.resolve(env.STORAGE_DIR));
-        break;
-    }
-  }
+  driver ??= new S3Driver();
   return driver;
 }
 
-/**
- * Temporary workspace for tools that need real files (LibreOffice PPTX → PDF).
- * Lives here so the "only StorageDriver touches the filesystem" rule holds.
- */
-export async function withTempDir<T>(fn: (dir: string, write: (name: string, data: Buffer) => Promise<string>, readOut: (name: string) => Promise<Buffer>) => Promise<T>): Promise<T> {
-  const dir = path.join(path.resolve(env.STORAGE_DIR), ".tmp", randomUUID());
-  await mkdir(dir, { recursive: true });
-  try {
-    return await fn(
-      dir,
-      async (name, data) => {
-        const p = path.join(dir, path.basename(name));
-        await writeFile(p, data);
-        return p;
-      },
-      async (name) => {
-        const chunks: Buffer[] = [];
-        for await (const c of createReadStream(path.join(dir, path.basename(name)))) chunks.push(c as Buffer);
-        return Buffer.concat(chunks);
-      },
-    );
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
+export { withTempDir } from "./tmp";

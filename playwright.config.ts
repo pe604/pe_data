@@ -32,7 +32,8 @@ export default defineConfig({
     env: {
       NEXT_DIST_DIR: ".next-e2e",
       DATABASE_URL: E2E_DB,
-      STORAGE_DIR: "./.data/e2e-storage",
+      // Uploads go to the real bucket under a separate, test-only sub-folder.
+      STORAGE_NAMESPACE: "e2e-tests",
       DEV_LOGIN: "true",
       // No WhatsApp polling or paid AI calls during tests.
       EVOLUTION_API_URL: "",

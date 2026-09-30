@@ -13,14 +13,14 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | App | Next.js (App Router), TypeScript `strict`, React Server Components for reads, server actions for mutations, route handlers for files/export/jobs |
 | DB | PostgreSQL + Prisma (`prisma/schema.prisma`). Local Postgres via `docker-compose.yml` |
 | Auth | Auth.js, Microsoft Entra ID provider, JWT sessions (no adapter tables). Sign-in restricted to `ALLOWED_EMAIL_DOMAIN`. `DEV_LOGIN=true` bypass for local dev only |
-| Files | `StorageDriver` interface, `local` disk driver (`STORAGE_DIR`). S3-compatible driver later |
+| Files | `StorageDriver` backed by an S3-compatible bucket (`AWS_S3_*`), every object AES-256-GCM encrypted client-side with `STORAGE_ENCRYPTION_KEY` (the bucket is publicly readable, so it must only ever hold ciphertext). No local file storage |
 | AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`). Every request sets `provider.data_collection = "deny"` |
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
 | Excel / zip | `exceljs` / `archiver`, in route handlers |
 | Validation | `zod` on every input |
 | Styling | `src/app/globals.css`: the prototype's stylesheet ported as-is (SPEC §11 tokens as CSS variables, same class names), plus a small "additions" block at the end. IBM Plex Sans + Source Serif 4 via `next/font` |
 | Tests | Vitest (unit), Playwright (E2E) |
-| Deploy | `Dockerfile` + `docker-compose.prod.yml` (app, Postgres, files volume) |
+| Deploy | `Dockerfile` + `docker-compose.prod.yml` (app, Postgres) |
 
 Package manager: npm.
 
@@ -73,7 +73,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │   └── lib/
 │       ├── auth/session.ts         # currentUser(), requireRole()
 │       ├── db.ts  env.ts           # Prisma client; zod-validated env (the only reader of process.env)
-│       ├── storage/                # StorageDriver + LocalDiskDriver (the only fs access)
+│       ├── storage/                # StorageDriver (S3 + encryption), crypto.ts, tmp.ts (OS temp dir for LibreOffice only)
 │       ├── ai/                     # AiProvider (OpenRouter), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
 │       ├── summary/                # JSON → markdown builder, markdown → safe HTML renderer
 │       ├── whatsapp/               # Evolution API client + intake poller (SPEC §14); pure matching in domain/whatsapp.ts
@@ -89,7 +89,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 
 **Security (non-negotiable)**
 - Every route handler and server action starts with `requireRole(...)` and parses its input with a zod schema. UI hiding is not enforcement. Roles are Admin (`ADMIN_EMAILS`) and Editor (everyone else on the domain); there is no Viewer role. Admin-only: hard delete, adding sectors.
-- `StorageDriver` is the only code that touches the filesystem. No `fs` imports anywhere else (except build/test tooling).
+- `StorageDriver` (`src/lib/storage`) is the only code that stores or reads files, and the only `fs` use (a temp dir for LibreOffice). Never upload unencrypted bytes, never link to bucket URLs; serve files only via the authorised routes.
 - Uploads: check extension, sniff MIME from bytes, enforce `MAX_UPLOAD_MB`, store under a random key. Serve only through the authorised file routes with `Content-Disposition`.
 - OneDrive URLs: only `http:`/`https:`, validated on write and again before rendering. Never render a `javascript:` URL.
 - Never log deck text, prompts or AI output. Log ids and error codes only.

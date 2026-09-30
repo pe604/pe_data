@@ -12,8 +12,17 @@ const schema = z.object({
   ADMIN_EMAILS: z.string().optional().default(""),
   OPENROUTER_API_KEY: z.string().optional().default(""),
   OPENROUTER_MODEL: z.string().optional().default(""),
-  STORAGE_DRIVER: z.enum(["local"]).default("local"),
-  STORAGE_DIR: z.string().min(1).default("./storage"),
+  // S3-compatible file storage (SPEC §2). All files are encrypted before upload.
+  AWS_S3_ENDPOINT_URL: z.string().url(),
+  AWS_S3_BUCKET_NAME: z.string().min(1),
+  AWS_S3_FOLDER: z.string().min(1).regex(/^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/, "folder without leading/trailing slashes"),
+  AWS_ACCESS_KEY_ID: z.string().min(1),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  AWS_REGION: z.string().min(1).default("us-east-1"),
+  STORAGE_ENCRYPTION_KEY: z
+    .string()
+    .refine((s) => Buffer.from(s, "base64").length === 32, "must be 32 random bytes, base64-encoded"),
+  STORAGE_NAMESPACE: z.string().regex(/^[a-z0-9-]+$/).default("files"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(50),
   DEV_LOGIN: z.string().optional().default(""),
   SOFFICE_PATH: z.string().optional().default(""),
