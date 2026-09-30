@@ -97,6 +97,8 @@ model TeamMember {
   nameKey String @unique
   /// Non-null = shown in the PE team bar, ascending.
   peRank  Int?
+  /// Digits only, with country code (e.g. 9198xxxxxxxx). Used to recognise WhatsApp senders (SPEC §14).
+  whatsappNumber String? @unique
 
   assignments CompanyPerson[]
 
@@ -303,6 +305,41 @@ model Sector {
   companies Company[]
 
   @@index([sortOrder])
+}
+
+// ─── WhatsApp intake (SPEC §14) ──────────────────────────────────────────────
+
+enum IntakeStatus {
+  PROCESSING
+  DONE
+  SKIPPED
+  FAILED
+}
+
+/// One row per WhatsApp document message seen in the group, so each is handled once.
+model WhatsAppIntake {
+  /// WhatsApp message id
+  id           String       @id
+  sentAt       DateTime
+  senderName   String
+  senderNumber String?
+  viaName      String?
+  fileName     String
+  status       IntakeStatus @default(PROCESSING)
+  companyId    String?
+  /// User-facing reason for SKIPPED / FAILED. Never deck contents.
+  error        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status, createdAt])
+}
+
+/// Small key/value store (e.g. the WhatsApp poll start point).
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 /// Written before a hard delete; survives the delete.

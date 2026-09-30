@@ -17,6 +17,12 @@ const schema = z.object({
   MAX_UPLOAD_MB: z.coerce.number().positive().default(50),
   DEV_LOGIN: z.string().optional().default(""),
   SOFFICE_PATH: z.string().optional().default(""),
+  // WhatsApp intake via Evolution API (SPEC §14)
+  EVOLUTION_API_URL: z.string().optional().default(""),
+  EVOLUTION_API_KEY: z.string().optional().default(""),
+  EVOLUTION_INSTANCE: z.string().optional().default(""),
+  EVOLUTION_Receiver: z.string().optional().default(""),
+  WHATSAPP_POLL_SECONDS: z.coerce.number().int().min(15).default(60),
   NODE_ENV: z.string().optional().default("development"),
 });
 
@@ -40,6 +46,10 @@ export const entraConfigured = Boolean(
 );
 
 export const maxUploadBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
+
+export const whatsappConfigured = Boolean(
+  env.EVOLUTION_API_URL && env.EVOLUTION_API_KEY && env.EVOLUTION_INSTANCE && env.EVOLUTION_Receiver,
+);
 
 /** Default model when GEMINI_MODEL is unset. */
 export const geminiModel = env.GEMINI_MODEL || "gemini-2.5-flash";

@@ -76,6 +76,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │       ├── storage/                # StorageDriver + LocalDiskDriver (the only fs access)
 │       ├── ai/                     # AiProvider (Gemini), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
 │       ├── summary/                # JSON → markdown builder, markdown → safe HTML renderer
+│       ├── whatsapp/               # Evolution API client + intake poller (SPEC §14); pure matching in domain/whatsapp.ts
 │       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types
 │       ├── server/                 # row loading/serialising, audit(), action wrapper, upload sniffing, HTTP errors
 │       └── excel/                  # export workbook builder

@@ -46,6 +46,11 @@ npm run verify:export         # downloads the Excel export and checks its format
 | `MAX_UPLOAD_MB` | Default 50 |
 | `DEV_LOGIN` | `true` for local development only |
 | `SOFFICE_PATH` | Optional path to LibreOffice `soffice` if it isn't on PATH |
+| `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE` | Evolution API v2 instance used for WhatsApp deck intake (SPEC §14). Blank = off |
+| `EVOLUTION_Receiver` | The WhatsApp group JID (`…@g.us`) to watch and reply in |
+| `WHATSAPP_POLL_SECONDS` | How often to check the group (default 60) |
+
+**WhatsApp intake:** the app polls the group while it's running (it does not change the instance's existing webhook). A PDF/PPTX shared in the group becomes a Pipeline company dated the day it was sent, with Via = the sender or the person named after "from"/"via" in the caption or a nearby message, and the bot replies in the group. Senders are matched to team members by first name the first time, then by phone number.
 
 If a value contains `#`, wrap it in quotes (`'...'`), otherwise everything after the `#` is treated as a comment.
 

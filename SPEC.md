@@ -379,7 +379,25 @@ Institutional and restrained, in Niveshaay's colours. Light and dark themes (`pr
 - AuditLog entries for every field change, status change, file upload/remove and summary generate/edit.
 - Optimistic UI updates, with rollback and a toast on failure.
 
-## 14. Non-goals (for now)
+## 14. WhatsApp deck intake
+
+Decks shared in the team's WhatsApp group are added to the pipeline automatically, through the firm's Evolution API instance (v2).
+
+- **Env:** `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE`, `EVOLUTION_Receiver` (the group JID, `…@g.us`). Optional `WHATSAPP_POLL_SECONDS` (default 60).
+- **Delivery:** for now the app **polls** Evolution (`/chat/findMessages`, newest first) every `WHATSAPP_POLL_SECONDS`. The instance's existing webhook belongs to another integration and must not be changed. When the app is hosted, a webhook can replace polling.
+- **Start point:** the first poll records "now" and only handles messages after it (no back-fill of old group history). Each message is handled once (tracked by its WhatsApp message id).
+- **What counts as a deck:** a document message in that group that is a PDF or PPTX (by mimetype or extension). Everything else is ignored. The `MAX_UPLOAD_MB` and MIME-sniff rules apply.
+- **For each deck:**
+  1. Download it (`/chat/getBase64FromMediaMessage`) and store it like any upload (kind Deck).
+  2. If AI is configured, run the summary (§9) first and use its company name, sector and sub-sector. Otherwise the name comes from the file name.
+  3. **Duplicate** (§7.4) → the deck and a new summary version are added to the existing company. Otherwise a new **Pipeline** company is created with **Date received = the date the message was sent** (India time) and stage Not Assigned.
+  4. **Sender:** the WhatsApp sender is matched to a team member by phone number (`TeamMember.whatsappNumber`), else by display name (first name). A display-name match stores the number for next time. Unknown senders use their display name (Title Case, emojis removed).
+  5. **Via:** if the caption, or a text from the same sender within 5 minutes of the deck, says `from`, `via`, `through`, `thru`, `ref`/`referred by` or `from/via` followed by a name (e.g. "from/Via arvind sir"), Via is that person (matched to the team list, else Title Case). Otherwise Via is the sender.
+  6. History records "Added from WhatsApp, shared by <sender>" (actor: WhatsApp).
+  7. The bot **replies in the group**, e.g. "Added *FreshBus* to the pipeline, via Arvind Sir (shared by Raghav), received 30 Sep 2026." or "Added this deck to *FreshBus*, already in Rejected." If a deck can't be handled it replies with the reason (too large, unreadable).
+- Deck contents are never written to logs; the reply never quotes deck contents beyond the company name.
+
+## 15. Non-goals (for now)
 
 - Email ingestion
 - Notifications
