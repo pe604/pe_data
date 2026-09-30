@@ -31,7 +31,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${plex.variable} ${serif.variable}`}>
+    // suppressHydrationWarning: browser extensions (QuillBot, Grammarly) add attributes to <html> before React loads.
+    // It only affects this element's attributes, not the app below it.
+    <html lang="en" className={`${plex.variable} ${serif.variable}`} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
