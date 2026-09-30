@@ -5,7 +5,7 @@ import { dateToISO } from "@/lib/domain/dates";
 import { nameKey, titleCase } from "@/lib/domain/names";
 import type { CompanyRow, DashboardData, Me } from "@/lib/domain/types";
 import { safeHref } from "@/lib/domain/onedrive";
-import { env } from "@/lib/env";
+import { aiConfigured, env } from "@/lib/env";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const rowInclude = {
@@ -73,7 +73,7 @@ export async function loadDashboard(me: Me): Promise<DashboardData> {
     team: team.map((t) => ({ id: t.id, name: t.name, peRank: t.peRank })),
     peMeta: peLog ? { by: peLog.actor.name, at: peLog.at.toISOString() } : null,
     me,
-    aiEnabled: Boolean(env.GEMINI_API_KEY),
+    aiEnabled: aiConfigured,
     maxUploadMb: env.MAX_UPLOAD_MB,
   };
 }

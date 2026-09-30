@@ -1,6 +1,5 @@
 import "server-only";
-import { createPartFromUri, GoogleGenAI, type Part } from "@google/genai";
-import { env, geminiModel } from "@/lib/env";
+import { aiConfigured, aiModel, env } from "@/lib/env";
 
 /** Deck content ready for the model. */
 export type DeckInput =
@@ -22,71 +21,79 @@ export interface AiProvider {
 
 export class AiError extends Error {
   constructor(
-    public code: "not_configured" | "empty" | "blocked" | "cancelled" | "failed",
+    public code: "not_configured" | "empty" | "blocked" | "cancelled" | "no_credits" | "failed",
     message: string,
+    public status?: number,
   ) {
     super(message);
   }
 }
 
-const INLINE_LIMIT = 19 * 1024 * 1024; // Gemini inline request limit is ~20 MB
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "file"; file: { filename: string; file_data: string } };
 
-class GeminiProvider implements AiProvider {
-  private ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-
+/** OpenRouter chat completions (SPEC §2, §9, §13). Never logs deck content. */
+class OpenRouterProvider implements AiProvider {
   async generateJson({ system, prompt, deck, jsonSchema, signal }: GenerateRequest): Promise<string> {
-    let uploadedName: string | null = null;
-    try {
-      const parts: Part[] = [];
-      if (deck.kind === "pdf") {
-        if (deck.data.length <= INLINE_LIMIT) {
-          parts.push({ inlineData: { mimeType: "application/pdf", data: deck.data.toString("base64") } });
-        } else {
-          const blob = new Blob([new Uint8Array(deck.data)], { type: "application/pdf" });
-          let f = await this.ai.files.upload({ file: blob, config: { mimeType: "application/pdf" } });
-          uploadedName = f.name ?? null;
-          for (let i = 0; f.state === "PROCESSING" && i < 60; i++) {
-            if (signal?.aborted) throw new AiError("cancelled", "Cancelled");
-            await new Promise((r) => setTimeout(r, 2000));
-            f = await this.ai.files.get({ name: f.name! });
-          }
-          if (f.state !== "ACTIVE" || !f.uri) throw new AiError("failed", "The deck could not be prepared for reading.");
-          parts.push(createPartFromUri(f.uri, "application/pdf"));
-        }
-      }
-      parts.push({ text: prompt });
-
-      const res = await this.ai.models.generateContent({
-        model: geminiModel,
-        contents: [{ role: "user", parts }],
-        config: {
-          systemInstruction: system,
-          responseMimeType: "application/json",
-          responseJsonSchema: jsonSchema,
-          temperature: 0.2,
-          abortSignal: signal,
-        },
+    const content: ContentPart[] = [];
+    if (deck.kind === "pdf") {
+      content.push({
+        type: "file",
+        file: { filename: deck.fileName.replace(/\.pptx$/i, ".pdf"), file_data: "data:application/pdf;base64," + deck.data.toString("base64") },
       });
-      if (res.promptFeedback?.blockReason) throw new AiError("blocked", "The model declined to read this deck.");
-      const text = res.text;
-      if (!text) throw new AiError("empty", "The summary came back empty.");
-      return text;
+    }
+    content.push({ type: "text", text: prompt });
+
+    let res: Response;
+    try {
+      res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal,
+        headers: {
+          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "X-Title": "Niveshaay Deal Pipeline",
+        },
+        body: JSON.stringify({
+          model: aiModel,
+          temperature: 0.2,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content },
+          ],
+          response_format: { type: "json_schema", json_schema: { name: "deck_summary", strict: true, schema: jsonSchema } },
+          // NDA decks: only providers that don't store or train on prompts, and that support the schema.
+          provider: { data_collection: "deny", require_parameters: true },
+          plugins: [{ id: "file-parser", pdf: { engine: "native" } }],
+        }),
+      });
     } catch (e) {
       if (signal?.aborted) throw new AiError("cancelled", "Cancelled");
       throw e;
-    } finally {
-      // Files API keeps uploads for 48 h by default; remove NDA material straight away.
-      if (uploadedName) await this.ai.files.delete({ name: uploadedName }).catch(() => undefined);
     }
+
+    const body = (await res.json().catch(() => null)) as {
+      choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+      error?: { code?: number };
+    } | null;
+    if (res.status === 402) throw new AiError("no_credits", "The AI account is out of credits. Top up OpenRouter and generate again.", 402);
+    if (!res.ok || body?.error) {
+      throw new AiError("failed", "The summary could not be written. Try generating it again.", body?.error?.code ?? res.status);
+    }
+    const text = body?.choices?.[0]?.message?.content;
+    if (body?.choices?.[0]?.finish_reason === "content_filter") throw new AiError("blocked", "The model declined to read this deck.");
+    if (!text) throw new AiError("empty", "The summary came back empty.");
+    return text;
   }
 }
 
 let provider: AiProvider | null = null;
 
 export function aiProvider(): AiProvider {
-  if (!env.GEMINI_API_KEY) {
-    throw new AiError("not_configured", "AI summaries are not set up yet. Add a paid GEMINI_API_KEY to enable them.");
+  if (!aiConfigured) {
+    throw new AiError("not_configured", "AI summaries are not set up yet. Add an OPENROUTER_API_KEY to enable them.");
   }
-  provider ??= new GeminiProvider();
+  provider ??= new OpenRouterProvider();
   return provider;
 }

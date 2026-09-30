@@ -14,7 +14,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | DB | PostgreSQL + Prisma (`prisma/schema.prisma`). Local Postgres via `docker-compose.yml` |
 | Auth | Auth.js, Microsoft Entra ID provider, JWT sessions (no adapter tables). Sign-in restricted to `ALLOWED_EMAIL_DOMAIN`. `DEV_LOGIN=true` bypass for local dev only |
 | Files | `StorageDriver` interface, `local` disk driver (`STORAGE_DIR`). S3-compatible driver later |
-| AI | `@google/genai` with a **paid Gemini API key** (not Vertex), server-only, behind `AiProvider`. Model from `GEMINI_MODEL` |
+| AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`). Every request sets `provider.data_collection = "deny"` |
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
 | Excel / zip | `exceljs` / `archiver`, in route handlers |
 | Validation | `zod` on every input |
@@ -74,7 +74,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │       ├── auth/session.ts         # currentUser(), requireRole()
 │       ├── db.ts  env.ts           # Prisma client; zod-validated env (the only reader of process.env)
 │       ├── storage/                # StorageDriver + LocalDiskDriver (the only fs access)
-│       ├── ai/                     # AiProvider (Gemini), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
+│       ├── ai/                     # AiProvider (OpenRouter), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
 │       ├── summary/                # JSON → markdown builder, markdown → safe HTML renderer
 │       ├── whatsapp/               # Evolution API client + intake poller (SPEC §14); pure matching in domain/whatsapp.ts
 │       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types
@@ -94,7 +94,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 - OneDrive URLs: only `http:`/`https:`, validated on write and again before rendering. Never render a `javascript:` URL.
 - Never log deck text, prompts or AI output. Log ids and error codes only.
 - Read env only through `src/lib/env.ts`. Never print, log or commit `.env`.
-- AI calls are server-only (`import "server-only"`). Paid Gemini key or Vertex AI, never the free tier.
+- AI calls are server-only (`import "server-only"`). Paid OpenRouter key, `data_collection: "deny"`, never `:free` models. Try the prompt on a local deck with `npx tsx --conditions=react-server scripts/try-summary.mts <deck>`.
 - Rendered markdown (summaries) goes through a renderer with raw HTML disabled.
 
 **Data**

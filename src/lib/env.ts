@@ -10,8 +10,8 @@ const schema = z.object({
   AUTH_MICROSOFT_ENTRA_ID_ISSUER: z.string().optional().default(""),
   ALLOWED_EMAIL_DOMAIN: z.string().min(1),
   ADMIN_EMAILS: z.string().optional().default(""),
-  GEMINI_API_KEY: z.string().optional().default(""),
-  GEMINI_MODEL: z.string().optional().default(""),
+  OPENROUTER_API_KEY: z.string().optional().default(""),
+  OPENROUTER_MODEL: z.string().optional().default(""),
   STORAGE_DRIVER: z.enum(["local"]).default("local"),
   STORAGE_DIR: z.string().min(1).default("./storage"),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(50),
@@ -51,5 +51,8 @@ export const whatsappConfigured = Boolean(
   env.EVOLUTION_API_URL && env.EVOLUTION_API_KEY && env.EVOLUTION_INSTANCE && env.EVOLUTION_Receiver,
 );
 
-/** Default model when GEMINI_MODEL is unset. */
-export const geminiModel = env.GEMINI_MODEL || "gemini-2.5-flash";
+/** AI summaries are on when an OpenRouter key is set. */
+export const aiConfigured = Boolean(env.OPENROUTER_API_KEY);
+
+/** Default model when OPENROUTER_MODEL is unset (reads PDFs natively). */
+export const aiModel = env.OPENROUTER_MODEL || "google/gemini-2.5-flash";

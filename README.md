@@ -39,8 +39,8 @@ npm run verify:export         # downloads the Excel export and checks its format
 | `AUTH_MICROSOFT_ENTRA_ID_ISSUER` | `https://login.microsoftonline.com/<tenant-id>/v2.0` (single tenant) |
 | `ALLOWED_EMAIL_DOMAIN` | `niveshaay.com`. Other domains and guest (#EXT#) accounts are refused |
 | `ADMIN_EMAILS` | Comma list. Admins can hard-delete and add sectors; everyone else is an Editor |
-| `GEMINI_API_KEY` | **Paid-tier** key only (see below). Leave blank to run without AI summaries |
-| `GEMINI_MODEL` | e.g. `gemini-2.5-pro` or `gemini-2.5-flash` (default when blank: `gemini-2.5-flash`) |
+| `OPENROUTER_API_KEY` | Paid OpenRouter key with credits (see below). Leave blank to run without AI summaries |
+| `OPENROUTER_MODEL` | Must read PDFs, e.g. `google/gemini-2.5-flash` (default) or `google/gemini-2.5-pro` |
 | `STORAGE_DRIVER` | `local` |
 | `STORAGE_DIR` | Where uploaded files are kept, e.g. `./storage` (Docker: `/data/files`) |
 | `MAX_UPLOAD_MB` | Default 50 |
@@ -54,13 +54,17 @@ npm run verify:export         # downloads the Excel export and checks its format
 
 If a value contains `#`, wrap it in quotes (`'...'`), otherwise everything after the `#` is treated as a comment.
 
-## Gemini: paid tier only
+## AI summaries: OpenRouter
 
-Decks are received under NDA. Google's **free tier** allows prompts and files to be used to improve its products. The **paid tier** does not use your data for training. Create the key in a Google Cloud project **with billing enabled** (AI Studio → API keys → a key on a billed project), and confirm it shows "Paid" / "Tier 1" in AI Studio before adding it here.
+Decks are received under NDA, so:
 
+- Use a **paid** OpenRouter key with credits, and never a `:free` model (free models may log or train on prompts).
+- Every request sets `provider.data_collection = "deny"`, so OpenRouter only routes to providers that don't store or train on data. `require_parameters` keeps it on providers that support the strict JSON schema.
+- In the OpenRouter account's **Settings → Privacy**, turn off prompt logging / "allow training" as well.
+- PDFs are sent natively (the `file-parser` plugin, `native` engine), so charts and scanned pages are read.
 - Deck text and model output are never logged.
-- Decks over ~20 MB go through the Gemini Files API and are deleted right after the call.
-- Vertex AI (with India-region processing) can be added later behind `AiProvider` (`src/lib/ai/provider.ts`).
+- Try the prompt on a local deck without storing anything: `npx tsx --conditions=react-server scripts/try-summary.mts path/to/deck.pdf`.
+- Watch the key's spending limit on openrouter.ai; when credits run out, summaries fail with a "top up" message and decks are still saved.
 
 ## Microsoft Entra ID app registration (for IT, about 10 minutes)
 

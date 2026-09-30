@@ -1,6 +1,6 @@
 # Build plan (Prompt 0)
 
-Status: **Phases 1–8 built 2026-09-28.** Outstanding: a paid `GEMINI_API_KEY` and the two sample decks to tune the prompt (Prompt 6 check), Entra ID app registration, and CREATE rights on the RDS database (see README). Decisions marked **Proposed** are what I'll do unless you say otherwise.
+Status: **Phases 1–8 built 2026-09-28.** Outstanding: the two sample decks to tune the prompt (Prompt 6 check), Entra ID app registration, and CREATE rights on the RDS database (see README). Decisions marked **Proposed** are what I'll do unless you say otherwise.
 
 ## Phases
 

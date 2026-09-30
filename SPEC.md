@@ -26,7 +26,7 @@ The app must be portable to Niveshaay's own servers later.
 | DB | PostgreSQL + Prisma. Local dev via `docker-compose` |
 | Auth | Auth.js with the **Microsoft Entra ID** provider (the firm uses Microsoft 365 / OneDrive). Restrict sign-in to `ALLOWED_EMAIL_DOMAIN` |
 | File storage | A `StorageDriver` interface with a `local` disk driver now; an S3-compatible driver added later. Nothing outside the driver may touch the filesystem |
-| AI | Google Gen AI SDK (`@google/genai`), server-side only, behind an `AiProvider` interface so the model can be swapped later. Model from env `GEMINI_MODEL` (set to the current Gemini Pro or Flash model). Use a **paid** Gemini API key or Vertex AI (see §13) |
+| AI | **OpenRouter** (OpenAI-compatible chat completions API), server-side only, behind an `AiProvider` interface so the model can be swapped later. Model from env `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`, which reads PDFs natively). Requests set `provider.data_collection = "deny"` (see §13) |
 | Excel | `exceljs` (server route) |
 | Zip | `archiver` or `jszip` (server route) |
 | Styling | CSS variables for design tokens (section 11). Tailwind is fine if tokens map to CSS variables |
@@ -42,8 +42,8 @@ Env vars:
 - `AUTH_MICROSOFT_ENTRA_ID_ISSUER`
 - `ALLOWED_EMAIL_DOMAIN`
 - `ADMIN_EMAILS` (comma list)
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
 - `STORAGE_DRIVER` (`local`)
 - `STORAGE_DIR`
 - `MAX_UPLOAD_MB` (default 50)
@@ -219,14 +219,14 @@ Aerospace & Defence, Agri & Food, Auto & Auto Components, Chemicals & Materials,
 
 ### 9.1 Input
 
-- **PDF:** send natively to Gemini (`application/pdf`), so charts and scanned pages are read too. Up to about 20 MB, pass the file inline as base64; above that, upload it through the Gemini Files API and reference it.
-- **PPTX:** Gemini doesn't read PPTX. Convert to PDF with LibreOffice headless if it's available on the server. Otherwise extract slide text (`ppt/slides/slideN.xml`, `<a:t>` runs, slide order) and send it as text.
+- **PDF:** send natively to the model as an OpenRouter `file` content part (base64 data URL) with the `file-parser` plugin set to the `native` engine, so charts and scanned pages are read too.
+- **PPTX:** the models don't read PPTX. Convert to PDF with LibreOffice headless if it's available on the server. Otherwise extract slide text (`ppt/slides/slideN.xml`, `<a:t>` runs, slide order) and send it as text.
 - Enforce `MAX_UPLOAD_MB`.
 - Run server-side as a background job, recording status on the Summary row or a job table, so a closed tab doesn't lose work. The UI polls for the result or streams progress.
 
 ### 9.2 Output
 
-Force structured output with Gemini's JSON mode (`responseMimeType: "application/json"` plus a `responseSchema`). Validate the result with zod, and retry once if validation fails:
+Force structured output with `response_format: { type: "json_schema", strict: true }` (and `provider.require_parameters = true` so only endpoints that honour it are used). Validate the result with zod, and retry once if validation fails:
 
 ```
 company, sector (one of the master list), subSector (2–5 words),
@@ -374,8 +374,8 @@ Institutional and restrained, in Niveshaay's colours. Light and dark themes (`pr
   - store files with random keys; never trust the original filename on disk
   - serve files via an authorised route with `Content-Disposition`
 - The OneDrive URL is rendered only after protocol validation. No `javascript:` URLs.
-- Deck content is sent to Gemini only for summarising. No logging of deck text.
-- **Use a paid Gemini API key or Vertex AI, never the free tier.** Google's free-tier terms allow prompts and files to be used to improve its products, which is incompatible with NDA decks. On the paid tier, data isn't used for training. Vertex AI also lets you pin processing to an India region (asia-south1, Mumbai).
+- Deck content is sent to the model only for summarising. No logging of deck text.
+- **Use a paid OpenRouter key with credits, never free (`:free`) models.** Free models and some providers may log or train on prompts, which is incompatible with NDA decks. Every request sets `provider.data_collection = "deny"`, so OpenRouter only routes to providers that don't store or train on data. Also turn off "prompt logging / training" in the OpenRouter account's privacy settings.
 - AuditLog entries for every field change, status change, file upload/remove and summary generate/edit.
 - Optimistic UI updates, with rollback and a toast on failure.
 

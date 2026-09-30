@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { FILE_KIND_LABELS, FILE_KINDS } from "@/lib/domain/constants";
 import type { CompanyRow, JobItem } from "@/lib/domain/types";
-import { env } from "@/lib/env";
+import { aiConfigured } from "@/lib/env";
 import { run, UserError } from "@/lib/server/action";
 import { audit, getRow } from "@/lib/server/company";
 import { storage } from "@/lib/storage";
@@ -81,7 +81,7 @@ export async function attachStagedToCompany(fileId: string, companyId: string, j
 export async function generateSummary(fileId: string) {
   return run<JobItem>(async () => {
     const me = await requireRole();
-    if (!env.GEMINI_API_KEY) throw new UserError("AI summaries are not set up yet. Add a paid GEMINI_API_KEY to enable them.");
+    if (!aiConfigured) throw new UserError("AI summaries are not set up yet. Add an OPENROUTER_API_KEY to enable them.");
     const f = await db.file.findUniqueOrThrow({ where: { id: id.parse(fileId) } });
     if (!f.companyId || !isDeckFile(f.originalName)) throw new UserError("Summaries can be generated from PDF and PowerPoint (.pptx) decks.");
     const running = await db.summaryJob.findFirst({ where: { companyId: f.companyId, status: { in: ["QUEUED", "RUNNING"] } } });

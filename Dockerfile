@@ -19,7 +19,7 @@ RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" AUTH_SECRET=bui
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TZ=Asia/Kolkata
-# LibreOffice (headless) converts PPTX decks to PDF so Gemini can read charts and images (SPEC §9.1).
+# LibreOffice (headless) converts PPTX decks to PDF so the model can read charts and images (SPEC §9.1).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends libreoffice-impress fonts-dejavu-core ca-certificates \
   && rm -rf /var/lib/apt/lists/*

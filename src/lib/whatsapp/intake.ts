@@ -13,7 +13,7 @@ import {
   parseVia,
   phoneFromJid,
 } from "@/lib/domain/whatsapp";
-import { env, maxUploadBytes, whatsappConfigured } from "@/lib/env";
+import { aiConfigured, env, maxUploadBytes, whatsappConfigured } from "@/lib/env";
 import { audit, replacePeople } from "@/lib/server/company";
 import { sniff } from "@/lib/server/upload";
 import { storage } from "@/lib/storage";
@@ -142,7 +142,7 @@ async function handleDeck(rec: EvoRecord, context: EvoRecord[], botId: string) {
     });
     let jobId: string | null = null;
     let ai: SummaryOutput | null = null;
-    if (env.GEMINI_API_KEY) {
+    if (aiConfigured) {
       const job = await createJob(file.id, null, botId);
       jobId = job.id;
       const done = await waitForJob(job.id);

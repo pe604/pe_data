@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// SPEC §9.2 output contract. Validated with zod after Gemini's JSON mode.
+// SPEC §9.2 output contract. Validated with zod after the model's strict JSON-schema output.
 
 const str = z.string().nullable().optional();
 const arr = z.array(z.string().nullable()).nullable().optional();
@@ -43,7 +43,7 @@ export const summarySchema = z.object({
 
 export type SummaryOutput = z.infer<typeof summarySchema>;
 
-/** JSON Schema passed to Gemini as responseJsonSchema. */
+/** JSON Schema passed as response_format.json_schema (strict). */
 export function responseJsonSchema(sectors: string[]) {
   const s = { type: ["string", "null"] };
   const list = (desc: string) => ({ type: "array", items: { type: "string" }, description: desc });
@@ -74,11 +74,13 @@ export function responseJsonSchema(sectors: string[]) {
                 values: { type: "array", items: { type: ["string", "null"] } },
               },
               required: ["label", "values"],
+              additionalProperties: false,
             },
           },
           growth: { ...s, description: '"X% CAGR actual (FYa–FYb) vs Y% projected (FYc–FYd)"' },
         },
-        required: ["unit", "columns", "rows"],
+        required: ["unit", "columns", "rows", "growth"],
+        additionalProperties: false,
       },
       dealAsk: { ...s, description: "Raise size, round and use of funds, one or two sentences" },
       founders: { ...s, description: "Founders with one-line background, plus existing investors" },
@@ -91,5 +93,6 @@ export function responseJsonSchema(sectors: string[]) {
       "company", "sector", "subSector", "round", "advisor", "location", "deckDate", "business",
       "revenueMix", "financials", "dealAsk", "founders", "customers", "differentiation", "sectorPoints", "tailwinds",
     ],
+    additionalProperties: false,
   };
 }

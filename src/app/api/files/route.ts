@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { FILE_KIND_LABELS, FILE_KINDS } from "@/lib/domain/constants";
 import type { FileItem } from "@/lib/domain/types";
-import { env, maxUploadBytes } from "@/lib/env";
+import { aiConfigured, env, maxUploadBytes } from "@/lib/env";
 import { UserError } from "@/lib/server/action";
 import { audit } from "@/lib/server/company";
 import { errorResponse } from "@/lib/server/http";
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     }
 
     let jobId: string | null = null;
-    const wantsSummary = p.kind === "DECK" && isDeckFile(name) && !!env.GEMINI_API_KEY;
+    const wantsSummary = p.kind === "DECK" && isDeckFile(name) && aiConfigured;
     if (wantsSummary && (p.summarise === "1" || p.companyId)) {
       const busy = p.companyId
         ? await db.summaryJob.findFirst({ where: { companyId: p.companyId, status: { in: ["QUEUED", "RUNNING"] } } })
