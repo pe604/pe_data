@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { setPeople, updateCompany } from "@/actions/companies";
 import { addSector } from "@/actions/misc";
 import type { PersonRole } from "@/lib/domain/constants";
+import { todayISO } from "@/lib/domain/dates";
 import { checkLink } from "@/lib/domain/onedrive";
 import type { CompanyRow } from "@/lib/domain/types";
 import { useStore } from "../store";
@@ -135,7 +136,16 @@ export function DatePopover({ c, anchor, onClose }: Base) {
   return (
     <Popover anchor={anchor} onClose={onClose} width={240} label="Date received">
       <h4>Date received</h4>
-      <input className="inp" type="date" value={v} onChange={(e) => setV(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && save()} />
+      <input
+        className="inp"
+        type="date"
+        aria-label="Date received"
+        value={v}
+        max={todayISO()}
+        onChange={(e) => setV(e.target.value)}
+        autoFocus
+        onKeyDown={(e) => e.key === "Enter" && save()}
+      />
       <div className="foot">
         <button className="btn-ghost sm" type="button" onClick={onClose}>
           Cancel

@@ -81,6 +81,21 @@ test("reject with a reason, days freeze, then restore", async ({ page }) => {
   await expect(row(page, name)).toBeVisible();
 });
 
+test("change the date received from the drawer; it shows in the table and History", async ({ page }) => {
+  const name = uniq("Dateco");
+  await page.goto("/");
+  await addByName(page, name);
+  await openCompany(page, name);
+  await page.getByRole("button", { name: /^Received / }).click();
+  await page.locator('input[type="date"]').fill("2026-01-15");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Received 15 Jan 2026" })).toBeVisible();
+  await page.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".drawer.open")).toContainText("Jan 2026");
+  await page.keyboard.press("Escape");
+  await expect(row(page, name).locator("td.c-date")).toContainText("15 Jan 2026");
+});
+
 test("delete a company permanently, with a reason", async ({ page }) => {
   const name = uniq("Deleteco");
   await page.goto("/");

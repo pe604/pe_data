@@ -13,7 +13,7 @@ import { getJob } from "@/actions/files";
 import { STAGE_LABELS } from "@/lib/domain/constants";
 import { daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
 import type { CompanyDetail } from "@/lib/domain/types";
-import { OneDrivePopover, SectorPopover } from "../cells/popovers";
+import { DatePopover, OneDrivePopover, SectorPopover } from "../cells/popovers";
 import { useStore, type DrawerTab } from "../store";
 import { IconX } from "../ui/icons";
 import { ReasonModal } from "../ui/overlay";
@@ -135,7 +135,7 @@ function DrawerBody({
   const { mutate, putRow, removeRow, toast } = store;
   const [editName, setEditName] = useState(false);
   const [modal, setModal] = useState<"reject" | "delete" | null>(null);
-  const [pop, setPop] = useState<{ kind: "sector" | "od"; el: HTMLElement } | null>(null);
+  const [pop, setPop] = useState<{ kind: "sector" | "od" | "date"; el: HTMLElement } | null>(null);
   const openId = detail?.row.id;
   const c = store.companies.find((x) => x.id === openId) ?? detail?.row;
 
@@ -258,13 +258,18 @@ function DrawerBody({
               Add OneDrive link
             </button>
           )}
+          <button
+            className="meta-btn"
+            type="button"
+            title="Change the date received"
+            onClick={(e) => setPop({ kind: "date", el: e.currentTarget })}
+          >
+            {c.dateReceived ? `Received ${fmtDate(c.dateReceived)}` : "Set date received"}
+          </button>
           {c.dateReceived && (
-            <>
-              <span>Received {fmtDate(c.dateReceived)}</span>
-              <span>
-                {days} days{st !== "PIPELINE" ? " in pipeline" : ""}
-              </span>
-            </>
+            <span>
+              {days} days{st !== "PIPELINE" ? " in pipeline" : ""}
+            </span>
           )}
           {st === "PIPELINE" && <span>{STAGE_LABELS[c.stage]}</span>}
         </div>
@@ -305,6 +310,7 @@ function DrawerBody({
 
       {pop?.kind === "sector" && <SectorPopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
       {pop?.kind === "od" && <OneDrivePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
+      {pop?.kind === "date" && <DatePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
 
       {modal === "reject" && (
         <ReasonModal

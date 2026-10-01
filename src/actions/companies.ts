@@ -24,6 +24,11 @@ import { attachJobToCompany } from "@/lib/ai/jobs";
 
 const id = z.string().min(1).max(40);
 const isoDate = z.string().refine(isISODate, "Invalid date");
+
+/** Date received can be any past day, not a future one (days in pipeline would go negative). */
+function assertReceivedNotFuture(d: string | null | undefined) {
+  if (d && d > todayISO()) throw new UserError("The date received can't be in the future.");
+}
 const nameStr = z.string().trim().min(1).max(200);
 const peopleList = z.array(z.string().trim().min(1).max(60)).max(20);
 const stage = z.enum(STAGES);
@@ -83,6 +88,7 @@ export async function updateCompany(companyId: string, patch: z.input<typeof pat
         changes.push({ field: "priority", from: fmtPriority(c.priority), to: fmtPriority(p.priority) });
       }
       if (p.dateReceived !== undefined && p.dateReceived !== dateToISO(c.dateReceived)) {
+        assertReceivedNotFuture(p.dateReceived);
         data.dateReceived = isoToDate(p.dateReceived);
         changes.push({ field: "dateReceived", from: fmtDay(dateToISO(c.dateReceived)), to: fmtDay(p.dateReceived) });
       }
@@ -158,6 +164,7 @@ export async function createCompany(input: z.input<typeof createSchema>) {
   return run<CompanyRow>(async () => {
     const me = await requireRole();
     const p = createSchema.parse(input);
+    assertReceivedNotFuture(p.dateReceived);
     const invested = p.target === "invested";
     const cid = await db.$transaction(async (tx) => {
       const assigned = p.pe.length > 0 || p.research.length > 0;
