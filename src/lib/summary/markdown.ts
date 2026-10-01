@@ -41,7 +41,8 @@ export function cleanArr(a: unknown): string[] {
 
 const cell = (v: unknown) => String(v).replace(/\|/g, "/").replace(/\s+/g, " ").trim();
 
-export function buildMarkdown(j: SummaryJson): string {
+/** `unverified`: financial figures not found in the deck text (see verify.ts); listed under the table. */
+export function buildMarkdown(j: SummaryJson, unverified: string[] = []): string {
   const out: string[] = [];
 
   const snap = (
@@ -80,6 +81,7 @@ export function buildMarkdown(j: SummaryJson): string {
     );
     const growth = cleanStr(f.growth);
     if (growth) out.push("", "Growth: " + growth);
+    if (unverified.length) out.push("", `Check against the deck (not found in its text): ${unverified.map(cell).join(", ")}`);
     out.push("");
   }
 

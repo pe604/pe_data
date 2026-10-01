@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   // exceljs, archiver and the Prisma pg adapter are Node-only.
-  serverExternalPackages: ["exceljs", "archiver", "@prisma/adapter-pg", "pg"],
+  serverExternalPackages: ["exceljs", "archiver", "@prisma/adapter-pg", "pg", "unpdf"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -87,15 +87,36 @@ export async function pptxText(data: Buffer): Promise<string> {
   return out.join("\n\n");
 }
 
+const MAX_TEXT = 200_000;
+
+/**
+ * The PDF's text layer, page by page. Sent to the model next to the PDF so it copies exact digits instead of
+ * reading them off chart images, and used to verify the figures afterwards. Empty for scanned PDFs.
+ */
+export async function pdfText(data: Buffer): Promise<string> {
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const doc = await getDocumentProxy(new Uint8Array(data));
+    if (doc.numPages > 300) return "";
+    const { text } = await extractText(doc, { mergePages: false });
+    return text
+      .map((t, i) => `[Page ${i + 1}]\n${t.replace(/[ \t]+/g, " ").trim()}`)
+      .join("\n\n")
+      .slice(0, MAX_TEXT);
+  } catch {
+    return ""; // damaged or encrypted PDF: the model still gets the PDF itself
+  }
+}
+
 export async function prepareDeck(data: Buffer, fileName: string, mime: string): Promise<DeckInput> {
   const lower = fileName.toLowerCase();
-  if (mime === "application/pdf" || lower.endsWith(".pdf")) return { kind: "pdf", data, fileName };
+  if (mime === "application/pdf" || lower.endsWith(".pdf")) return { kind: "pdf", data, fileName, text: await pdfText(data) };
   if (lower.endsWith(".pptx")) {
     const pdf = await pptxToPdf(data);
-    if (pdf) return { kind: "pdf", data: pdf, fileName };
+    if (pdf) return { kind: "pdf", data: pdf, fileName, text: await pdfText(pdf) };
     const text = await pptxText(data);
     if (!text.trim()) throw new Error("no_text");
-    return { kind: "text", text: text.slice(0, 400_000), fileName };
+    return { kind: "text", text: text.slice(0, MAX_TEXT), fileName };
   }
   throw new Error("bad_type");
 }

@@ -1,4 +1,5 @@
 // System prompt enforcing SPEC §9.3.
+import type { DeckInput } from "./provider";
 
 export function systemPrompt(sectors: string[]): string {
   return [
@@ -11,9 +12,25 @@ export function systemPrompt(sectors: string[]): string {
     "- When something is not in the deck, use null or an empty list. Never write phrases like \"not in deck\", \"not disclosed\", \"N/A\" or \"not available\".",
     `- sector must be exactly one of: ${sectors.join(" | ")}. Use "Other" only if none fits.`,
     "- subSector is 2 to 5 words.",
-    "- Money: express Indian-rupee amounts in ₹ Cr (1 Cr = 10 Mn = 100 Lakh; so ₹ 236 Mn = ₹ 23.6 Cr, ₹ 450 Lakh = ₹ 4.5 Cr). Keep US-dollar amounts in US dollars (e.g. USD 12 Mn). Apply this everywhere, including dealAsk and founders.",
-    "- financials: unit is \"₹ Cr\" for rupee decks. Convert every figure to ₹ Cr (round to one decimal place where useful). At most 6 columns covering the latest actual years and the projections. Keep the deck's E or P suffix on projected years exactly (FY27E, FY28P). At most 3 rows: Revenue first, then the most useful of EBITDA %, Gross margin %, PAT. Show losses and negative margins in brackets, e.g. (12.4) or (86%). If the deck has no financials, set financials to null.",
-    "- financials.growth: \"X% CAGR actual (FYa–FYb) vs Y% projected (FYc–FYd)\", computed from the Revenue row. If only one period exists, give only that one. Null if not computable.",
+    "- Do not expand abbreviations or acronyms the deck does not define (write \"MIB\", never a guess at what it stands for).",
+    "",
+    "Numbers (most important):",
+    "- Copy every figure exactly as printed in the deck. The deck's text layer is given with the PDF: take digits from it, not from reading chart images. If a chart and a table disagree, use the table.",
+    "- First find the unit printed on the slide (e.g. \"Amount in INR Cr\", \"₹ Mn\", \"Rs Lakh\", \"USD Mn\").",
+    "- If rupee figures are already in Cr (crore), never convert or rescale them: 2,080 stays 2,080, 59.7 stays 59.7.",
+    "- Convert to ₹ Cr only when the slide states another rupee unit: ₹ Mn ÷ 10 (₹ 236 Mn = ₹ 23.6 Cr), ₹ Lakh ÷ 100 (₹ 450 Lakh = ₹ 4.5 Cr), ₹ Bn × 100. Keep US-dollar amounts in US dollars (e.g. USD 12 Mn). Apply this everywhere, including dealAsk and founders.",
+    "- Sanity check before answering: each Revenue value must match the deck's revenue for that year in size (a ₹ 2,080 Cr company is never 208.0).",
+    "",
+    "Financials table:",
+    "- unit is \"₹ Cr\" for rupee decks. At most 6 columns covering the latest actual years and the projections, oldest first.",
+    "- Column labels are financial years as FY + two digits: \"2025-26\", \"FY 2025-26\" and \"FY'26\" are all FY26. Projected years get the deck's suffix (FY27E) or P when the deck calls them plan, projection or forecast (FY27P).",
+    "- At most 3 rows. Revenue first. Then \"EBITDA\" in the same unit as Revenue if the deck gives absolute EBITDA, and \"EBITDA %\" if it gives margins; otherwise Gross margin % or PAT. Never mix absolute values and percentages in one row.",
+    "- Decks often print several versions of the same year (incl./excl. GMV, ex discontinued business, a rounded headline vs a table). Take each row from ONE consistent series: the headline revenue/EBITDA trend that covers the most years. Never mix bases across years in a row. If that series has gaps, fill them only from a slide on the same basis.",
+    "- Fill every year that series gives (a trend chart often has earlier years than a KPI table). Leave a cell null only when no slide has that figure on the same basis; never compute one.",
+    "- Write negative values in brackets, never with a minus sign: (198.2), (9.0%). Use thousands separators as in the deck (2,080).",
+    "- financials.growth: \"X% CAGR actual (FYa–FYb) vs Y% projected (FYc–FYd)\". Use CAGRs or growth rates the deck states; otherwise compute from the Revenue row. Give both parts when the table has actual and projected years. Null if not computable.",
+    "",
+    "Other sections:",
     "- business: 3 or 4 bullets, each under 18 words, covering what they do, for whom, and how they make money.",
     "- sectorPoints and tailwinds: 2 or 3 bullets each, only from the deck.",
     "- differentiation is what the company claims; state it as their claim.",
@@ -23,9 +40,23 @@ export function systemPrompt(sectors: string[]): string {
   ].join("\n");
 }
 
-export function userPrompt(fileName: string, extractedText?: string): string {
-  if (extractedText) {
-    return `Deck file: ${fileName}\nThe deck is a PowerPoint file; its slide text follows in slide order.\n---\n${extractedText}`;
+export function userPrompt(deck: DeckInput): string {
+  if (deck.kind === "text") {
+    return `Deck file: ${deck.fileName}\nThe deck is a PowerPoint file; its slide text follows in slide order.\n---\n${deck.text}`;
   }
-  return `Deck file: ${fileName}\nThe deck is attached as a PDF. Read every page, including charts, tables and scanned pages.`;
+  const base = `Deck file: ${deck.fileName}\nThe deck is attached as a PDF. Read every page, including charts, tables and scanned pages.`;
+  if (!deck.text.trim()) return base;
+  return `${base}\n\nThe PDF's text layer follows, page by page. Use it for exact figures and units.\n---\n${deck.text}`;
+}
+
+/** Follow-up when figures in the first answer could not be found in the deck. */
+export function correctionPrompt(deck: DeckInput, unverified: string[]): string {
+  return [
+    userPrompt(deck),
+    "",
+    "---",
+    "A previous answer contained financial figures that do not appear anywhere in the deck:",
+    ...unverified.map((u) => `- ${u}`),
+    "Re-read the financial slides and their unit labels, and copy each figure exactly as printed in the deck's own unit. Do not rescale figures that are already in ₹ Cr.",
+  ].join("\n");
 }

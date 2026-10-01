@@ -1,9 +1,9 @@
 import "server-only";
 import { aiConfigured, aiModel, env } from "@/lib/env";
 
-/** Deck content ready for the model. */
+/** Deck content ready for the model. `text` is the deck's own text (PDF text layer or slide text). */
 export type DeckInput =
-  | { kind: "pdf"; data: Buffer; fileName: string }
+  | { kind: "pdf"; data: Buffer; fileName: string; text: string }
   | { kind: "text"; text: string; fileName: string };
 
 export interface GenerateRequest {
@@ -43,7 +43,7 @@ class OpenRouterProvider implements AiProvider {
         file: { filename: deck.fileName.replace(/\.pptx$/i, ".pdf"), file_data: "data:application/pdf;base64," + deck.data.toString("base64") },
       });
     }
-    content.push({ type: "text", text: prompt });
+    content.push({ type: "text", text: prompt }); // includes the deck's text layer (see prompt.ts)
 
     let res: Response;
     try {

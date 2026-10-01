@@ -66,7 +66,8 @@ export function responseJsonSchema(sectors: string[]) {
           columns: { type: "array", items: { type: "string" }, description: "At most 6 years, e.g. FY24, FY25, FY26E" },
           rows: {
             type: "array",
-            description: "At most 3 rows. Revenue first, then the most useful of EBITDA %, Gross margin %, PAT",
+            description:
+              "At most 3 rows. Revenue first, then EBITDA (same unit as Revenue) and/or EBITDA %, else Gross margin % or PAT. Figures copied exactly as printed in the deck",
             items: {
               type: "object",
               properties: {

@@ -56,5 +56,8 @@ export const whatsappConfigured = Boolean(
 /** AI summaries are on when an OpenRouter key is set. */
 export const aiConfigured = Boolean(env.OPENROUTER_API_KEY);
 
-/** Default model when OPENROUTER_MODEL is unset (reads PDFs natively). */
-export const aiModel = env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
+/**
+ * Default model when OPENROUTER_MODEL is unset (reads PDFs natively). Pro, not Flash: in testing Flash put
+ * correct figures under the wrong years, which no automatic check can catch.
+ */
+export const aiModel = env.OPENROUTER_MODEL || "google/gemini-2.5-pro";

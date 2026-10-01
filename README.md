@@ -36,7 +36,7 @@ npm run verify:export         # downloads the Excel export from the running dev 
 | `DB_SSL_CA` | CA bundle for `verify-full`. Default `certs/rds-ap-south-1-bundle.pem` (public AWS RDS Mumbai CA, shipped in the repo and image) |
 | `DB_SCHEMA` | Optional Postgres schema (default `public`) |
 | `OPENROUTER_API_KEY` | Paid OpenRouter key with credits (see below). Leave blank to run without AI summaries |
-| `OPENROUTER_MODEL` | Must read PDFs, e.g. `google/gemini-2.5-flash` (default) or `google/gemini-2.5-pro` |
+| `OPENROUTER_MODEL` | Must read PDFs. Default `google/gemini-2.5-pro` (about ₹5 and one minute per deck). `google/gemini-2.5-flash` is cheaper and faster but misplaced figures across years in testing |
 | `AWS_S3_ENDPOINT_URL`, `AWS_S3_BUCKET_NAME`, `AWS_S3_FOLDER`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | S3-compatible bucket for uploaded files (`AWS_REGION` optional, default `us-east-1`) |
 | `STORAGE_ENCRYPTION_KEY` | 32 random bytes, base64 (`openssl rand -base64 32`). Every file is encrypted with it before upload. **Back it up**: without it, stored decks can't be read |
 | `STORAGE_NAMESPACE` | Optional sub-folder inside `AWS_S3_FOLDER` (default `files`; E2E tests use `e2e-tests`) |
@@ -57,7 +57,8 @@ Decks are received under NDA, so:
 - Use a **paid** OpenRouter key with credits, and never a `:free` model (free models may log or train on prompts).
 - Every request sets `provider.data_collection = "deny"`, so OpenRouter only routes to providers that don't store or train on data. `require_parameters` keeps it on providers that support the strict JSON schema.
 - In the OpenRouter account's **Settings → Privacy**, turn off prompt logging / "allow training" as well.
-- PDFs are sent natively (the `file-parser` plugin, `native` engine), so charts and scanned pages are read.
+- PDFs are sent natively (the `file-parser` plugin, `native` engine), so charts and scanned pages are read. The PDF's text layer goes with it so figures are copied exactly rather than read off chart images.
+- **Figure check:** every number in the summary's financials table must appear in the deck's text (allowing ₹ Mn/Lakh → Cr conversion only when the deck uses those units). If any doesn't, the model gets one corrective pass; anything still unmatched is listed under the table as "Check against the deck". Scanned decks with no text layer can't be checked.
 - Deck text and model output are never logged.
 - Try the prompt on a local deck without storing anything: `npx tsx --conditions=react-server scripts/try-summary.mts path/to/deck.pdf`.
 - Watch the key's spending limit on openrouter.ai; when credits run out, summaries fail with a "top up" message and decks are still saved.

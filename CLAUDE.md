@@ -14,7 +14,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | DB | PostgreSQL on AWS RDS (`DB_*` in `.env`) + Prisma (`prisma/schema.prisma`). Connection settings built in `src/lib/db-config.ts` (shared by the app, `prisma.config.ts` and scripts); TLS verified against `certs/rds-ap-south-1-bundle.pem`. No local database |
 | Auth | **None for now (open access).** `src/lib/auth/session.ts` returns one shared "Team" user (Editor) for every request. A future login replaces only that file. `noindex` header + `robots.txt` keep it out of search engines |
 | Files | `StorageDriver` backed by an S3-compatible bucket (`AWS_S3_*`), every object AES-256-GCM encrypted client-side with `STORAGE_ENCRYPTION_KEY` (the bucket is publicly readable, so it must only ever hold ciphertext). No local file storage |
-| AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`). Every request sets `provider.data_collection = "deny"` |
+| AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-pro`). Every request sets `provider.data_collection = "deny"`. The PDF's text layer (`unpdf`) goes with the PDF; `src/lib/summary/verify.ts` checks every financial figure against it, with one corrective retry (`src/lib/ai/summarise.ts`) |
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
 | Excel / zip | `exceljs` / `archiver`, in route handlers |
 | Validation | `zod` on every input |

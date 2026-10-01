@@ -5,9 +5,9 @@ import { audit } from "@/lib/server/company";
 import { storage } from "@/lib/storage";
 import { buildMarkdown } from "@/lib/summary/markdown";
 import { prepareDeck } from "./deck";
-import { systemPrompt, userPrompt } from "./prompt";
 import { AiError, aiProvider } from "./provider";
-import { responseJsonSchema, summarySchema, type SummaryOutput } from "./schema";
+import type { SummaryOutput } from "./schema";
+import { summarise } from "./summarise";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Background summary jobs (SPEC §9.1). DB-backed, so a closed tab or a restart doesn't lose work.
@@ -135,7 +135,7 @@ async function processJob(jobId: string) {
   try {
     const job = await db.summaryJob.findUniqueOrThrow({ where: { id: jobId }, include: { sourceFile: true } });
     if (!job.sourceFile) throw new Error("bad_type");
-    const provider = aiProvider();
+    aiProvider(); // fail fast with "not configured" before reading the deck
 
     await db.summaryJob.update({ where: { id: jobId }, data: { step: "READING" } });
     const bytes = await storage().read(job.sourceFile.storageKey);
@@ -144,28 +144,9 @@ async function processJob(jobId: string) {
 
     await db.summaryJob.update({ where: { id: jobId }, data: { step: "WRITING" } });
     const sectors = (await db.sector.findMany({ orderBy: { sortOrder: "asc" } })).map((s) => s.name);
-    const req = {
-      system: systemPrompt(sectors),
-      prompt: userPrompt(job.sourceFile.originalName, deck.kind === "text" ? deck.text : undefined),
-      deck,
-      jsonSchema: responseJsonSchema(sectors),
-      signal: ctl.signal,
-    };
-
-    // Validate with zod; retry once on failure (SPEC §9.2).
-    let parsed: SummaryOutput | null = null;
-    for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
-      const text = await provider.generateJson(req);
-      try {
-        const r = summarySchema.safeParse(JSON.parse(text));
-        if (r.success) parsed = r.data;
-      } catch {
-        /* retry */
-      }
-    }
-    if (!parsed) throw new Error("invalid_json");
-    const markdown = buildMarkdown(parsed);
+    const { parsed, markdown, unverified } = await summarise(deck, sectors, ctl.signal);
     if (!markdown) throw new Error("no_text");
+    if (unverified.length) console.warn("[summary-job] figures not found in deck text", jobId, unverified.length);
 
     await db.$transaction(async (tx) => {
       const cur = await tx.summaryJob.findUniqueOrThrow({ where: { id: jobId } });
