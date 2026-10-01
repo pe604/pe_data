@@ -87,7 +87,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 ## Coding rules
 
 **Security (non-negotiable)**
-- Every route handler and server action starts with `requireRole(...)` and parses its input with a zod schema. UI hiding is not enforcement. Roles are Admin and Editor; there is no Viewer role. Admin-only: hard delete, adding sectors. With no login yet, every visitor is the shared Editor "Team" user; keep the `requireRole()` calls so a login can be added in one place.
+- Every route handler and server action starts with `requireRole(...)` and parses its input with a zod schema. UI hiding is not enforcement. Roles are Admin and Editor; there is no Viewer role. Admin-only: adding sectors. Permanent delete is open to Editors (logged in `DeletionLog`). With no login yet, every visitor is the shared Editor "Team" user; keep the `requireRole()` calls so a login can be added in one place.
 - `StorageDriver` (`src/lib/storage`) is the only code that stores or reads files, and the only `fs` use (a temp dir for LibreOffice). Never upload unencrypted bytes, never link to bucket URLs; serve files only via the authorised routes.
 - Uploads: check extension, sniff MIME from bytes, enforce `MAX_UPLOAD_MB`, store under a random key. Serve only through the authorised file routes with `Content-Disposition`.
 - OneDrive URLs: only `http:`/`https:`, validated on write and again before rendering. Never render a `javascript:` URL.

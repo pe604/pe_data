@@ -81,6 +81,23 @@ test("reject with a reason, days freeze, then restore", async ({ page }) => {
   await expect(row(page, name)).toBeVisible();
 });
 
+test("delete a company permanently, with a reason", async ({ page }) => {
+  const name = uniq("Deleteco");
+  await page.goto("/");
+  await addByName(page, name);
+  await openCompany(page, name);
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  const dlg = page.getByRole("dialog");
+  await expect(dlg.getByRole("button", { name: "Delete permanently" })).toBeDisabled();
+  await dlg.getByLabel("Reason for deleting").fill("Duplicate entry");
+  await dlg.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(page.getByRole("status")).toContainText(`${name} was deleted.`);
+  await expect(row(page, name)).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator("table.grid")).toBeVisible();
+  await expect(row(page, name)).toHaveCount(0);
+});
+
 test("invest, then undo", async ({ page }) => {
   const name = uniq("Investco");
   await page.goto("/");

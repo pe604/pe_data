@@ -14,7 +14,7 @@ export class AuthError extends Error {
 }
 
 // OPEN ACCESS (temporary, by decision of the firm): there is no login. Every visitor acts as one shared
-// "Team" user with Editor rights, so admin-only actions (hard delete, adding sectors) are unavailable.
+// "Team" user with Editor rights, so admin-only actions (adding sectors) are unavailable.
 // When a login is added, only this file needs to change: every route and action already calls requireRole().
 const TEAM_EMAIL = "team@portal.invalid";
 let teamUser: Promise<Me> | null = null;

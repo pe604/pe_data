@@ -132,7 +132,7 @@ function DrawerBody({
   setBusyEditing: (b: boolean) => void;
 }) {
   const store = useStore();
-  const { me, mutate, putRow, removeRow, toast } = store;
+  const { mutate, putRow, removeRow, toast } = store;
   const [editName, setEditName] = useState(false);
   const [modal, setModal] = useState<"reject" | "delete" | null>(null);
   const [pop, setPop] = useState<{ kind: "sector" | "od"; el: HTMLElement } | null>(null);
@@ -211,11 +211,9 @@ function DrawerBody({
                 Restore to pipeline
               </button>
             )}
-            {me.role === "ADMIN" && (
-              <button className="btn-ghost danger-text" type="button" onClick={() => setModal("delete")}>
-                Delete
-              </button>
-            )}
+            <button className="btn-ghost danger-text" type="button" onClick={() => setModal("delete")}>
+              Delete
+            </button>
           </div>
         </div>
         {editName ? (

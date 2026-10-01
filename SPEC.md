@@ -48,11 +48,12 @@ Env vars:
 
 | Role | Can |
 |---|---|
-| Admin | Everything, plus hard delete, plus manage the sector master list |
-| Editor | Add and edit companies, upload files, comment, reject, invest, restore, manage the PE team list |
+| Admin | Everything, plus manage the sector master list |
+| Editor | Add and edit companies, upload files, comment, reject, invest, restore, permanently delete, manage the PE team list |
 
 - There is no read-only Viewer role for now.
-- **While there is no login, everyone is an Editor** (the shared "Team" user). Admin actions are unavailable until a login exists.
+- **While there is no login, everyone is an Editor** (the shared "Team" user). Adding sectors is unavailable until a login exists.
+- **Permanent delete is open to Editors** (decision of 2026-10-01): drawer → Delete → reason → "Delete permanently". It removes the company, its files (from storage too), summaries, comments and history; a `DeletionLog` row keeps the name and reason.
 
 - Enforce roles on **every** API route and server action, not just in the UI.
 

@@ -2,7 +2,7 @@
 
 Internal deal tracker for Niveshaay's PE team. It replaces the Excel deck tracker. `SPEC.md` is the source of truth; `reference/` holds the v1.3 prototype.
 
-> **No login yet.** For now anyone with the URL can open and edit the dashboard (everyone acts as a shared "Team" user; admin actions such as permanent delete are off). Search engines are told not to index it. Don't share the URL outside the team until a login is added (see `src/lib/auth/session.ts`).
+> **No login yet.** For now anyone with the URL can open and edit the dashboard (everyone acts as a shared "Team" user and can also delete companies permanently). Search engines are told not to index it. Don't share the URL outside the team until a login is added (see `src/lib/auth/session.ts`).
 
 ## Local setup
 
@@ -105,7 +105,7 @@ To move existing rows from another database: `npx tsx scripts/db-data.mts export
 ## Security checklist (production)
 
 What the app enforces:
-- **No login (temporary, by decision).** Anyone with the URL can view and edit. Everyone acts as the shared Editor "Team" user, so permanent delete and adding sectors are unavailable. `X-Robots-Tag: noindex` and `robots.txt` keep the site out of search engines. `npm run dev` binds to `127.0.0.1`.
+- **No login (temporary, by decision).** Anyone with the URL can view and edit. Everyone acts as the shared Editor "Team" user: permanent delete is available to all (each deletion is logged with its reason in `DeletionLog`); adding sectors is not. `X-Robots-Tag: noindex` and `robots.txt` keep the site out of search engines. `npm run dev` binds to `127.0.0.1`.
 - **Every server action and API route** calls `requireRole()` and validates input with zod, so a login can be added in `src/lib/auth/session.ts` without touching the routes.
 - **Uploads:** extension allow-list, MIME sniffed from the bytes, size limit checked before the body is read, random storage keys, and served only via the app's routes with `Content-Disposition` and `nosniff`.
 - **Headers:** a nonce-based Content-Security-Policy (`src/proxy.ts`), HSTS in production, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Cross-Origin-Opener-Policy` / `-Resource-Policy`.

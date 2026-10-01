@@ -310,9 +310,10 @@ export async function restoreCompany(companyId: string, undo = false) {
   });
 }
 
+// Permanent delete is open to Editors (firm's decision, 2026-10-01). A DeletionLog row keeps name + reason.
 export async function deleteCompany(companyId: string, reason: string) {
   return run<null>(async () => {
-    const me = await requireRole("ADMIN");
+    const me = await requireRole();
     const cid = id.parse(companyId);
     const r = z.string().trim().min(1, "Add a reason").max(5000).parse(reason);
     const keys = await db.$transaction(async (tx) => {
