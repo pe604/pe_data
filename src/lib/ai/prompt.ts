@@ -11,6 +11,7 @@ export function systemPrompt(sectors: string[]): string {
     "- Use only what the deck states. Never estimate, infer or add outside knowledge.",
     "- When something is not in the deck, use null or an empty list. Never write phrases like \"not in deck\", \"not disclosed\", \"N/A\" or \"not available\".",
     `- sector must be exactly one of: ${sectors.join(" | ")}. Use "Other" only if none fits.`,
+    "- Choose the most specific sector that fits, not a broader neighbour: satellites, launch vehicles or space services are Space Tech (not Aerospace & Defence); EV or battery makers are EV & Battery Tech (not Auto); medical devices, diagnostics or labs are MedTech & Diagnostics (not Healthcare & Pharma); IT services, BPM or GCCs are IT Services & BPM (not Technology & SaaS); AI, robotics, drones or quantum are AI & Deep Tech; online marketplaces, quick commerce and consumer apps are Consumer Internet & E-commerce.",
     "- subSector is 2 to 5 words.",
     "- Do not expand abbreviations or acronyms the deck does not define (write \"MIB\", never a guess at what it stands for).",
     "",
