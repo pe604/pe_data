@@ -3,7 +3,7 @@ import { db, type Tx } from "@/lib/db";
 import { PERSON_ROLES, type PersonRole } from "@/lib/domain/constants";
 import { dateToISO } from "@/lib/domain/dates";
 import { nameKey, titleCase } from "@/lib/domain/names";
-import type { CompanyRow, DashboardData, Me } from "@/lib/domain/types";
+import type { CompanyRow, DashboardData, Me, TeamMemberOption } from "@/lib/domain/types";
 import { safeHref } from "@/lib/domain/onedrive";
 import { aiConfigured, env } from "@/lib/env";
 import type { Prisma } from "@/generated/prisma/client";
@@ -70,7 +70,7 @@ export async function loadDashboard(me: Me): Promise<DashboardData> {
   return {
     companies: companies.map(toRow),
     sectors: sectors.map((s) => ({ id: s.id, name: s.name })),
-    team: team.map((t) => ({ id: t.id, name: t.name, peRank: t.peRank })),
+    team: team.map(toTeamOption),
     peMeta: peLog ? { by: peLog.actor.name, at: peLog.at.toISOString() } : null,
     me,
     aiEnabled: aiConfigured,
@@ -104,9 +104,31 @@ export async function audit(
 
 // ─── People ──────────────────────────────────────────────────────────────────
 
-/** Finds or creates TeamMembers (Title Case, case-insensitive unique). Returns ids in input order. */
-export async function ensureTeamMembers(tx: Tx, names: string[]): Promise<{ id: string; name: string }[]> {
-  const out: { id: string; name: string }[] = [];
+const LIST_FLAG = {
+  PE: { inPe: true },
+  RESEARCH: { inResearch: true },
+  VIA: { inVia: true },
+} as const satisfies Record<PersonRole, Prisma.TeamMemberUpdateInput>;
+
+export const toTeamOption = (t: {
+  id: string;
+  name: string;
+  peRank: number | null;
+  inPe: boolean;
+  inResearch: boolean;
+  inVia: boolean;
+}): TeamMemberOption => ({ id: t.id, name: t.name, peRank: t.peRank, inPe: t.inPe, inResearch: t.inResearch, inVia: t.inVia });
+
+/**
+ * Finds or creates TeamMembers (Title Case, case-insensitive unique) and adds them to `role`'s name list.
+ * Returns them in input order.
+ */
+export async function ensureTeamMembers(
+  tx: Tx,
+  names: string[],
+  role: PersonRole,
+): Promise<{ id: string; name: string; peRank: number | null }[]> {
+  const out: { id: string; name: string; peRank: number | null }[] = [];
   const seen = new Set<string>();
   for (const raw of names) {
     const key = nameKey(raw);
@@ -114,16 +136,28 @@ export async function ensureTeamMembers(tx: Tx, names: string[]): Promise<{ id: 
     seen.add(key);
     const m = await tx.teamMember.upsert({
       where: { nameKey: key },
-      create: { name: titleCase(raw), nameKey: key },
-      update: {},
+      create: { name: titleCase(raw), nameKey: key, ...LIST_FLAG[role] },
+      update: LIST_FLAG[role],
     });
-    out.push({ id: m.id, name: m.name });
+    out.push({ id: m.id, name: m.name, peRank: m.peRank });
   }
   return out;
 }
 
 export async function replacePeople(tx: Tx, companyId: string, role: PersonRole, names: string[]) {
-  const members = await ensureTeamMembers(tx, names);
+  const members = await ensureTeamMembers(tx, names, role);
+  const previous = new Set(
+    (await tx.companyPerson.findMany({ where: { companyId, role }, select: { teamMemberId: true } })).map((p) => p.teamMemberId),
+  );
+  // A name newly assigned as PE joins the end of the PE team bar. Names already on this company don't, so
+  // someone removed from the bar via Manage isn't re-added just because this company's PE list was edited.
+  if (role === "PE") {
+    for (const m of members) {
+      if (m.peRank !== null || previous.has(m.id)) continue;
+      const max = (await tx.teamMember.aggregate({ _max: { peRank: true } }))._max.peRank ?? -1;
+      await tx.teamMember.update({ where: { id: m.id }, data: { peRank: max + 1 } });
+    }
+  }
   await tx.companyPerson.deleteMany({ where: { companyId, role } });
   if (members.length) {
     await tx.companyPerson.createMany({

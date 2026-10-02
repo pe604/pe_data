@@ -95,8 +95,12 @@ model TeamMember {
   name    String // Title Case, as displayed
   /// lower-case, trimmed, single-spaced copy of `name`. Enforces case-insensitive uniqueness.
   nameKey String @unique
-  /// Non-null = shown in the PE team bar, ascending.
+  /// Non-null = shown in the PE team bar, ascending. Set automatically when the name is newly assigned as PE.
   peRank  Int?
+  /// Which name lists this person is in (separate autofill pools). Via suggests PE + Via names.
+  inPe       Boolean @default(false)
+  inResearch Boolean @default(false)
+  inVia      Boolean @default(false)
   /// Digits only, with country code (e.g. 9198xxxxxxxx). Used to recognise WhatsApp senders (SPEC §14).
   whatsappNumber String? @unique
 

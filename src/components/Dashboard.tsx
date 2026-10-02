@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDashboard } from "@/actions/companies";
+import { addNamesToTeam, namePools } from "@/lib/domain/team";
 import type { CompanyRow, DashboardData } from "@/lib/domain/types";
 import { TAB_STATUS, queryToView, viewToQuery, type Tab, type ViewState } from "@/lib/domain/view";
 import { AddCompanyModal } from "./add/AddCompanyModal";
@@ -67,14 +68,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
     setCompanies((list) => list.filter((c) => c.id !== id));
   }, []);
 
-  const addTeamNames = useCallback((names: string[]) => {
-    setTeam((t) => {
-      const have = new Set(t.map((m) => m.name.toLowerCase()));
-      const add = names.filter((n) => !have.has(n.toLowerCase()));
-      return add.length
-        ? [...t, ...add.map((n) => ({ id: "local-" + n, name: n, peRank: null }))].sort((a, b) => a.name.localeCompare(b.name))
-        : t;
-    });
+  const addTeamNames = useCallback<Store["addTeamNames"]>((names, role, previous) => {
+    if (names.length) setTeam((t) => addNamesToTeam(t, names, role, previous));
   }, []);
 
   const mutate = useCallback<Store["mutate"]>(
@@ -128,7 +123,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       companies,
       sectors,
       team,
-      teamNames: team.map((t) => t.name),
+      pools: namePools(team),
       peMeta,
       aiEnabled: initial.aiEnabled,
       maxUploadMb: initial.maxUploadMb,

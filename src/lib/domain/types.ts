@@ -34,7 +34,12 @@ export interface SectorOption {
 export interface TeamMemberOption {
   id: string;
   name: string;
+  /** Position in the PE team bar, or null when not shown there. */
   peRank: number | null;
+  /** Name lists this person is in (see domain/team.ts). */
+  inPe: boolean;
+  inResearch: boolean;
+  inVia: boolean;
 }
 
 export interface Me {

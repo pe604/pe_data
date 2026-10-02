@@ -106,6 +106,7 @@ Stages enum, in order:
      - see the ordered list (drag handle, ↑ ↓, remove ✕)
      - add a name with autofill (section 6.3)
      - save, which updates `peRank` for everyone and records who changed it (shown as "Last changed by X").
+   - **Automatic:** a name newly assigned as PE on a company (table, drawer, Add company) joins the end of the bar if it isn't there. Names already on that company aren't re-added, so a name removed via Manage stays removed until it's newly assigned somewhere.
 5. **Toolbar**.
    - Search across company name, sector, sub-sector, comment text and rejection reason.
    - Filter buttons, each showing an active-count badge: Date (from/to plus presets for the last 7, 30 and 90 days), Priority (P1–P5, Unset), Stage, Sector, PE, Research, Via, OneDrive (Link saved / Link missing).
@@ -125,7 +126,7 @@ Stages enum, in order:
 | Stage | A thin 6-segment progress rail above an inline dropdown. Any stage can be chosen (skipping is allowed). The Rejected and Invested tabs show "Stage at exit" read-only, or "Added directly" for direct-invested companies. |
 | Priority | Inline dropdown: Set / P1…P5. P1 is solid gold, P2 gold outline, P3 neutral outline, P4–P5 muted, and unset uses a dashed outline. |
 | Assigned PE | People chips. Click to edit with the chip picker. |
-| Assigned Research | Same as Assigned PE. |
+| Assigned Research | Same as Assigned PE, with its own name list (6.3). |
 | Comment | The latest comment (2-line clamp) with author and date, plus "· N comments". Click opens the drawer on Comments. In the Rejected tab this column shows the rejection reason and date instead. |
 | Via | People chips (internal person who brought the deal). |
 | Date | Date received. Click to edit. |
@@ -150,7 +151,11 @@ Stages enum, in order:
 
 ### 6.3 Name autofill (PE, Research, Via, Manage)
 
-- Suggestions come from the TeamMember list:
+- **Separate name lists** (decision of 2026-10-02): each TeamMember is in one or more of the PE, Research and Via lists (`inPe`, `inResearch`, `inVia`).
+  - Assigned PE suggests PE names only; Assigned Research suggests Research names only; Via suggests PE names plus Via names. Manage (PE team) suggests PE names.
+  - A name typed into a field is added to that field's list (a new Via name goes to the Via list, not PE).
+  - Existing names were sorted by how they had been used; names used nowhere went to PE and Via.
+- Suggestions within a list:
   - ranked by prefix match (including first name), then substring, then small Levenshtein distance (≤1, or ≤2 for inputs of 4+ characters)
   - "keyurr" → Keyur
   - "ar" → Arjun, Arvind Sir

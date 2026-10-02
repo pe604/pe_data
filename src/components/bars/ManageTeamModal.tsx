@@ -10,7 +10,7 @@ import { Modal, ModalHead } from "../ui/overlay";
 
 /** PE team order: drag, ↑ ↓, remove, add with autofill (SPEC §5.4). */
 export function ManageTeamModal({ initial, onClose }: { initial: string[]; onClose: () => void }) {
-  const { teamNames, peMeta, setTeam, setPeMeta, toast } = useStore();
+  const { pools, peMeta, setTeam, setPeMeta, toast } = useStore();
   const [list, setList] = useState(initial);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
@@ -103,7 +103,7 @@ export function ManageTeamModal({ initial, onClose }: { initial: string[]; onClo
           <span>Add a name</span>
           <ChipPicker
             value={[]}
-            pool={teamNames.filter((t) => !list.some((x) => norm(x) === norm(t)))}
+            pool={pools.PE.filter((t) => !list.some((x) => norm(x) === norm(t)))}
             label="Add a name"
             onChange={(v) => {
               const n = v[v.length - 1];

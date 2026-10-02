@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { nameKey, titleCase } from "@/lib/domain/names";
 import type { CommentItem, CompanyRow, SectorOption, TeamMemberOption } from "@/lib/domain/types";
 import { run, UserError } from "@/lib/server/action";
-import { audit, ensureTeamMembers, getRow, listText } from "@/lib/server/company";
+import { audit, ensureTeamMembers, getRow, listText, toTeamOption } from "@/lib/server/company";
 
 const id = z.string().min(1).max(40);
 
@@ -46,7 +46,7 @@ export async function saveTeamOrder(names: string[]) {
     const list = z.array(z.string().trim().min(1).max(60)).max(50).parse(names);
     return db.$transaction(async (tx) => {
       const before = await tx.teamMember.findMany({ where: { peRank: { not: null } }, orderBy: { peRank: "asc" } });
-      const members = await ensureTeamMembers(tx, list);
+      const members = await ensureTeamMembers(tx, list, "PE");
       await tx.teamMember.updateMany({ where: { peRank: { not: null } }, data: { peRank: null } });
       for (const [i, m] of members.entries()) {
         await tx.teamMember.update({ where: { id: m.id }, data: { peRank: i } });
@@ -56,7 +56,7 @@ export async function saveTeamOrder(names: string[]) {
       ]);
       const team = await tx.teamMember.findMany({ orderBy: { name: "asc" } });
       return {
-        team: team.map((t) => ({ id: t.id, name: t.name, peRank: t.peRank })),
+        team: team.map(toTeamOption),
         peMeta: { by: me.name, at: new Date().toISOString() },
       };
     });

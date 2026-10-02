@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import type { PersonRole } from "@/lib/domain/constants";
 import type {
   ActionResult,
   CompanyRow,
@@ -17,7 +18,8 @@ export interface Store {
   companies: CompanyRow[];
   sectors: SectorOption[];
   team: TeamMemberOption[];
-  teamNames: string[];
+  /** Autofill names per field (PE and Research separate; Via = PE + Via names). */
+  pools: Record<PersonRole, string[]>;
   peMeta: DashboardData["peMeta"];
   aiEnabled: boolean;
   maxUploadMb: number;
@@ -39,7 +41,8 @@ export interface Store {
     patch: Partial<CompanyRow>,
     call: () => Promise<ActionResult<CompanyRow>>,
   ) => Promise<CompanyRow | null>;
-  addTeamNames: (names: string[]) => void;
+  /** Optimistically add names to a field's list (and new PE names to the PE team bar). */
+  addTeamNames: (names: string[], role: PersonRole, previous?: string[]) => void;
   setTeam: (team: TeamMemberOption[]) => void;
   setSectors: (s: SectorOption[]) => void;
   setPeMeta: (m: DashboardData["peMeta"]) => void;

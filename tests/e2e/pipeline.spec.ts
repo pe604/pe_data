@@ -57,6 +57,53 @@ test("assigning PE moves Not Assigned to Call Pending, and new names can be adde
   await expect(r.locator(".stage-sel")).toHaveValue("CALL_PENDING");
 });
 
+test("a new PE name joins the PE team bar; PE and Research suggest separate names; Via suggests PE names", async ({ page }) => {
+  const name = uniq("Lists");
+  const person = "Pe" + uniq("x").replace(/\W/g, "").toLowerCase();
+  const display = person.charAt(0).toUpperCase() + person.slice(1);
+  await page.goto("/");
+  await addByName(page, name);
+  const r = row(page, name);
+  const pop = page.locator(".pop");
+  const bar = page.getByRole("group", { name: "PE team" });
+
+  await r.locator("td.c-pe").click();
+  let input = pop.getByRole("textbox", { name: "Assigned PE" });
+  await input.fill(person);
+  await pop.getByRole("option", { name: /as a new team member/ }).click();
+  await pop.getByRole("button", { name: "Done" }).click();
+  await expect(bar).toContainText(display);
+  await page.reload();
+  await expect(page.getByRole("group", { name: "PE team" })).toContainText(display);
+
+  // Research: no PE names, only Research names.
+  await row(page, name).locator("td.c-re").click();
+  input = pop.getByRole("textbox", { name: "Assigned Research" });
+  await input.fill("Ke");
+  await expect(pop.getByRole("option", { name: "Keyur", exact: true })).toHaveCount(0);
+  await input.fill("Ri");
+  await expect(pop.getByRole("option", { name: "Riya", exact: true })).toBeVisible();
+  await input.fill("");
+  await pop.getByRole("button", { name: "Done" }).click();
+  await expect(pop).toHaveCount(0);
+
+  // PE: no Research names. Via: PE names are suggested.
+  await row(page, name).locator("td.c-pe").click();
+  input = pop.getByRole("textbox", { name: "Assigned PE" });
+  await input.fill("Ri");
+  await expect(pop.getByRole("option", { name: "Riya", exact: true })).toHaveCount(0);
+  await input.fill("");
+  await pop.getByRole("button", { name: "Done" }).click();
+  await expect(pop).toHaveCount(0);
+  // The Via column needs a scroll; popovers close on scroll, so let it settle before clicking.
+  const via = row(page, name).locator("td.c-via");
+  await via.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await via.click();
+  await pop.getByRole("textbox", { name: "Via" }).fill("Ke");
+  await expect(pop.getByRole("option", { name: "Keyur", exact: true })).toBeVisible();
+});
+
 test("reject with a reason, days freeze, then restore", async ({ page }) => {
   const name = uniq("Rejectco");
   await page.goto("/");

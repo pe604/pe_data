@@ -17,7 +17,7 @@ const ROLE_LABEL: Record<PersonRole, string> = { PE: "Assigned PE", RESEARCH: "A
 const ROLE_KEY = { PE: "pe", RESEARCH: "research", VIA: "via" } as const;
 
 export function PeoplePopover({ c, anchor, onClose, role }: Base & { role: PersonRole }) {
-  const { teamNames, mutate, addTeamNames } = useStore();
+  const { pools, mutate, addTeamNames } = useStore();
   const [value, setValue] = useState(c[ROLE_KEY[role]]);
   return (
     <Popover anchor={anchor} onClose={onClose} width={300} label={ROLE_LABEL[role]}>
@@ -26,12 +26,12 @@ export function PeoplePopover({ c, anchor, onClose, role }: Base & { role: Perso
       </h4>
       <ChipPicker
         value={value}
-        pool={teamNames}
+        pool={pools[role]}
         label={ROLE_LABEL[role]}
         autoFocus
         onChange={(v) => {
+          addTeamNames(v, role, value);
           setValue(v);
-          addTeamNames(v);
           const patch: Partial<CompanyRow> = { [ROLE_KEY[role]]: v };
           // SPEC §7.5, applied optimistically too; the server is the source of truth.
           if (role !== "VIA" && v.length && c.status === "PIPELINE" && c.stage === "NOT_ASSIGNED") patch.stage = "CALL_PENDING";

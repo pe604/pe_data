@@ -48,7 +48,7 @@ export function AddCompanyModal({
   onClose: () => void;
   onAdded: (t: Target) => void;
 }) {
-  const { companies, sectors, teamNames, addTeamNames, putRow, toast, openDrawer, aiEnabled, maxUploadMb } = useStore();
+  const { companies, sectors, pools, addTeamNames, putRow, toast, openDrawer, aiEnabled, maxUploadMb } = useStore();
   const [target, setTarget] = useState<Target>(initialTarget);
   const [step, setStep] = useState<Step>("choose");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -192,7 +192,9 @@ export function AddCompanyModal({
     setSaving(false);
     if (!r.ok) return toast(r.error);
     saved.current = true;
-    addTeamNames([...form.pe, ...form.research, ...form.via]);
+    addTeamNames(form.pe, "PE");
+    addTeamNames(form.research, "RESEARCH");
+    addTeamNames(form.via, "VIA");
     putRow(r.data);
     onAdded(target);
     onClose();
@@ -332,15 +334,15 @@ export function AddCompanyModal({
             </label>
             <div className="field">
               <span>Assigned PE</span>
-              <ChipPicker value={form.pe} onChange={(v) => set({ pe: v })} pool={teamNames} label="Assigned PE" />
+              <ChipPicker value={form.pe} onChange={(v) => set({ pe: v })} pool={pools.PE} label="Assigned PE" />
             </div>
             <div className="field">
               <span>Assigned Research</span>
-              <ChipPicker value={form.research} onChange={(v) => set({ research: v })} pool={teamNames} label="Assigned Research" />
+              <ChipPicker value={form.research} onChange={(v) => set({ research: v })} pool={pools.RESEARCH} label="Assigned Research" />
             </div>
             <div className="field full">
               <span>Via</span>
-              <ChipPicker value={form.via} onChange={(v) => set({ via: v })} pool={teamNames} label="Via" />
+              <ChipPicker value={form.via} onChange={(v) => set({ via: v })} pool={pools.VIA} label="Via" />
             </div>
             <label className="field full">
               <span>Comment</span>
