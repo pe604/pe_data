@@ -36,6 +36,48 @@ export function allowedScales(text: string): number[] {
   return scales;
 }
 
+/** A financials row must be a metric (Revenue, EBITDA, PAT…), never another company's name. */
+const METRIC = /revenue|sales|turnover|income|ebitda|\bebit\b|\bpat\b|profit|loss|margin|gross|\bgm\b|\bcm ?1\b|contribution|\bgmv\b|\barr\b|\bmrr\b|\baum\b|order ?book|book ?size|net ?worth|cash|burn|opex|capex|expenses|cost|debt|bookings|disbursement|premium/i;
+const COMPANY_NAME = /\b(ltd|limited|pvt|private|inc|llp|corp|corporation|plc|gmbh|s\.?p\.?a)\b/i;
+
+export function isMetricLabel(label: unknown): boolean {
+  const l = String(label ?? "").trim();
+  return !!l && METRIC.test(l) && !COMPANY_NAME.test(l);
+}
+
+/**
+ * Keeps only rows labelled as a financial metric. A table whose rows are company names (a peer comparison copied
+ * from the deck) ends up empty, so the financials are dropped rather than shown as the company's own.
+ */
+export function cleanFinancials<T extends SummaryJson>(j: T): T {
+  const f = j.financials;
+  if (!f) return j;
+  const rows = (f.rows ?? []).filter((r) => r && isMetricLabel(r.label));
+  return { ...j, financials: rows.length ? { ...f, rows } : null };
+}
+
+/**
+ * The deck pages (or slides) whose text contains the table's figures, most matches first: the context for checking
+ * that the figures are the company's own. Expects "[Page n]" / "[Slide n]" markers, as deck.ts writes them.
+ */
+export function pagesWithFigures(j: SummaryJson, deckText: string, max = 6): string[] {
+  const values = (j.financials?.rows ?? [])
+    .flatMap((r) => r?.values ?? [])
+    .map(parseFigure)
+    .filter((v): v is number => v !== null && v !== 0);
+  if (!values.length) return [];
+  const pages = deckText.split(/(?=\[(?:Page|Slide) \d+\])/).filter((p) => p.trim());
+  return pages
+    .map((p) => {
+      const nums = deckNumbers(p);
+      return { p, hits: values.filter((v) => nums.some((n) => close(n, v))).length };
+    })
+    .filter((x) => x.hits > 0)
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, max)
+    .map((x) => x.p.trim());
+}
+
 const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.051, Math.abs(b) * 0.002);
 
 /**

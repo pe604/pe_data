@@ -23,6 +23,9 @@ export function systemPrompt(sectors: string[]): string {
     "- Sanity check before answering: each Revenue value must match the deck's revenue for that year in size (a ₹ 2,080 Cr company is never 208.0).",
     "",
     "Financials table:",
+    "- Only the presenting company's OWN reported figures. Never use figures of other companies (peers, competitors, listed comparables, customers, investors), market or TAM sizes, government or defence budgets, order or contract values, pipeline or LoI values, or funding raised, even if they are in a table with years.",
+    "- If the deck does not state the company's own revenue or profit figures, set financials to null. An early-stage deck with no financials is normal; never fill the table from other numbers.",
+    "- Row labels are metric names (Revenue, EBITDA, EBITDA %, PAT, Gross margin %), never company names.",
     "- unit is \"₹ Cr\" for rupee decks. At most 6 columns covering the latest actual years and the projections, oldest first.",
     "- Column labels are financial years as FY + two digits: \"2025-26\", \"FY 2025-26\" and \"FY'26\" are all FY26. Projected years get the deck's suffix (FY27E) or P when the deck calls them plan, projection or forecast (FY27P).",
     "- At most 3 rows. Revenue first. Then \"EBITDA\" in the same unit as Revenue if the deck gives absolute EBITDA, and \"EBITDA %\" if it gives margins; otherwise Gross margin % or PAT. Never mix absolute values and percentages in one row.",
@@ -48,6 +51,37 @@ export function userPrompt(deck: DeckInput): string {
   const base = `Deck file: ${deck.fileName}\nThe deck is attached as a PDF. Read every page, including charts, tables and scanned pages.`;
   if (!deck.text.trim()) return base;
   return `${base}\n\nThe PDF's text layer follows, page by page. Use it for exact figures and units.\n---\n${deck.text}`;
+}
+
+/** Second, independent check that a financials table is the company's own figures (not peers, market, orders). */
+export const ownershipSystem = [
+  "You check one thing in a company pitch deck: whether a table of figures is the presenting company's OWN reported financials.",
+  "Answer own = false if the figures belong to other companies (peers, competitors, listed comparables, customers), or are market or TAM sizes, budgets, order or contract values, pipeline values, funding raised, or anything other than the presenting company's own revenue, profit or margins.",
+  "Answer own = true only if the deck pages clearly present these figures as the company's own.",
+  "Reply with one JSON object matching the schema.",
+].join("\n");
+
+export const ownershipSchema = {
+  type: "object",
+  properties: {
+    own: { type: "boolean", description: "True only if these are the presenting company's own financials" },
+    reason: { type: "string", description: "One short sentence" },
+  },
+  required: ["own", "reason"],
+  additionalProperties: false,
+};
+
+export function ownershipPrompt(company: string | null | undefined, table: string, pages: string[]): string {
+  return [
+    `Presenting company: ${company || "(name not given; the company the deck is about)"}`,
+    "",
+    "Table extracted as this company's financials:",
+    table,
+    "",
+    pages.length
+      ? "Deck pages where these figures appear:\n---\n" + pages.join("\n\n---\n")
+      : "The deck is attached as a PDF; find where these figures appear.",
+  ].join("\n");
 }
 
 /** Follow-up when figures in the first answer could not be found in the deck. */

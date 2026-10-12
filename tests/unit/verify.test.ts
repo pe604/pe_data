@@ -1,6 +1,63 @@
 import { describe, expect, it } from "vitest";
 import { buildMarkdown } from "@/lib/summary/markdown";
-import { allowedScales, deckNumbers, parseFigure, unverifiedFigures } from "@/lib/summary/verify";
+import {
+  allowedScales,
+  cleanFinancials,
+  deckNumbers,
+  isMetricLabel,
+  pagesWithFigures,
+  parseFigure,
+  unverifiedFigures,
+} from "@/lib/summary/verify";
+
+describe("own financials only", () => {
+  it("accepts metric labels and rejects company names", () => {
+    for (const l of ["Revenue", "Operating EBITDA", "EBITDA %", "PAT", "Gross margin %", "Revenue incl. GMV", "Order book"]) {
+      expect(isMetricLabel(l), l).toBe(true);
+    }
+    for (const l of ["Bharat Dynamics Ltd", "Munitions India Ltd", "Premier Explosives Ltd", "Solar Industries", "Skyroot", ""]) {
+      expect(isMetricLabel(l), l).toBe(false);
+    }
+  });
+
+  it("drops a peer-comparison table entirely", () => {
+    const peers = {
+      financials: {
+        unit: "₹ Cr",
+        columns: ["FY23", "FY24"],
+        rows: [
+          { label: "Bharat Dynamics Ltd", values: ["2,469", "2,350"] },
+          { label: "Premier Explosives Ltd", values: ["205", "300"] },
+        ],
+        growth: null,
+      },
+    };
+    expect(cleanFinancials(peers).financials).toBeNull();
+  });
+
+  it("keeps metric rows and removes stray company rows", () => {
+    const mixed = {
+      financials: {
+        unit: "₹ Cr",
+        columns: ["FY25"],
+        rows: [
+          { label: "Revenue", values: ["1,538"] },
+          { label: "Solar Industries Ltd", values: ["7,540"] },
+        ],
+        growth: null,
+      },
+    };
+    expect(cleanFinancials(mixed).financials?.rows?.map((r) => r.label)).toEqual(["Revenue"]);
+  });
+
+  it("finds the pages the figures come from", () => {
+    const text = "[Page 1]\nMarket size $500B\n\n[Page 11]\nBharat Dynamics 2,500 3,300 2,350\n\n[Page 20]\nContracts worth 30 cr";
+    const j = { financials: { unit: "₹ Cr", columns: ["FY26", "FY25"], rows: [{ label: "Revenue", values: ["2,500", "3,300"] }], growth: null } };
+    const pages = pagesWithFigures(j, text);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toContain("[Page 11]");
+  });
+});
 
 const filler = " ".repeat(10) + "Market overview and strategy. ".repeat(12);
 const crDeck =
