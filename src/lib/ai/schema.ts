@@ -18,7 +18,8 @@ export const summarySchema = z.object({
   financials: z
     .object({
       unit: str,
-      columns: z.array(z.string()).max(8).nullable().optional(),
+      // No tight limits here: long tables (e.g. FY23–FY31E) are trimmed by cleanFinancials(), not rejected.
+      columns: z.array(z.string()).max(40).nullable().optional(),
       rows: z
         .array(
           z.object({
@@ -26,7 +27,7 @@ export const summarySchema = z.object({
             values: z.array(z.union([z.string(), z.number()]).nullable()),
           }),
         )
-        .max(6)
+        .max(40)
         .nullable()
         .optional(),
       growth: str,

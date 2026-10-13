@@ -52,8 +52,36 @@ export function isMetricLabel(label: unknown): boolean {
 export function cleanFinancials<T extends SummaryJson>(j: T): T {
   const f = j.financials;
   if (!f) return j;
-  const rows = (f.rows ?? []).filter((r) => r && isMetricLabel(r.label));
-  return { ...j, financials: rows.length ? { ...f, rows } : null };
+  const rows = (f.rows ?? [])
+    .filter((r): r is NonNullable<typeof r> => !!r && isMetricLabel(r.label))
+    .slice(0, 3);
+  if (!rows.length) return { ...j, financials: null };
+  const keep = pickColumns((f.columns ?? []).map((c) => String(c ?? "")));
+  return {
+    ...j,
+    financials: {
+      ...f,
+      columns: keep.map((i) => f.columns?.[i] ?? ""),
+      rows: rows.map((r) => ({ ...r, values: keep.map((i) => r.values?.[i] ?? null) })),
+    },
+  };
+}
+
+/** Projected year: "FY27E", "FY28P", "2027E", "FY29 (P)", "FY30 Proj". */
+const PROJECTED = /(\d)\s*\(?\s*(e|p|f|est|proj|plan|bp)\b\.?\)?\s*$/i;
+
+/**
+ * Indices of at most `max` columns to keep, in order: the latest actual years (up to half) plus the nearest
+ * projections. Long decks (e.g. FY23–FY31E) are trimmed instead of failing validation.
+ */
+export function pickColumns(cols: string[], max = 6): number[] {
+  const all = cols.map((_, i) => i);
+  if (cols.length <= max) return all;
+  const actual = all.filter((i) => !PROJECTED.test(cols[i].trim()));
+  const projected = all.filter((i) => PROJECTED.test(cols[i].trim()));
+  const nProj = Math.min(projected.length, max - Math.min(actual.length, Math.ceil(max / 2)));
+  const nAct = Math.min(actual.length, max - nProj);
+  return [...actual.slice(actual.length - nAct), ...projected.slice(0, nProj)].sort((a, b) => a - b);
 }
 
 /**

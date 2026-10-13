@@ -7,6 +7,7 @@ import {
   isMetricLabel,
   pagesWithFigures,
   parseFigure,
+  pickColumns,
   unverifiedFigures,
 } from "@/lib/summary/verify";
 
@@ -48,6 +49,25 @@ describe("own financials only", () => {
       },
     };
     expect(cleanFinancials(mixed).financials?.rows?.map((r) => r.label)).toEqual(["Revenue"]);
+  });
+
+  it("trims long tables to 6 columns (latest actuals + nearest projections) instead of failing", () => {
+    const cols = ["FY23", "FY24", "FY25", "FY26E", "FY27E", "FY28E", "FY29E", "FY30E", "FY31E"];
+    expect(pickColumns(cols).map((i) => cols[i])).toEqual(["FY23", "FY24", "FY25", "FY26E", "FY27E", "FY28E"]);
+    const mostlyActual = ["FY19", "FY20", "FY21", "FY22", "FY23", "FY24", "FY25", "FY26P"];
+    expect(pickColumns(mostlyActual).map((i) => mostlyActual[i])).toEqual(["FY21", "FY22", "FY23", "FY24", "FY25", "FY26P"]);
+    expect(pickColumns(["FY24", "FY25"])).toEqual([0, 1]);
+    const j = {
+      financials: {
+        unit: "₹ Cr",
+        columns: cols,
+        rows: [{ label: "Revenue", values: ["15", "30", "61", "107", "193", "394", "634", "941", "1,345"] }],
+        growth: null,
+      },
+    };
+    const out = cleanFinancials(j).financials;
+    expect(out?.columns).toHaveLength(6);
+    expect(out?.rows?.[0].values).toEqual(["15", "30", "61", "107", "193", "394"]);
   });
 
   it("finds the pages the figures come from", () => {
