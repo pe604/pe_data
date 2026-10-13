@@ -255,7 +255,7 @@ sectorPoints: string[2–3], tailwinds: string[2–3]
 The server builds markdown from the JSON, omitting empty sections entirely:
 
 1. Snapshot (key–value grid: Round, Advisor, Location, Deck date)
-2. Business (one paragraph of 3–4 sentences on the business model)
+2. Business (3–4 bullets, each a full sentence, together explaining the business model)
 3. Revenue mix
 4. Financials (₹ Cr) table plus a "Growth:" line
 5. Deal ask
