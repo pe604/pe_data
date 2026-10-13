@@ -58,7 +58,9 @@ export function responseJsonSchema(sectors: string[]) {
       advisor: { ...s, description: "Investment banker or advisor firm" },
       location: { ...s, description: "Headquarters city" },
       deckDate: { ...s, description: "Month and year of the deck" },
-      business: list("3 or 4 bullets, each under 18 words: what they do, for whom, how they make money"),
+      business: list(
+        "3 or 4 full sentences, one per item, 20 to 35 words each, explaining the whole business model: what they do, for whom, how they make money and deliver, and current scale",
+      ),
       revenueMix: { ...s, description: "One or two sentences on revenue split" },
       financials: {
         type: ["object", "null"],

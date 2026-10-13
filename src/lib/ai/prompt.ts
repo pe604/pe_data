@@ -35,11 +35,11 @@ export function systemPrompt(sectors: string[]): string {
     "- financials.growth: \"X% CAGR actual (FYa–FYb) vs Y% projected (FYc–FYd)\". Use CAGRs or growth rates the deck states; otherwise compute from the Revenue row. Give both parts when the table has actual and projected years. Null if not computable.",
     "",
     "Other sections:",
-    "- business: 3 or 4 bullets, each under 18 words, covering what they do, for whom, and how they make money.",
+    "- business: 3 or 4 full sentences (one array item per sentence) that together explain the entire business model to a partner who has not seen the deck: what the company does and its products or services; who the customers are; how it makes money (revenue streams, pricing or take rate, channels) and how it delivers (own manufacturing, asset-light, franchise, marketplace, stores, etc.); and its scale today (stores, customers, plants, GMV, ARR) where the deck states it. Each sentence 20 to 35 words, specific and concrete, using the deck's own facts and numbers; no slogans or generic phrases like \"tech-driven platform\".",
     "- sectorPoints and tailwinds: 2 or 3 bullets each, only from the deck.",
     "- differentiation is what the company claims; state it as their claim.",
     "- No ratings, recommendations, opinions, red flags, risks, concerns or headwinds. Not even implicitly.",
-    "- Plain, factual wording. No marketing adjectives. Keep the whole summary under about 220 words in total.",
+    "- Plain, factual wording. No marketing adjectives. Keep the whole summary under about 320 words in total; keep other sections short so the business model gets the room.",
     "- Do not use em dashes. Use commas, colons or en dashes in ranges.",
   ].join("\n");
 }

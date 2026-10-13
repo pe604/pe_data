@@ -234,7 +234,8 @@ Force structured output with `response_format: { type: "json_schema", strict: tr
 ```
 company, sector (one of the master list), subSector (2–5 words),
 round, advisor, location, deckDate,
-business: string[3–4] (each < 18 words: what they do, for whom, how they make money),
+business: string[3–4] (full sentences, 20–35 words each, together explaining the whole business model: what they do,
+  for whom, how they make money and deliver, current scale),
 revenueMix, financials: { unit: "₹ Cr", columns: string[≤6], rows: [{label, values[]}] (≤3 rows, Revenue first,
   then the most useful of EBITDA %, Gross margin %, PAT), growth: "X% CAGR actual (FYa–FYb) vs Y% projected (FYc–FYd)" },
 dealAsk, founders (incl. existing investors), customers, differentiation (as claimed),
@@ -247,14 +248,14 @@ sectorPoints: string[2–3], tailwinds: string[2–3]
 - INR amounts are shown in ₹ Cr (1 Cr = 10 Mn = 100 Lakh). USD amounts stay in USD.
 - Keep the deck's E or P suffix on projected years. Losses go in brackets.
 - **No** ratings, recommendations, red flags, risks or headwinds.
-- Plain, factual wording, under about 220 words in total, readable in 60–90 seconds.
+- Plain, factual wording, under about 320 words in total (raised from 220 on 2026-10-13 so the business model is explained properly); other sections stay short.
 
 ### 9.4 Rendering
 
 The server builds markdown from the JSON, omitting empty sections entirely:
 
 1. Snapshot (key–value grid: Round, Advisor, Location, Deck date)
-2. Business (bullets)
+2. Business (one paragraph of 3–4 sentences on the business model)
 3. Revenue mix
 4. Financials (₹ Cr) table plus a "Growth:" line
 5. Deal ask

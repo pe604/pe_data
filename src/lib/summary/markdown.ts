@@ -56,7 +56,8 @@ export function buildMarkdown(j: SummaryJson, unverified: string[] = []): string
   if (snap.length) out.push("## Snapshot", ...snap.map(([k, v]) => `${k}: ${v}`), "");
 
   const business = cleanArr(j.business);
-  if (business.length) out.push("## Business", ...business.map((x) => "- " + x), "");
+  // One paragraph: 3–4 sentences explaining the business model (SPEC §9.3).
+  if (business.length) out.push("## Business", business.map((x) => (/[.!?]$/.test(x) ? x : x + ".")).join(" "), "");
 
   const mix = cleanStr(j.revenueMix);
   if (mix) out.push("## Revenue mix", mix, "");

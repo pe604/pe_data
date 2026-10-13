@@ -47,7 +47,12 @@ describe("buildMarkdown (SPEC §9.4)", () => {
 
   it("omits empty sections entirely", () => {
     const md = buildMarkdown({ business: ["Makes widgets"], round: null, financials: null, tailwinds: [] });
-    expect(md).toBe("## Business\n- Makes widgets");
+    expect(md).toBe("## Business\nMakes widgets.");
+  });
+
+  it("writes Business as one paragraph of sentences", () => {
+    const md = buildMarkdown({ business: ["Runs 22 menswear stores.", "Sells online via its app and Myntra"] });
+    expect(md).toBe("## Business\nRuns 22 menswear stores. Sells online via its app and Myntra.");
   });
 
   it("drops placeholder text like 'not in deck'", () => {
@@ -75,7 +80,7 @@ describe("buildMarkdown (SPEC §9.4)", () => {
   });
 
   it("stays within the word budget for a full summary", () => {
-    expect(wordCount(buildMarkdown(full))).toBeLessThan(220);
+    expect(wordCount(buildMarkdown(full))).toBeLessThan(320);
   });
 });
 
