@@ -186,12 +186,13 @@ test("bulk add to Invested skips duplicates", async ({ page }) => {
   await expect(row(page, a)).toBeVisible();
 });
 
-test("Invested tab: no Priority/Stage/Via, amount invested is editable and totalled", async ({ page }) => {
-  const a = uniq("Amtone");
+test("Invested tab: rounds and valuation give total invested, current value and MOIC", async ({ page }) => {
+  const a = uniq("Portco");
   await page.goto("/");
   await openTab(page, "Invested");
   const head = page.locator("table.grid thead");
-  await expect(head).toContainText("Amount invested (₹ Cr)");
+  // Names may carry the sort arrow ("Invested↓" is the default sort here).
+  for (const h of ["Invested", "Current value", "MOIC"]) await expect(head.getByRole("columnheader", { name: new RegExp(`^${h}`) })).toHaveCount(1);
   for (const h of ["Priority", "Stage at exit", "Via"]) await expect(head.getByRole("columnheader", { name: h, exact: true })).toHaveCount(0);
   for (const b of ["Priority", "Stage", "Via"]) await expect(page.locator(".toolbar").getByRole("button", { name: b, exact: true })).toHaveCount(0);
 
@@ -200,22 +201,56 @@ test("Invested tab: no Priority/Stage/Via, amount invested is editable and total
   await dlg.getByText("Add several portfolio companies at once").click();
   await dlg.locator("textarea").fill(a);
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
-  await expect(row(page, a)).toBeVisible();
+  await expect(row(page, a)).toContainText("Add rounds");
 
-  await row(page, a).locator("td.c-amt").click();
-  const input = page.getByLabel("Amount invested in crore");
-  await input.fill("abc");
-  await expect(page.locator(".pop").getByRole("button", { name: "Save" })).toBeDisabled();
-  await input.fill("1,250.5");
-  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
-  await expect(row(page, a).locator("td.c-amt")).toHaveText("1,250.5");
-  await expect(page.locator("tfoot .total-row")).toContainText("1,250.5");
-  await page.reload();
-  await expect(row(page, a).locator("td.c-amt")).toHaveText("1,250.5");
+  // Round 1: stake suggested from amount and pre-money.
+  await row(page, a).locator("td.c-amt").first().click();
+  const drawer = page.locator(".drawer.open");
+  await expect(drawer.getByRole("tab", { name: /Investment/ })).toHaveAttribute("aria-selected", "true");
+  await drawer.getByLabel("Date").fill("2024-06-10");
+  await drawer.getByLabel("Round", { exact: true }).fill("Seed");
+  await drawer.getByLabel("Amount invested (₹ Cr)").fill("10");
+  await drawer.getByLabel("Pre-money valuation (₹ Cr)").fill("190");
+  await drawer.getByRole("button", { name: /Use 5% \(amount ÷ post-money\)/ }).click();
+  await drawer.getByRole("button", { name: "Add round", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Round added.");
 
-  await openCompany(page, a);
-  await page.getByRole("tab", { name: "History" }).click();
-  await expect(page.locator(".hist")).toContainText("₹ 1,250.5 Cr");
+  // Round 2, no stake.
+  await drawer.getByRole("button", { name: "Add round", exact: true }).click();
+  await drawer.getByLabel("Date").fill("2025-11-02");
+  await drawer.getByLabel("Amount invested (₹ Cr)").fill("5");
+  await drawer.locator("form").getByRole("button", { name: "Add round", exact: true }).click();
+  await expect(drawer.locator(".inv-sum")).toContainText("₹ 15 Cr");
+  await expect(drawer.locator(".inv-sum")).toContainText("2 rounds");
+
+  // Valuation: stake pre-filled from stakes bought (5%).
+  await drawer.getByRole("button", { name: "Add valuation" }).click();
+  await expect(drawer.getByLabel("Our stake (%)")).toHaveValue("5");
+  await drawer.getByLabel("As of").fill("2026-03-31");
+  await drawer.getByLabel("Company valuation (₹ Cr)").fill("400");
+  await drawer.locator("form").getByRole("button", { name: "Add valuation" }).click();
+  await expect(drawer.locator(".inv-sum")).toContainText("₹ 20 Cr");
+  await expect(drawer.locator(".inv-sum")).toContainText("1.33x");
+
+  await drawer.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText("added investment Seed: ₹ 10 Cr on 10 Jun 2024");
+  await expect(page.locator(".hist")).toContainText("added valuation mark (New round): company ₹ 400 Cr, our stake 5%");
+  await page.keyboard.press("Escape");
+
+  const r = row(page, a);
+  await expect(r).toContainText("₹ 15 Cr");
+  await expect(r).toContainText("2 rounds");
+  await expect(r).toContainText("₹ 20 Cr");
+  await expect(r).toContainText("1.33x");
+  await expect(page.locator(".pf")).toContainText("₹ 15 Cr");
+  await expect(page.locator("tfoot .total-row")).toContainText("₹ 15 Cr");
+
+  // Removing a round updates the totals.
+  await r.locator("td.c-amt").first().click();
+  await drawer.getByRole("row", { name: /2 Nov 2025/ }).getByRole("button", { name: "Remove" }).click();
+  await drawer.getByRole("button", { name: "Confirm remove" }).click();
+  await expect(drawer.locator(".inv-sum")).toContainText("₹ 10 Cr");
+  await expect(drawer.locator(".inv-sum")).toContainText("2.00x");
 });
 
 test("bulk add to Rejected with one reason and date, skipping duplicates", async ({ page }) => {

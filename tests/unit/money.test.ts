@@ -26,8 +26,9 @@ describe("₹ Cr amounts", () => {
     expect(totalCr([null, null])).toBeNull();
   });
 
-  it("sorts by amount, blanks last", () => {
-    const row = (id: string, amountInvested: number | null) => ({ id, name: id, amountInvested }) as CompanyRow;
+  it("sorts by amount invested, blanks last", () => {
+    const row = (id: string, invested: number | null) =>
+      ({ id, name: id, holding: invested === null ? null : { invested, rounds: 1, firstDate: null, currentValue: null, moic: null, markDate: null } }) as CompanyRow;
     const rows = [row("a", 5), row("b", null), row("c", 20)];
     expect(sortRows(rows, "amount-high").map((r) => r.id)).toEqual(["c", "a", "b"]);
     expect(sortRows(rows, "amount-low").map((r) => r.id)).toEqual(["a", "c", "b"]);

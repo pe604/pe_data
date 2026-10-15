@@ -63,7 +63,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │   │       ├── files/              # POST upload (staged or attached); [id] GET view/download
 │   │       ├── companies/[id]/download-all/  # zip grouped Deck/ Model/ Other/
 │   │       └── export/             # Excel
-│   ├── actions/                    # server actions: companies.ts, files.ts (files + summaries), misc.ts (comments, team, sectors), auth.ts
+│   ├── actions/                    # server actions: companies.ts, files.ts (files + summaries), misc.ts (comments, team, sectors), portfolio.ts (rounds, valuations)
 │   ├── components/
 │   │   ├── Dashboard.tsx store.tsx # client state, optimistic mutate() with rollback, URL sync
 │   │   ├── shell/ bars/ toolbar/ table/ cells/ drawer/ add/ ui/

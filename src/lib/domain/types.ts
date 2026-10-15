@@ -1,4 +1,5 @@
 import type { FileKind, Stage, Status } from "./constants";
+import type { Holding } from "./portfolio";
 
 /** One table row. Serialisable; sent from server to client. */
 export interface CompanyRow {
@@ -14,8 +15,8 @@ export interface CompanyRow {
   exitAt: string | null;
   exitStage: Stage | null;
   directInvested: boolean;
-  /** ₹ Cr; Invested tab only. */
-  amountInvested: number | null;
+  /** Invested companies only: rounds total, current value, MOIC (SPEC §15). */
+  holding: Holding | null;
   rejectReason: string | null;
   oneDriveUrl: string | null;
   pe: string[];
@@ -117,6 +118,28 @@ export interface CompanyDetail {
   comments: CommentItem[];
   history: HistoryItem[];
   activeJob: JobItem | null;
+  rounds: RoundItem[];
+  marks: MarkItem[];
+}
+
+export interface RoundItem {
+  id: string;
+  date: string;
+  round: string | null;
+  instrument: string | null;
+  amount: number;
+  preMoney: number | null;
+  stakePct: number | null;
+}
+
+export interface MarkItem {
+  id: string;
+  date: string;
+  valuation: number;
+  stakePct: number;
+  source: string;
+  note: string | null;
+  by: string;
 }
 
 export type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error: string };

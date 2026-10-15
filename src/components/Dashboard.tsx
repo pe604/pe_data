@@ -17,6 +17,7 @@ import {
 } from "@/lib/domain/view";
 import { AddCompanyModal } from "./add/AddCompanyModal";
 import { PeBar, StagesBar } from "./bars/Bars";
+import { PortfolioBar } from "./bars/PortfolioBar";
 import { Drawer } from "./drawer/Drawer";
 import { Header } from "./shell/Header";
 import { StoreCtx, type DrawerTab, type Store } from "./store";
@@ -201,6 +202,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
             <PeBar rows={inTab} view={view} setView={setView} />
           </>
         )}
+        {view.tab === "invested" && counts.invested > 0 && <PortfolioBar rows={inTab} view={view} />}
         <Toolbar rows={inTab} view={view} setView={setView} />
         <DealTable rows={inTab} view={view} setView={setView} openId={openId} />
       </div>

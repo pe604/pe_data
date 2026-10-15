@@ -73,7 +73,11 @@ function columns(status: Status, today: string): Col[] {
   // Invested: no Priority, Stage at exit or Via (as on the dashboard); Amount invested instead.
   return [
     ...base,
-    { h: "Amount invested (₹ Cr)", w: 16, t: "num", v: (c) => c.amountInvested ?? "" },
+    { h: "Invested (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.invested ?? "" },
+    { h: "Rounds", w: 8, t: "num", v: (c) => c.holding?.rounds || "" },
+    { h: "Current value (₹ Cr)", w: 16, t: "num", v: (c) => c.holding?.currentValue ?? "" },
+    { h: "MOIC", w: 8, t: "num", v: (c) => c.holding?.moic ?? "" },
+    { h: "Valuation as of", w: 15, t: "date", v: (c) => xDate(c.holding?.markDate ?? null) },
     ...people.filter((p) => p.h !== "Priority"),
     latest,
     received,

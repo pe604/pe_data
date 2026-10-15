@@ -6,7 +6,6 @@ import { db } from "@/lib/db";
 import { STAGES, type PersonRole } from "@/lib/domain/constants";
 import { dateToISO, isISODate, isoToDate, todayISO } from "@/lib/domain/dates";
 import { isDuplicateName, normCompany, parseBulkNames } from "@/lib/domain/names";
-import { fmtCr } from "@/lib/domain/money";
 import { checkLink } from "@/lib/domain/onedrive";
 import type { CompanyDetail, CompanyRow, DashboardData } from "@/lib/domain/types";
 import { run, UserError } from "@/lib/server/action";
@@ -15,6 +14,7 @@ import {
   getRow,
   listText,
   loadDashboard,
+  num,
   peopleOf,
   replacePeople,
   type Change,
@@ -50,8 +50,6 @@ const patchSchema = z
     priority,
     dateReceived: isoDate.nullable(),
     oneDriveUrl: z.string().trim().max(2000).nullable(),
-    /** ₹ Cr, up to 2 decimals. */
-    amountInvested: z.number().finite().min(0).max(1_000_000).nullable(),
   })
   .partial();
 
@@ -94,15 +92,6 @@ export async function updateCompany(companyId: string, patch: z.input<typeof pat
         assertReceivedNotFuture(p.dateReceived);
         data.dateReceived = isoToDate(p.dateReceived);
         changes.push({ field: "dateReceived", from: fmtDay(dateToISO(c.dateReceived)), to: fmtDay(p.dateReceived) });
-      }
-      if (p.amountInvested !== undefined) {
-        const next = p.amountInvested === null ? null : Math.round(p.amountInvested * 100) / 100;
-        const cur = c.amountInvested === null ? null : Number(c.amountInvested);
-        if (next !== cur) {
-          if (c.status !== "INVESTED") throw new UserError("Amount invested is only for companies in Invested.");
-          data.amountInvested = next;
-          changes.push({ field: "amountInvested", from: fmtCr(cur), to: fmtCr(next) });
-        }
       }
       if (p.oneDriveUrl !== undefined) {
         let url: string | null = null;
@@ -406,6 +395,8 @@ export async function getCompanyDetail(companyId: string) {
           summaries: { include: { editedBy: { select: { name: true } } }, orderBy: { version: "asc" } },
           comments: { include: { author: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
           auditLogs: { include: { actor: { select: { name: true } } }, orderBy: { at: "desc" }, take: 500 },
+          rounds: { orderBy: [{ date: "asc" }, { createdAt: "asc" }] },
+          marks: { include: { createdBy: { select: { name: true } } }, orderBy: [{ date: "desc" }, { createdAt: "desc" }] },
         },
       }),
       db.summaryJob.findFirst({
@@ -462,6 +453,24 @@ export async function getCompanyDetail(companyId: string) {
             sourceFileName: job.sourceFile?.originalName ?? null,
           }
         : null,
+      rounds: c.rounds.map((r) => ({
+        id: r.id,
+        date: dateToISO(r.date) ?? "",
+        round: r.round,
+        instrument: r.instrument,
+        amount: Number(r.amount),
+        preMoney: num(r.preMoney),
+        stakePct: num(r.stakePct),
+      })),
+      marks: c.marks.map((m) => ({
+        id: m.id,
+        date: dateToISO(m.date) ?? "",
+        valuation: Number(m.valuation),
+        stakePct: Number(m.stakePct),
+        source: m.source,
+        note: m.note,
+        by: m.createdBy.name,
+      })),
     };
   });
 }

@@ -18,6 +18,7 @@ import { useStore, type DrawerTab } from "../store";
 import { IconX } from "../ui/icons";
 import { ReasonModal } from "../ui/overlay";
 import { CommentsTab, HistoryTab } from "./CommentsHistory";
+import { InvestmentTab } from "./InvestmentTab";
 import { MaterialsTab } from "./MaterialsTab";
 import { SummaryTab } from "./SummaryTab";
 
@@ -188,6 +189,9 @@ function DrawerBody({
     ["comments", "Comments", detail?.comments.length ?? c.commentCount],
     ["history", "History", null],
   ];
+  // Invested companies get an Investment tab (rounds and valuations), first.
+  if (st === "INVESTED") tabs.unshift(["investment", "Investment", detail?.rounds.length ?? c.holding?.rounds ?? null]);
+  const current: DrawerTab = tab === "investment" && st !== "INVESTED" ? "summary" : tab;
 
   return (
     <>
@@ -287,7 +291,7 @@ function DrawerBody({
         )}
         <nav className="dtabs" role="tablist" aria-label="Company file sections">
           {tabs.map(([k, l, n]) => (
-            <button key={k} className="dtab" role="tab" type="button" aria-selected={tab === k} onClick={() => setTab(k)}>
+            <button key={k} className="dtab" role="tab" type="button" aria-selected={current === k} onClick={() => setTab(k)}>
               {l}
               {n ? <span className="n">{n}</span> : null}
             </button>
@@ -297,11 +301,13 @@ function DrawerBody({
       <div className="dbody">
         {!detail ? (
           <p className="muted">Loading…</p>
-        ) : tab === "summary" ? (
+        ) : current === "investment" ? (
+          <InvestmentTab detail={detail} reload={reload} />
+        ) : current === "summary" ? (
           <SummaryTab detail={detail} reload={reload} goMaterials={() => setTab("materials")} setBusyEditing={setBusyEditing} />
-        ) : tab === "materials" ? (
+        ) : current === "materials" ? (
           <MaterialsTab detail={detail} reload={reload} />
-        ) : tab === "comments" ? (
+        ) : current === "comments" ? (
           <CommentsTab detail={detail} reload={reload} setBusyEditing={setBusyEditing} />
         ) : (
           <HistoryTab detail={detail} />

@@ -52,8 +52,10 @@ export const SORTS = [
   ["name-za", "Company Z–A"],
   ["sector-az", "Sector A–Z"],
   ["sector-za", "Sector Z–A"],
-  ["amount-high", "Amount invested, highest first"],
-  ["amount-low", "Amount invested, lowest first"],
+  ["amount-high", "Invested, highest first"],
+  ["amount-low", "Invested, lowest first"],
+  ["value-high", "Current value, highest first"],
+  ["moic-high", "MOIC, highest first"],
 ] as const;
 export type SortKey = (typeof SORTS)[number][0];
 export const DEFAULT_SORT: SortKey = "priority";
@@ -61,7 +63,9 @@ export const DEFAULT_SORT: SortKey = "priority";
 /** Invested tab hides Priority, Stage at exit and Via; amount sorting is Invested-only. */
 export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
   return SORTS.filter(([k]) =>
-    tab === "invested" ? !k.startsWith("priority") && !k.startsWith("stage") : !k.startsWith("amount"),
+    tab === "invested"
+      ? !k.startsWith("priority") && !k.startsWith("stage")
+      : !k.startsWith("amount") && !k.startsWith("moic") && !k.startsWith("value"),
   );
 }
 
@@ -79,6 +83,9 @@ export const HEADER_SORTS: Record<string, [SortKey, SortKey]> = {
   date: ["date-new", "date-old"],
   days: ["days-most", "days-least"],
   amount: ["amount-high", "amount-low"],
+  // Highest first only; blanks always last.
+  value: ["value-high", "value-high"],
+  moic: ["moic-high", "moic-high"],
 };
 
 export function activeFilterCount(f: Filters): number {
@@ -166,9 +173,13 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
     case "sector-za":
       return out.sort(blanksLast((c) => c.sector || null, (x, y) => str(y, x)));
     case "amount-high":
-      return out.sort(blanksLast((c) => c.amountInvested, (x, y) => y - x));
+      return out.sort(blanksLast((c) => c.holding?.invested ?? null, (x, y) => y - x));
     case "amount-low":
-      return out.sort(blanksLast((c) => c.amountInvested, num));
+      return out.sort(blanksLast((c) => c.holding?.invested ?? null, num));
+    case "moic-high":
+      return out.sort(blanksLast((c) => c.holding?.moic ?? null, (x, y) => y - x));
+    case "value-high":
+      return out.sort(blanksLast((c) => c.holding?.currentValue ?? null, (x, y) => y - x));
   }
   return out;
 }

@@ -6,8 +6,9 @@ import { STAGE_LABELS, STAGES, stageIndex, type PersonRole, type Stage } from "@
 import { ageClass, daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
 import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, emptyFilters, HEADER_SORTS, sortRows, type ViewState } from "@/lib/domain/view";
-import { fmtCrNumber, totalCr } from "@/lib/domain/money";
-import { AmountPopover, DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
+import { fmtCr } from "@/lib/domain/money";
+import { fmtMoic, portfolioSummary } from "@/lib/domain/portfolio";
+import { DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
 import { useStore } from "../store";
 import { CloudFill, CloudLine } from "../ui/icons";
 
@@ -18,7 +19,7 @@ type Props = {
   openId: string | null;
 };
 
-type Pop = { kind: "sector" | "date" | "od" | "amount" | PersonRole; id: string; el: HTMLElement };
+type Pop = { kind: "sector" | "date" | "od" | PersonRole; id: string; el: HTMLElement };
 
 const EMPTY = {
   pipeline: ["No companies in the pipeline yet", "Add a deck to start tracking your first deal."],
@@ -34,7 +35,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   const exited = view.tab !== "pipeline";
   // Invested: no Priority, Stage at exit or Via; an Amount invested column instead.
   const invested = view.tab === "invested";
-  const colCount = invested ? 9 : 11;
+  const colCount = 11;
 
   if (!rows.length) {
     const [h, p] = EMPTY[view.tab];
@@ -97,7 +98,9 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             {th("c-co", "Company", "co")}
             {th("c-od", "OneDrive")}
             {th("c-sec", "Sector & sub-sector", "sector")}
-            {invested && th("c-amt", "Amount invested (₹ Cr)", "amount")}
+            {invested && th("c-amt", "Invested", "amount")}
+            {invested && th("c-amt", "Current value", "value")}
+            {invested && th("c-amt c-moic", "MOIC", "moic")}
             {!invested && th("c-stage", exited ? "Stage at exit" : "Stage", "stage")}
             {!invested && th("c-pri", "Priority", "pri")}
             {th("c-pe", "Assigned PE")}
@@ -189,11 +192,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                     <span className="ph">Add sector</span>
                   )}
                 </td>
-                {invested && (
-                  <td className="c-amt editable num" {...editable("amount")}>
-                    {c.amountInvested === null ? <span className="ph">Add</span> : fmtCrNumber(c.amountInvested)}
-                  </td>
-                )}
+                {invested && <HoldingCells c={c} open={() => openDrawer(c.id, "investment")} />}
                 {!invested && (
                 <td className="c-stage">
                   <StageCell c={c} onChange={(s) => mutate(c.id, { stage: s }, () => updateCompany(c.id, { stage: s }))} />
@@ -259,23 +258,12 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             );
           })}
         </tbody>
-        {invested && list.length > 0 && (
-          <tfoot>
-            <tr className="total-row">
-              <td className="c-co">Total ({list.length})</td>
-              <td />
-              <td />
-              <td className="c-amt num">{fmtCrNumber(totalCr(list.map((c) => c.amountInvested)) ?? 0)}</td>
-              <td colSpan={colCount - 4} />
-            </tr>
-          </tfoot>
-        )}
+        {invested && list.length > 0 && <TotalRow rows={list} colCount={colCount} />}
       </table>
       {pop && popRow && (
         <>
           {pop.kind === "sector" && <SectorPopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
           {pop.kind === "date" && <DatePopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
-          {pop.kind === "amount" && <AmountPopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
           {pop.kind === "od" && <OneDrivePopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
           {(pop.kind === "PE" || pop.kind === "RESEARCH" || pop.kind === "VIA") && (
             <PeoplePopover key={pop.kind + pop.id} c={popRow} role={pop.kind} anchor={pop.el} onClose={() => setPop(null)} />
@@ -283,6 +271,77 @@ export function DealTable({ rows, view, setView, openId }: Props) {
         </>
       )}
     </div>
+  );
+}
+
+/** Invested tab: total invested (with round count), current value (with mark date) and MOIC. Click opens Investment. */
+function HoldingCells({ c, open }: { c: CompanyRow; open: () => void }) {
+  const h = c.holding;
+  const cell = {
+    role: "button",
+    tabIndex: 0,
+    onClick: open,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    },
+    title: "Open the investment details",
+  } as const;
+  return (
+    <>
+      <td className="c-amt editable" {...cell}>
+        {h?.invested ? (
+          <>
+            <div className="amt">{fmtCr(h.invested)}</div>
+            <div className="sub">
+              {h.rounds} round{h.rounds > 1 ? "s" : ""}
+            </div>
+          </>
+        ) : (
+          <span className="ph">Add rounds</span>
+        )}
+      </td>
+      <td className="c-amt editable" {...cell}>
+        {h?.currentValue !== null && h?.currentValue !== undefined ? (
+          <>
+            <div className="amt">{fmtCr(h.currentValue)}</div>
+            <div className="sub">as of {h.markDate ? fmtDate(h.markDate) : "–"}</div>
+          </>
+        ) : (
+          <span className="ph">{h?.invested ? "Add valuation" : "–"}</span>
+        )}
+      </td>
+      <td className="c-amt c-moic editable" {...cell}>
+        {h?.moic !== null && h?.moic !== undefined ? (
+          <span className={"moic" + (h.moic >= 1 ? " up" : " down")}>{fmtMoic(h.moic)}</span>
+        ) : (
+          <span className="ph">–</span>
+        )}
+      </td>
+    </>
+  );
+}
+
+/** Totals for the rows shown; unmarked companies count at cost in the current value. */
+function TotalRow({ rows, colCount }: { rows: CompanyRow[]; colCount: number }) {
+  const s = portfolioSummary(rows);
+  return (
+    <tfoot>
+      <tr className="total-row">
+        <td className="c-co">Total ({rows.length})</td>
+        <td />
+        <td />
+        <td className="c-amt">{fmtCr(s.invested)}</td>
+        <td className="c-amt" title={s.unmarked ? `${s.unmarked} without a valuation counted at cost` : undefined}>
+          {fmtCr(s.currentValue)}
+          {s.unmarked > 0 && <div className="sub">{s.unmarked} at cost</div>}
+        </td>
+        <td className="c-amt c-moic">{fmtMoic(s.moic) ?? "–"}</td>
+        <td colSpan={colCount - 6} />
+      </tr>
+    </tfoot>
   );
 }
 

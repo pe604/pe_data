@@ -11,7 +11,7 @@ import type {
   TeamMemberOption,
 } from "@/lib/domain/types";
 
-export type DrawerTab = "summary" | "materials" | "comments" | "history";
+export type DrawerTab = "summary" | "materials" | "comments" | "history" | "investment";
 
 export interface Store {
   me: Me;

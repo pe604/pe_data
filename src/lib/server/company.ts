@@ -5,6 +5,7 @@ import { dateToISO } from "@/lib/domain/dates";
 import { nameKey, titleCase } from "@/lib/domain/names";
 import type { CompanyRow, DashboardData, Me, TeamMemberOption } from "@/lib/domain/types";
 import { safeHref } from "@/lib/domain/onedrive";
+import { holdingOf } from "@/lib/domain/portfolio";
 import { aiConfigured, env } from "@/lib/env";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -16,7 +17,13 @@ export const rowInclude = {
     orderBy: { createdAt: "desc" },
   },
   _count: { select: { files: true } },
+  rounds: { select: { date: true, amount: true, stakePct: true } },
+  // Latest mark only (by date, then entry order).
+  marks: { select: { date: true, valuation: true, stakePct: true }, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 1 },
 } satisfies Prisma.CompanyInclude;
+
+/** Prisma Decimal | null → number | null. */
+export const num = (d: Prisma.Decimal | null | undefined) => (d === null || d === undefined ? null : Number(d));
 
 type RowSource = Prisma.CompanyGetPayload<{ include: typeof rowInclude }>;
 
@@ -37,7 +44,15 @@ export function toRow(c: RowSource): CompanyRow {
     exitAt: dateToISO(c.exitAt),
     exitStage: c.exitStage,
     directInvested: c.directInvested,
-    amountInvested: c.amountInvested === null ? null : Number(c.amountInvested),
+    holding:
+      c.status === "INVESTED"
+        ? holdingOf(
+            c.rounds.map((r) => ({ date: dateToISO(r.date) ?? "", amount: Number(r.amount), stakePct: num(r.stakePct) })),
+            c.marks[0]
+              ? { date: dateToISO(c.marks[0].date) ?? "", valuation: Number(c.marks[0].valuation), stakePct: Number(c.marks[0].stakePct) }
+              : null,
+          )
+        : null,
     rejectReason: c.rejectReason,
     oneDriveUrl: safeHref(c.oneDriveUrl),
     pe: people("PE"),

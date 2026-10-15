@@ -28,7 +28,7 @@ const row = (p: Partial<CompanyRow>): CompanyRow => ({
   exitAt: null,
   exitStage: null,
   directInvested: false,
-  amountInvested: null,
+  holding: null,
   rejectReason: null,
   oneDriveUrl: null,
   pe: [],

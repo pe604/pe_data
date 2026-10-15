@@ -53,7 +53,7 @@ Env vars:
 
 - There is no read-only Viewer role for now.
 - **While there is no login, everyone is an Editor** (the shared "Team" user). Adding sectors is unavailable until a login exists.
-- **Invested tab columns** (2026-10-15): no Priority, Stage at exit or Via (hidden in the table, filter buttons, sort list and the Excel Invested sheet; switching to Invested clears those filters). Instead an **Amount invested (₹ Cr)** column after Sector: click to edit (accepts "12.5", "1,250", "₹ 20 Cr"; blank clears; ≥ 0, 2 decimals), Indian digit grouping, sortable (highest/lowest first, blanks last; default sort on Invested), a **Total** row for the companies shown, and a History entry on every change. Stored as `Company.amountInvested` (Decimal 14,2); editable only while the company is in Invested.
+- **Invested tab columns** (2026-10-15): no Priority, Stage at exit or Via (hidden in the table, filter buttons, sort list and the Excel Invested sheet; switching to Invested clears those filters). Portfolio columns, rounds and valuations: see section 15.
 - **Bulk add to Rejected** (2026-10-15): Add company (Pipeline target, opened automatically from the Rejected tab) → "Add several rejected companies at once": one name per line, one shared reason (required) and a "Rejected on" date (default today, not in the future). Names already on the dashboard are skipped; stage at exit is Not Assigned; each company gets a Rejection row and a History note.
 - **Permanent delete is open to Editors** (decision of 2026-10-01): drawer → Delete → reason → "Delete permanently". It removes the company, its files (from storage too), summaries, comments and history; a `DeletionLog` row keeps the name and reason.
 
@@ -403,7 +403,20 @@ Decks shared in the team's WhatsApp group are added to the pipeline automaticall
   7. The bot **replies in the group**, e.g. "Added *FreshBus* to the pipeline, via Arvind Sir (shared by Raghav), received 30 Sep 2026." or "Added this deck to *FreshBus*, already in Rejected." If a deck can't be handled it replies with the reason (too large, unreadable).
 - Deck contents are never written to logs; the reply never quotes deck contents beyond the company name.
 
-## 15. Non-goals (for now)
+## 15. Portfolio tracking (Invested tab, Phase 1, 2026-10-16)
+
+All amounts are **₹ Cr**, shown as "₹ 12.5 Cr" with Indian digit grouping.
+
+- **Rounds** (`InvestmentRound`): any number per Invested company. Date (not in the future), round name (free text with suggestions: Seed, Pre-Series A, Series A–D, Pre-IPO, Bridge, Secondary), instrument (Equity, CCPS, CCD, Convertible note, Other), amount (> 0, required), pre-money valuation (optional), stake bought % (optional, entered; the form offers amount ÷ (pre-money + amount) as a one-click suggestion). Add, edit, remove.
+- **Valuation marks** (`ValuationMark`): date, company valuation (100%), our stake % at that date (after dilution; pre-filled from the previous mark, else the sum of stakes bought), source (New round, Fair value report, Auditor, Other), optional note. Full history is kept; the **latest by date** is used.
+- **Per company:** Invested = sum of rounds; Current value = latest valuation × our stake; MOIC = current value ÷ invested ("–" without a valuation).
+- **Invested table:** columns Invested (with "N rounds"), Current value (with "as of" date), MOIC (green ≥ 1x, brick below), in place of Priority, Stage at exit and Via. Clicking any of them opens the company file on its **Investment** tab. Sorts: Invested highest/lowest first (default), Current value highest first, MOIC highest first; blanks last. A **Total** row sums the companies shown.
+- **Portfolio cards** above the table (respect filters and search): Total invested, Current value, MOIC; split by sector and by Indian financial year of the first investment. Companies without a valuation count **at cost** in current value and overall MOIC (shown as "N at cost").
+- **Company file:** an **Investment** tab (first tab for Invested companies) with the summary, the rounds table + form, and the valuation history + form. Removing a round or valuation needs a second click to confirm.
+- Rounds and valuations can only be changed while the company is in Invested. Every add/edit/remove writes a History note. The Excel Invested sheet has Invested, Rounds, Current value, MOIC and Valuation as of.
+- The earlier single "Amount invested" field was migrated into one round per company (dated the invested date) and removed.
+
+## 16. Non-goals (for now)
 
 - Email ingestion
 - Notifications

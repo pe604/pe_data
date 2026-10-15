@@ -87,6 +87,8 @@ model User {
   rejections        Rejection[]
   auditLogs         AuditLog[]
   deletionLogs      DeletionLog[]
+  roundsCreated     InvestmentRound[]
+  marksCreated      ValuationMark[]
 }
 
 /// Names used in PE / Research / Via chips. Not necessarily app users.
@@ -129,8 +131,6 @@ model Company {
   exitAt         DateTime?     @db.Date
   exitStage      Stage?
   directInvested Boolean       @default(false)
-  /// Invested tab: total amount Niveshaay invested, in ₹ Cr (null = not entered).
-  amountInvested Decimal?      @db.Decimal(14, 2)
 
   // Other
   rejectReason    String?
@@ -156,6 +156,8 @@ model Company {
   summaryJobs SummaryJob[]
   rejections  Rejection[]
   auditLogs   AuditLog[]
+  rounds      InvestmentRound[]
+  marks       ValuationMark[]
 
   @@index([status])
   @@index([status, priority, dateReceived])
@@ -356,4 +358,48 @@ model DeletionLog {
   byId        String
   by          User     @relation(fields: [byId], references: [id])
   at          DateTime @default(now())
+}
+
+// ─── Portfolio (SPEC §15) ────────────────────────────────────────────────────
+
+/// One investment by Niveshaay into a portfolio company. Amounts in INR crore.
+model InvestmentRound {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  /// e.g. Seed, Series A, Pre-IPO
+  round       String?
+  /// Equity, CCPS, CCD, Convertible note, Other
+  instrument  String?
+  amount      Decimal  @db.Decimal(14, 2)
+  /// Company pre-money valuation for this round, INR crore.
+  preMoney    Decimal? @db.Decimal(16, 2)
+  /// Stake bought in this round, %.
+  stakePct    Decimal? @db.Decimal(7, 4)
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, date])
+}
+
+/// A valuation of a portfolio company at a date; the latest one gives current value and MOIC.
+model ValuationMark {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  /// Company valuation (100%), INR crore.
+  valuation   Decimal  @db.Decimal(16, 2)
+  /// Niveshaay's stake at this date, % (after any dilution).
+  stakePct    Decimal  @db.Decimal(7, 4)
+  /// New round, Fair value report, Auditor, Other
+  source      String
+  note        String?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, date])
 }
