@@ -18,6 +18,8 @@ import {
 import { AddCompanyModal } from "./add/AddCompanyModal";
 import { PeBar, StagesBar } from "./bars/Bars";
 import { PortfolioBar } from "./bars/PortfolioBar";
+import { MeetingsView } from "./portfolio/MeetingsView";
+import { QuarterlyTracker } from "./portfolio/QuarterlyTracker";
 import { Drawer } from "./drawer/Drawer";
 import { Header } from "./shell/Header";
 import { StoreCtx, type DrawerTab, type Store } from "./store";
@@ -44,6 +46,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const [drawerTab, setDrawerTab] = useState<DrawerTab>("summary");
   const [addOpen, setAddOpen] = useState(false);
   const [detailVersion, setDetailVersion] = useState(0);
+  // Invested tab sub-view (SPEC §15).
+  const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings">("portfolio");
 
   const rowsRef = useRef(companies);
   useEffect(() => {
@@ -202,9 +206,32 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
             <PeBar rows={inTab} view={view} setView={setView} />
           </>
         )}
-        {view.tab === "invested" && counts.invested > 0 && <PortfolioBar rows={inTab} view={view} />}
-        <Toolbar rows={inTab} view={view} setView={setView} />
-        <DealTable rows={inTab} view={view} setView={setView} openId={openId} />
+        {view.tab === "invested" && counts.invested > 0 && (
+          <div className="seg-switch" role="tablist" aria-label="Invested views">
+            {(
+              [
+                ["portfolio", "Portfolio"],
+                ["quarterly", "Quarterly tracker"],
+                ["meetings", "Meetings"],
+              ] as const
+            ).map(([k, l]) => (
+              <button key={k} type="button" role="tab" aria-selected={invView === k} onClick={() => setInvView(k)}>
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+        {view.tab === "invested" && counts.invested > 0 && invView === "quarterly" ? (
+          <QuarterlyTracker />
+        ) : view.tab === "invested" && counts.invested > 0 && invView === "meetings" ? (
+          <MeetingsView companies={inTab} />
+        ) : (
+          <>
+            {view.tab === "invested" && counts.invested > 0 && <PortfolioBar rows={inTab} view={view} />}
+            <Toolbar rows={inTab} view={view} setView={setView} />
+            <DealTable rows={inTab} view={view} setView={setView} openId={openId} />
+          </>
+        )}
       </div>
       <Drawer
         openId={openId}

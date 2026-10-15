@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
 import { addByName, openCompany, openTab, row, uniq } from "./helpers";
+import { addDays, todayISO } from "../../src/lib/domain/dates";
+import { quarterOf } from "../../src/lib/domain/quarters";
 
 test("add a company with a deck, review, and it appears in Pipeline", async ({ page }) => {
   const name = uniq("Deckco");
@@ -328,4 +330,78 @@ test("Excel export downloads", async ({ page }) => {
   await page.getByRole("button", { name: "Export to Excel" }).click();
   const d = await dl;
   expect(d.suggestedFilename()).toMatch(/^Niveshaay Deal Pipeline \d{4}-\d{2}-\d{2}\.xlsx$/);
+});
+
+test("quarterly tracker: tick MIS, remarks, MIS due date; meetings: plan, mark done, shown in tracker and company file", async ({ page }) => {
+  const today = todayISO();
+  const yesterday = addDays(today, -1);
+  await page.goto("/");
+  await openTab(page, "Invested");
+
+  // Meetings view: plan one for today, log one yesterday as planned (needs updating), then mark it done.
+  await page.getByRole("tab", { name: "Meetings" }).click();
+  for (const [date, type] of [[today, "Plant visit"], [yesterday, "Management meeting"]] as const) {
+    await page.getByRole("button", { name: "Add meeting" }).click();
+    const form = page.getByRole("form", { name: "Add meeting" });
+    await form.getByLabel("Company").selectOption({ label: "Mokobara" });
+    await form.getByLabel("Meeting date").fill(date);
+    await form.getByLabel("Type").selectOption(type);
+    const who = form.getByRole("textbox", { name: "Who is going" });
+    await who.fill("Keyur");
+    await who.press("Enter");
+    await who.press("Escape"); // close the suggestion list
+    await form.getByRole("button", { name: "Add meeting" }).click();
+    await expect(page.getByRole("status")).toContainText("Meeting planned.");
+  }
+  const needs = page.locator(".mtg-group", { hasText: "Needs updating" });
+  await expect(needs).toContainText("Management meeting");
+  await expect(needs).toContainText("Not marked done");
+  await expect(page.locator(".mtg-group", { hasText: "Upcoming" })).toContainText("Plant visit");
+  await needs.getByRole("button", { name: "Mark done" }).click();
+  const edit = page.getByRole("form", { name: "Edit meeting" });
+  await expect(edit.getByLabel("Status")).toHaveValue("DONE");
+  await edit.getByLabel("Notes and next steps").fill("Met the CFO, Q2 numbers due next week");
+  await edit.getByRole("button", { name: "Save meeting" }).click();
+  await expect(page.locator(".mtg-group", { hasText: "Past" })).toContainText("Met the CFO");
+  await expect(page.locator(".mtg-group", { hasText: "Needs updating" })).toHaveCount(0);
+
+  // Quarterly tracker for the last ended quarter.
+  await page.getByRole("tab", { name: "Quarterly tracker" }).click();
+  const mis = page.getByRole("button", { name: "MIS/FS received for Mokobara" });
+  await mis.click();
+  await page.locator(".pop").getByRole("button", { name: "Mark done" }).click();
+  await expect(mis).toContainText("✓");
+  await expect(page.locator(".q-progress")).toContainText("MIS/FS received: 1/");
+  // Far-right column: scroll first (popovers close on scroll), then open.
+  const remarks = page.getByRole("button", { name: "Remarks for Mokobara" });
+  await remarks.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await remarks.click();
+  await page.locator(".pop").getByLabel("Remarks").fill("Raghav will visit this month");
+  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: "Remarks for Mokobara" })).toHaveText("Raghav will visit this month");
+  // Meetings in the results period (this quarter) show in Quarterly calls.
+  if (quarterOf(yesterday) === quarterOf(today)) {
+    await expect(page.locator("tr", { hasText: "Mokobara" }).locator("td").nth(5)).toContainText("1 done · 1 planned");
+  }
+  // MIS due date is editable.
+  await page.getByRole("button", { name: /MIS due .*\(default\) · Edit/ }).click();
+  await page.locator(".pop").getByLabel("Date").fill("2030-01-31");
+  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: /MIS due 31 Jan 2030 · Edit/ })).toBeVisible();
+  await page.reload();
+  await openTab(page, "Invested");
+  await page.getByRole("tab", { name: "Quarterly tracker" }).click();
+  await expect(page.getByRole("button", { name: "Remarks for Mokobara" })).toHaveText("Raghav will visit this month");
+
+  // Company file: Meetings tab and History.
+  await page.getByRole("button", { name: "Mokobara", exact: true }).click();
+  const drawer = page.locator(".drawer.open");
+  await expect(drawer.getByRole("tab", { name: /Meetings/ })).toHaveAttribute("aria-selected", "true");
+  await expect(drawer).toContainText("Met the CFO");
+  await drawer.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText("checklist: MIS/FS received done on");
+  await expect(page.locator(".hist")).toContainText("remarks: Raghav will visit this month");
+  await expect(page.locator(".hist")).toContainText("planned meeting: Plant visit");
+  await expect(page.locator(".hist")).toContainText("marked done");
 });

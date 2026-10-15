@@ -416,6 +416,21 @@ All amounts are **₹ Cr**, shown as "₹ 12.5 Cr" with Indian digit grouping.
 - Rounds and valuations can only be changed while the company is in Invested. Every add/edit/remove writes a History note. The Excel Invested sheet has Invested, Rounds, Current value, MOIC and Valuation as of.
 - The earlier single "Amount invested" field was migrated into one round per company (dated the invested date) and removed.
 
+### 15.2 Quarterly tracker and meetings (2026-10-17)
+
+The Invested tab has three views: **Portfolio** (the table above), **Quarterly tracker**, **Meetings**.
+
+- **Quarterly tracker** replaces the "Team Allocation - Results" sheet. Indian FY quarters (Q1 Apr–Jun … Q4 Jan–Mar), keys like `FY27-Q2`. Opens on the last ended quarter; a picker shows the current quarter and the 8 before it. One row per Invested company (A–Z):
+  - Company (opens the company file on Meetings), **Handled by** = Assigned PE (read-only here).
+  - **MIS/FS received**, **Result note**, **Result update**, **Shared with BDO**: ticks stored as the date done (not in the future). Click → date + "Mark done" / "Not done". MIS shows "Due <date>" until received and **Overdue** (brick) after the due date.
+  - **Quarterly calls**: meetings with the company in the quarter's **results period** (the three months after it ends), e.g. "1 done · 1 planned"; click opens the company's Meetings tab.
+  - **Remarks**: free text for the quarter.
+  - Header: **MIS due date** for the quarter, editable (default quarter end + 45 days; "Reset to default"), and progress counts ("MIS/FS received: 14/22", "MIS overdue: 3").
+  - "Result made by" and "IPO/Exit tracking" from the sheet are intentionally not included. MIS files are uploaded to the company's Materials (AI reading of MIS numbers is a later step).
+- **Meetings**: per company, date, type (Plant visit, Management meeting, Quarterly call, Other), status (Planned, Done, Cancelled; Done can't be in the future), who is going (names, PE suggestions), notes / next steps. The Meetings view lists all portfolio meetings in **Needs updating** (planned, date passed), **Upcoming**, **Past**, filterable by person and company, with Add, Mark done (opens the form as Done for notes), Edit and Remove (two clicks). Each Invested company's file has a **Meetings** tab with the same, for that company.
+- Every tick, remark, MIS due date change and meeting add/edit/remove writes a History note.
+- **Next: reminders** (weekly WhatsApp digest of meetings this week, meetings not marked done, MIS overdue, checklist gaps).
+
 ## 16. Non-goals (for now)
 
 - Email ingestion

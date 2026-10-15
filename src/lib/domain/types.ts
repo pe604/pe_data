@@ -132,6 +132,39 @@ export interface RoundItem {
   stakePct: number | null;
 }
 
+/** Quarterly tracker (SPEC §15): one row per Invested company for a quarter. Tick fields are the date done. */
+export interface QuarterRow {
+  companyId: string;
+  name: string;
+  pe: string[];
+  misAt: string | null;
+  resultNoteAt: string | null;
+  resultUpdateAt: string | null;
+  bdoAt: string | null;
+  remarks: string | null;
+  /** Meetings in the results period, e.g. "1 done · 1 planned". */
+  meetings: string | null;
+}
+
+export interface QuarterView {
+  quarter: string;
+  misDue: string;
+  misDueIsDefault: boolean;
+  rows: QuarterRow[];
+}
+
+export interface MeetingItem {
+  id: string;
+  companyId: string;
+  companyName: string;
+  date: string;
+  type: string;
+  status: "PLANNED" | "DONE" | "CANCELLED";
+  attendees: string[];
+  notes: string | null;
+  by: string;
+}
+
 export interface MarkItem {
   id: string;
   date: string;

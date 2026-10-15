@@ -89,6 +89,7 @@ model User {
   deletionLogs      DeletionLog[]
   roundsCreated     InvestmentRound[]
   marksCreated      ValuationMark[]
+  meetingsCreated   Meeting[]
 }
 
 /// Names used in PE / Research / Via chips. Not necessarily app users.
@@ -158,6 +159,8 @@ model Company {
   auditLogs   AuditLog[]
   rounds      InvestmentRound[]
   marks       ValuationMark[]
+  checks      QuarterCheck[]
+  meetings    Meeting[]
 
   @@index([status])
   @@index([status, priority, dateReceived])
@@ -401,5 +404,51 @@ model ValuationMark {
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
+  @@index([companyId, date])
+}
+/// Quarterly checklist per portfolio company (replaces the "Team Allocation - Results" sheet). SPEC §15.
+/// Each tick is the date it was done (null = not done).
+model QuarterCheck {
+  id             String    @id @default(cuid())
+  companyId      String
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// Indian FY quarter, e.g. "FY27-Q2" (Jul-Sep 2026)
+  quarter        String
+  misAt          DateTime? @db.Date
+  resultNoteAt   DateTime? @db.Date
+  resultUpdateAt DateTime? @db.Date
+  bdoAt          DateTime? @db.Date
+  remarks        String?
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([companyId, quarter])
+}
+
+/// Per-quarter settings: the MIS due date (default quarter end + 45 days).
+model QuarterSetting {
+  quarter   String   @id
+  misDue    DateTime @db.Date
+  updatedAt DateTime @updatedAt
+}
+
+/// Visits, management meetings and calls with portfolio companies, planned and done.
+model Meeting {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  /// Plant visit, Management meeting, Quarterly call, Other
+  type        String
+  /// PLANNED, DONE, CANCELLED
+  status      String   @default("PLANNED")
+  /// Team members attending (names)
+  attendees   String[]
+  notes       String?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
   @@index([companyId, date])
 }

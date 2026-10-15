@@ -19,6 +19,7 @@ import { IconX } from "../ui/icons";
 import { ReasonModal } from "../ui/overlay";
 import { CommentsTab, HistoryTab } from "./CommentsHistory";
 import { InvestmentTab } from "./InvestmentTab";
+import { CompanyMeetings } from "../portfolio/MeetingsView";
 import { MaterialsTab } from "./MaterialsTab";
 import { SummaryTab } from "./SummaryTab";
 
@@ -190,8 +191,12 @@ function DrawerBody({
     ["history", "History", null],
   ];
   // Invested companies get an Investment tab (rounds and valuations), first.
-  if (st === "INVESTED") tabs.unshift(["investment", "Investment", detail?.rounds.length ?? c.holding?.rounds ?? null]);
-  const current: DrawerTab = tab === "investment" && st !== "INVESTED" ? "summary" : tab;
+  if (st === "INVESTED") {
+    tabs.unshift(["investment", "Investment", detail?.rounds.length ?? c.holding?.rounds ?? null]);
+    tabs.splice(1, 0, ["meetings", "Meetings", null]);
+  }
+  const portfolioOnly = tab === "investment" || tab === "meetings";
+  const current: DrawerTab = portfolioOnly && st !== "INVESTED" ? "summary" : tab;
 
   return (
     <>
@@ -303,6 +308,8 @@ function DrawerBody({
           <p className="muted">Loading…</p>
         ) : current === "investment" ? (
           <InvestmentTab detail={detail} reload={reload} />
+        ) : current === "meetings" ? (
+          <CompanyMeetings companyId={c.id} />
         ) : current === "summary" ? (
           <SummaryTab detail={detail} reload={reload} goMaterials={() => setTab("materials")} setBusyEditing={setBusyEditing} />
         ) : current === "materials" ? (

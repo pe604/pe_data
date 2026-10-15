@@ -451,3 +451,40 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
   .pf{margin:4px 16px 10px}
   .pf-cards,.pf-splits,.inv-sum,.inv-form .grid3{grid-template-columns:1fr}
 }
+
+/* Invested sub-views: Portfolio / Quarterly tracker / Meetings (SPEC §15) */
+.seg-switch{display:inline-flex;gap:2px;margin:6px 28px 4px;background:var(--rule-2);border-radius:8px;padding:3px}
+.seg-switch button{border:0;background:none;padding:6px 12px;border-radius:6px;font-size:13px;color:var(--ink-2);font-weight:500}
+.seg-switch button[aria-selected="true"]{background:var(--surface);color:var(--green);box-shadow:0 1px 2px rgba(22,36,26,.08)}
+.pview{margin:6px 0 24px}
+.pview-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:4px 28px 10px}
+.pview>.inv-form,.pview>.mtg-group,.pview>.empty,.pview>.muted{margin-left:28px;margin-right:28px}
+.q-progress{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.q-progress strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.q-progress .bad{color:var(--brick);font-weight:500}
+.qgrid .q-c{text-align:center;white-space:nowrap;min-width:110px}
+.qgrid .q-pe{font-size:13px;min-width:140px}
+.qgrid .q-rem{min-width:240px;max-width:380px;font-size:13px;white-space:pre-wrap}
+.qgrid .tick{color:var(--green);font-weight:500}
+.qgrid .late{color:var(--brick);font-weight:600}
+.qgrid td.q-overdue{background:var(--brick-soft)}
+.mtg-group{margin-top:14px}
+.mtg-group h3{font-size:14px;margin:0 0 6px;display:flex;gap:6px;align-items:center}
+.mtg-group h3 .n{font-size:12px;color:var(--muted);font-weight:500}
+.mtg-list{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:8px;background:var(--surface)}
+.mtg-list li{display:grid;grid-template-columns:100px minmax(0,1fr) auto;gap:12px;padding:10px 12px;border-top:1px solid var(--rule-2);font-size:13.5px}
+.mtg-list li:first-child{border-top:0}
+.mtg-list li.overdue{background:var(--brick-soft)}
+.mtg-date{font-variant-numeric:tabular-nums;font-weight:500}
+.mtg-notes{margin-top:4px;color:var(--ink-2);white-space:pre-wrap;font-size:13px}
+.mtg-status{margin-left:8px;font-size:11.5px;border-radius:4px;padding:1px 6px;background:var(--rule-2);color:var(--ink-2)}
+.mtg-status.done{background:var(--green-soft);color:var(--green)}
+.mtg-status.planned{background:var(--gold-soft);color:var(--gold)}
+.mtg-list li.overdue .mtg-status{background:var(--surface);color:var(--brick)}
+.mtg-list .acts{white-space:nowrap;align-self:start}
+@media (max-width:760px){
+  .seg-switch{margin:6px 16px 4px}
+  .pview-head{margin:4px 16px 10px}
+  .pview>.inv-form,.pview>.mtg-group,.pview>.empty,.pview>.muted{margin-left:16px;margin-right:16px}
+  .mtg-list li{grid-template-columns:1fr}
+}
