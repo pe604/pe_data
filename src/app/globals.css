@@ -488,3 +488,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
   .pview>.inv-form,.pview>.mtg-group,.pview>.empty,.pview>.muted{margin-left:16px;margin-right:16px}
   .mtg-list li{grid-template-columns:1fr}
 }
+/* MIS quarterly financials (SPEC §15.3) */
+.mis-table th:first-child,.mis-table td:first-child{white-space:nowrap}
+.mis-table .sub-row td{color:var(--muted);font-size:12px;padding-top:2px}
+.mis-table .acts-row td{border-bottom:0;padding-top:4px}
+.mis-table .acts-row .btn-ghost{padding:2px 4px}

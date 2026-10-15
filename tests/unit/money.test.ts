@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtCr, fmtCrNumber, parseCr, totalCr } from "@/lib/domain/money";
+import { fmtCr, fmtCrNumber, parseCr, parseSignedCr, totalCr } from "@/lib/domain/money";
 import { sortRows } from "@/lib/domain/view";
 import type { CompanyRow } from "@/lib/domain/types";
 
@@ -19,6 +19,14 @@ describe("₹ Cr amounts", () => {
     expect(parseCr("  ")).toBeNull();
     expect(parseCr("-5")).toBeUndefined();
     expect(parseCr("abc")).toBeUndefined();
+  });
+
+  it("parses signed amounts for losses", () => {
+    expect(parseSignedCr("-12.5")).toBe(-12.5);
+    expect(parseSignedCr("(3.2)")).toBe(-3.2);
+    expect(parseSignedCr("1,250")).toBe(1250);
+    expect(parseSignedCr("")).toBeNull();
+    expect(parseSignedCr("abc")).toBeUndefined();
   });
 
   it("totals only entered amounts", () => {

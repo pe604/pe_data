@@ -120,6 +120,31 @@ export interface CompanyDetail {
   activeJob: JobItem | null;
   rounds: RoundItem[];
   marks: MarkItem[];
+  /** Quarterly financials from MIS, oldest quarter first (₹ Cr). */
+  mis: MisItem[];
+}
+
+export interface MisItem {
+  quarter: string;
+  revenue: number | null;
+  ebitda: number | null;
+  pat: number | null;
+  cash: number | null;
+  note: string | null;
+  sourceFileId: string | null;
+  sourceFileName: string | null;
+}
+
+/** What the MIS reader found, for review before saving (₹ Cr). */
+export interface MisReadResult {
+  revenue: number | null;
+  ebitda: number | null;
+  pat: number | null;
+  cash: number | null;
+  unit: string | null;
+  source: Record<"revenue" | "ebitda" | "pat", "quarter" | "months" | null>;
+  /** Figures the model gave that aren't in the file's text: check these. */
+  unmatched: string[];
 }
 
 export interface RoundItem {

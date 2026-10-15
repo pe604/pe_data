@@ -52,6 +52,7 @@ enum FileKind {
   DECK
   MODEL
   OTHER
+  MIS
 }
 
 enum SummaryJobStatus {
@@ -90,6 +91,7 @@ model User {
   roundsCreated     InvestmentRound[]
   marksCreated      ValuationMark[]
   meetingsCreated   Meeting[]
+  misEntered        MisFigure[]
 }
 
 /// Names used in PE / Research / Via chips. Not necessarily app users.
@@ -161,6 +163,7 @@ model Company {
   marks       ValuationMark[]
   checks      QuarterCheck[]
   meetings    Meeting[]
+  misFigures  MisFigure[]
 
   @@index([status])
   @@index([status, priority, dateReceived])
@@ -209,6 +212,7 @@ model File {
 
   summaries   Summary[]
   summaryJobs SummaryJob[]
+  misFigures  MisFigure[]
 
   @@index([companyId, uploadedAt])
   @@index([companyId, kind])
@@ -451,4 +455,26 @@ model Meeting {
 
   @@index([date])
   @@index([companyId, date])
+}
+/// Quarterly financials from a company's MIS (or entered by hand), INR crore. One row per company per quarter.
+model MisFigure {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// e.g. "FY27-Q2"
+  quarter      String
+  revenue      Decimal? @db.Decimal(16, 2)
+  ebitda       Decimal? @db.Decimal(16, 2)
+  pat          Decimal? @db.Decimal(16, 2)
+  /// Cash and bank at quarter end
+  cash         Decimal? @db.Decimal(16, 2)
+  note         String?
+  sourceFileId String?
+  sourceFile   File?    @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, quarter])
 }

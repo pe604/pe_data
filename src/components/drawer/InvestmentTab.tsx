@@ -14,6 +14,7 @@ import {
 } from "@/lib/domain/portfolio";
 import type { CompanyDetail, MarkItem, RoundItem } from "@/lib/domain/types";
 import { useStore } from "../store";
+import { MisSection } from "./MisSection";
 
 // Investment rounds and valuation marks for an Invested company (SPEC §15). Amounts in ₹ Cr.
 
@@ -80,6 +81,8 @@ export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reloa
           <strong className={h.moic === null ? "" : h.moic >= 1 ? "moic up" : "moic down"}>{fmtMoic(h.moic) ?? "–"}</strong>
         </div>
       </div>
+
+      <MisSection companyId={c.id} items={detail.mis} reload={reload} />
 
       <section>
         <div className="inv-head">

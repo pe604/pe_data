@@ -431,6 +431,14 @@ The Invested tab has three views: **Portfolio** (the table above), **Quarterly t
 - Every tick, remark, MIS due date change and meeting add/edit/remove writes a History note.
 - **Next: reminders** (weekly WhatsApp digest of meetings this week, meetings not marked done, MIS overdue, checklist gaps).
 
+### 15.3 MIS reader (2026-10-18)
+
+- On the company's **Investment** tab, section **Quarterly financials (MIS)**: pick the quarter (default: last ended), **Upload MIS** (PDF, .xlsx, .xlsm; .xls is converted via LibreOffice) or **Enter manually**. The file is stored like any other (encrypted) with the new file type **MIS** and appears in Materials.
+- **Reading:** the model only *copies* the quarter's figures exactly as printed, plus the unit printed (Cr, Lakh, Mn, Thousand, Rupees): the quarter total if printed, else each of the three months (actuals only; never YTD, full-year or budget columns). Revenue = revenue from operations (not other income); EBITDA as labelled; PAT; cash and bank at quarter end. The code (not the model) converts to ₹ Cr and adds the three months when there's no quarter total (never a partial quarter). Every copied figure is checked against the file's text; misses are listed for checking.
+- **Review before saving:** the form is pre-filled (with "quarter total" / "sum of the 3 months" / "not found" per figure, and the EBITDA margin); nothing is saved until **Save figures**. Losses as -12.5 or (12.5). Saving replaces that quarter's figures (`MisFigure`, one per company per quarter), ticks **MIS/FS received** in the tracker if not yet ticked, and writes a History note.
+- **Table:** last 6 quarters with figures: Revenue, Revenue YoY (vs the same quarter a year earlier), EBITDA, EBITDA %, PAT, Cash and bank; Edit and Remove per quarter.
+- Deck-vs-actual comparison is not included yet.
+
 ## 16. Non-goals (for now)
 
 - Email ingestion

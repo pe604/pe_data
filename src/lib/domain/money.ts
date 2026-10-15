@@ -22,6 +22,15 @@ export function parseCr(input: string): number | null | undefined {
   return Number.isFinite(n) && n <= 1_000_000 ? n : undefined;
 }
 
+/** Like parseCr but allows losses: "-12.5" or "(12.5)". Blank → null; invalid → undefined. */
+export function parseSignedCr(input: string): number | null | undefined {
+  const t = input.trim();
+  if (!t) return null;
+  const neg = /^-/.test(t) || /^\(.*\)$/.test(t);
+  const v = parseCr(t.replace(/^-/, "").replace(/^\((.*)\)$/, "$1"));
+  return v === null || v === undefined ? undefined : neg ? -v : v;
+}
+
 /** Sum of the amounts entered, or null when none are. */
 export function totalCr(values: (number | null)[]): number | null {
   const v = values.filter((x): x is number => x !== null);

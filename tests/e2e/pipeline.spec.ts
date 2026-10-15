@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import { addByName, openCompany, openTab, row, uniq } from "./helpers";
 import { addDays, todayISO } from "../../src/lib/domain/dates";
-import { quarterOf } from "../../src/lib/domain/quarters";
+import { lastEndedQuarter, quarterLabel, quarterOf } from "../../src/lib/domain/quarters";
+import ExcelJS from "exceljs";
 
 test("add a company with a deck, review, and it appears in Pipeline", async ({ page }) => {
   const name = uniq("Deckco");
@@ -404,4 +405,53 @@ test("quarterly tracker: tick MIS, remarks, MIS due date; meetings: plan, mark d
   await expect(page.locator(".hist")).toContainText("remarks: Raghav will visit this month");
   await expect(page.locator(".hist")).toContainText("planned meeting: Plant visit");
   await expect(page.locator(".hist")).toContainText("marked done");
+});
+
+test("MIS: upload a file, enter figures (AI off in tests), see the financials table, tracker tick and History", async ({ page }) => {
+  const a = uniq("Misco");
+  await page.goto("/");
+  await openTab(page, "Invested");
+  await page.getByRole("button", { name: "Add company" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByText("Add several portfolio companies at once").click();
+  await dlg.locator("textarea").fill(a);
+  await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
+  await row(page, a).locator("td.c-amt").first().click();
+  const drawer = page.locator(".drawer.open");
+  await expect(drawer.getByRole("heading", { name: "Quarterly financials (MIS)" })).toBeVisible();
+
+  const wb = new ExcelJS.Workbook();
+  wb.addWorksheet("P&L").addRow(["Revenue", 410.2, 431.8, 455.6]);
+  const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+  const q = quarterLabel(lastEndedQuarter(todayISO()));
+  await drawer.locator('input[aria-label="MIS file"]').setInputFiles({
+    name: "mis.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
+  });
+  const form = drawer.getByRole("form", { name: "MIS figures" });
+  await expect(form).toContainText("AI reading is not set up");
+  await expect(form).toContainText("From mis.xlsx");
+  await form.getByLabel(/^Revenue/).fill("12.98");
+  await form.getByLabel(/^EBITDA/).fill("1.22");
+  await form.getByLabel(/^PAT/).fill("(0.5)");
+  await form.getByLabel(/^Cash and bank/).fill("5.89");
+  await expect(form).toContainText("EBITDA margin 9.4%");
+  await form.getByRole("button", { name: "Save figures" }).click();
+  await expect(page.getByRole("status").first()).toContainText(`${q} figures saved.`);
+  const table = drawer.locator(".mis-table");
+  await expect(table).toContainText(q);
+  await expect(table).toContainText("12.98");
+  await expect(table).toContainText("(0.5)");
+  await expect(table).toContainText("9.4%");
+
+  await drawer.getByRole("tab", { name: /Materials/ }).click();
+  await expect(drawer).toContainText("mis.xlsx");
+  await drawer.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText(`MIS figures: revenue ₹ 12.98 Cr`);
+  await page.keyboard.press("Escape");
+
+  // Saving the figures ticks "MIS/FS received" in the tracker for that quarter.
+  await page.getByRole("tab", { name: "Quarterly tracker" }).click();
+  await expect(page.getByRole("button", { name: `MIS/FS received for ${a}` })).toContainText("✓");
 });

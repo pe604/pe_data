@@ -25,6 +25,17 @@ export const rowInclude = {
 /** Prisma Decimal | null → number | null. */
 export const num = (d: Prisma.Decimal | null | undefined) => (d === null || d === undefined ? null : Number(d));
 
+export const toMisItem = (m: Prisma.MisFigureGetPayload<{ include: { sourceFile: { select: { originalName: true } } } }>) => ({
+  quarter: m.quarter,
+  revenue: num(m.revenue),
+  ebitda: num(m.ebitda),
+  pat: num(m.pat),
+  cash: num(m.cash),
+  note: m.note,
+  sourceFileId: m.sourceFileId,
+  sourceFileName: m.sourceFile?.originalName ?? null,
+});
+
 type RowSource = Prisma.CompanyGetPayload<{ include: typeof rowInclude }>;
 
 export function toRow(c: RowSource): CompanyRow {
