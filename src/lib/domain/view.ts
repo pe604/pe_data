@@ -54,8 +54,6 @@ export const SORTS = [
   ["sector-za", "Sector Z–A"],
   ["amount-high", "Invested, highest first"],
   ["amount-low", "Invested, lowest first"],
-  ["value-high", "Current value, highest first"],
-  ["moic-high", "MOIC, highest first"],
 ] as const;
 export type SortKey = (typeof SORTS)[number][0];
 export const DEFAULT_SORT: SortKey = "priority";
@@ -65,7 +63,7 @@ export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
   return SORTS.filter(([k]) =>
     tab === "invested"
       ? !k.startsWith("priority") && !k.startsWith("stage")
-      : !k.startsWith("amount") && !k.startsWith("moic") && !k.startsWith("value"),
+      : !k.startsWith("amount"),
   );
 }
 
@@ -82,11 +80,7 @@ export const HEADER_SORTS: Record<string, [SortKey, SortKey]> = {
   pri: ["priority", "priority-desc"],
   date: ["date-new", "date-old"],
   days: ["days-most", "days-least"],
-  amount: ["amount-high", "amount-low"],
-  // Highest first only; blanks always last.
-  value: ["value-high", "value-high"],
-  moic: ["moic-high", "moic-high"],
-};
+  amount: ["amount-high", "amount-low"],};
 
 export function activeFilterCount(f: Filters): number {
   return (
@@ -175,12 +169,7 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
     case "amount-high":
       return out.sort(blanksLast((c) => c.holding?.invested ?? null, (x, y) => y - x));
     case "amount-low":
-      return out.sort(blanksLast((c) => c.holding?.invested ?? null, num));
-    case "moic-high":
-      return out.sort(blanksLast((c) => c.holding?.moic ?? null, (x, y) => y - x));
-    case "value-high":
-      return out.sort(blanksLast((c) => c.holding?.currentValue ?? null, (x, y) => y - x));
-  }
+      return out.sort(blanksLast((c) => c.holding?.invested ?? null, num));  }
   return out;
 }
 

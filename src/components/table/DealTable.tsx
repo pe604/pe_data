@@ -7,7 +7,7 @@ import { ageClass, daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
 import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, emptyFilters, HEADER_SORTS, sortRows, type ViewState } from "@/lib/domain/view";
 import { fmtCr } from "@/lib/domain/money";
-import { fmtMoic, portfolioSummary } from "@/lib/domain/portfolio";
+import { portfolioSummary } from "@/lib/domain/portfolio";
 import { DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
 import { useStore } from "../store";
 import { CloudFill, CloudLine } from "../ui/icons";
@@ -35,7 +35,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   const exited = view.tab !== "pipeline";
   // Invested: no Priority, Stage at exit or Via; an Amount invested column instead.
   const invested = view.tab === "invested";
-  const colCount = 11;
+  const colCount = invested ? 9 : 11;
 
   if (!rows.length) {
     const [h, p] = EMPTY[view.tab];
@@ -99,8 +99,6 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             {th("c-od", "OneDrive")}
             {th("c-sec", "Sector & sub-sector", "sector")}
             {invested && th("c-amt", "Invested", "amount")}
-            {invested && th("c-amt", "Current value", "value")}
-            {invested && th("c-amt c-moic", "MOIC", "moic")}
             {!invested && th("c-stage", exited ? "Stage at exit" : "Stage", "stage")}
             {!invested && th("c-pri", "Priority", "pri")}
             {th("c-pe", "Assigned PE")}
@@ -274,7 +272,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   );
 }
 
-/** Invested tab: total invested (with round count), current value (with mark date) and MOIC. Click opens Investment. */
+/** Invested tab: total invested with round count. Click opens the Investment tab (current value and MOIC are there). */
 function HoldingCells({ c, open }: { c: CompanyRow; open: () => void }) {
   const h = c.holding;
   const cell = {
@@ -303,43 +301,20 @@ function HoldingCells({ c, open }: { c: CompanyRow; open: () => void }) {
           <span className="ph">Add rounds</span>
         )}
       </td>
-      <td className="c-amt editable" {...cell}>
-        {h?.currentValue !== null && h?.currentValue !== undefined ? (
-          <>
-            <div className="amt">{fmtCr(h.currentValue)}</div>
-            <div className="sub">as of {h.markDate ? fmtDate(h.markDate) : "–"}</div>
-          </>
-        ) : (
-          <span className="ph">{h?.invested ? "Add valuation" : "–"}</span>
-        )}
-      </td>
-      <td className="c-amt c-moic editable" {...cell}>
-        {h?.moic !== null && h?.moic !== undefined ? (
-          <span className={"moic" + (h.moic >= 1 ? " up" : " down")}>{fmtMoic(h.moic)}</span>
-        ) : (
-          <span className="ph">–</span>
-        )}
-      </td>
     </>
   );
 }
 
-/** Totals for the rows shown; unmarked companies count at cost in the current value. */
+/** Total invested for the rows shown. */
 function TotalRow({ rows, colCount }: { rows: CompanyRow[]; colCount: number }) {
-  const s = portfolioSummary(rows);
   return (
     <tfoot>
       <tr className="total-row">
         <td className="c-co">Total ({rows.length})</td>
         <td />
         <td />
-        <td className="c-amt">{fmtCr(s.invested)}</td>
-        <td className="c-amt" title={s.unmarked ? `${s.unmarked} without a valuation counted at cost` : undefined}>
-          {fmtCr(s.currentValue)}
-          {s.unmarked > 0 && <div className="sub">{s.unmarked} at cost</div>}
-        </td>
-        <td className="c-amt c-moic">{fmtMoic(s.moic) ?? "–"}</td>
-        <td colSpan={colCount - 6} />
+        <td className="c-amt">{fmtCr(portfolioSummary(rows).invested)}</td>
+        <td colSpan={colCount - 4} />
       </tr>
     </tfoot>
   );

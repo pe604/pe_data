@@ -192,8 +192,11 @@ test("Invested tab: rounds and valuation give total invested, current value and 
   await openTab(page, "Invested");
   const head = page.locator("table.grid thead");
   // Names may carry the sort arrow ("Invested↓" is the default sort here).
-  for (const h of ["Invested", "Current value", "MOIC"]) await expect(head.getByRole("columnheader", { name: new RegExp(`^${h}`) })).toHaveCount(1);
-  for (const h of ["Priority", "Stage at exit", "Via"]) await expect(head.getByRole("columnheader", { name: h, exact: true })).toHaveCount(0);
+  await expect(head.getByRole("columnheader", { name: /^Invested/ })).toHaveCount(1);
+  // Current value and MOIC live in the company's Investment tab, not the table.
+  for (const h of ["Priority", "Stage at exit", "Via", "Current value", "MOIC"]) {
+    await expect(head.getByRole("columnheader", { name: new RegExp(`^${h}`) })).toHaveCount(0);
+  }
   for (const b of ["Priority", "Stage", "Via"]) await expect(page.locator(".toolbar").getByRole("button", { name: b, exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Add company" }).first().click();
@@ -240,8 +243,7 @@ test("Invested tab: rounds and valuation give total invested, current value and 
   const r = row(page, a);
   await expect(r).toContainText("₹ 15 Cr");
   await expect(r).toContainText("2 rounds");
-  await expect(r).toContainText("₹ 20 Cr");
-  await expect(r).toContainText("1.33x");
+  await expect(r).not.toContainText("1.33x");
   await expect(page.locator(".pf")).toContainText("₹ 15 Cr");
   await expect(page.locator("tfoot .total-row")).toContainText("₹ 15 Cr");
 
