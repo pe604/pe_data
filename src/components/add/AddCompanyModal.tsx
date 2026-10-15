@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { bulkAddInvested, createCompany } from "@/actions/companies";
+import { bulkAddInvested, bulkAddRejected, createCompany } from "@/actions/companies";
 import { attachStagedToCompany, discardStaged, getJob, stopJob } from "@/actions/files";
 import { todayISO } from "@/lib/domain/dates";
 import { findDuplicate, norm } from "@/lib/domain/names";
@@ -43,10 +43,13 @@ export function AddCompanyModal({
   initialTarget,
   onClose,
   onAdded,
+  openRejectedBulk = false,
 }: {
   initialTarget: Target;
   onClose: () => void;
-  onAdded: (t: Target) => void;
+  onAdded: (t: Target | "rejected") => void;
+  /** Opened from the Rejected tab: start with "Add several rejected companies" open. */
+  openRejectedBulk?: boolean;
 }) {
   const { companies, sectors, pools, addTeamNames, putRow, toast, openDrawer, aiEnabled, maxUploadMb } = useStore();
   const [target, setTarget] = useState<Target>(initialTarget);
@@ -61,6 +64,8 @@ export function AddCompanyModal({
   const [nameOnly, setNameOnly] = useState("");
   const [bulk, setBulk] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [rej, setRej] = useState({ names: "", reason: "", on: todayISO() });
+  const [rejOpen, setRejOpen] = useState(openRejectedBulk);
   const [over, setOver] = useState(false);
   const [saving, setSaving] = useState(false);
   const saved = useRef(false);
@@ -226,6 +231,24 @@ export function AddCompanyModal({
     const { added, skipped } = r.data;
     toast(
       `Added ${added.length} to Invested.` +
+        (skipped.length
+          ? ` Skipped ${skipped.length} already on the dashboard: ${skipped.slice(0, 4).join(", ")}${skipped.length > 4 ? "…" : ""}`
+          : ""),
+    );
+  };
+
+  const addRejectedBulk = async () => {
+    if (!rej.names.trim() || !rej.reason.trim()) return;
+    setSaving(true);
+    const r = await bulkAddRejected(rej.names, rej.reason, rej.on);
+    setSaving(false);
+    if (!r.ok) return toast(r.error);
+    r.data.added.forEach(putRow);
+    onAdded("rejected");
+    onClose();
+    const { added, skipped } = r.data;
+    toast(
+      `Added ${added.length} to Rejected.` +
         (skipped.length
           ? ` Skipped ${skipped.length} already on the dashboard: ${skipped.slice(0, 4).join(", ")}${skipped.length > 4 ? "…" : ""}`
           : ""),
@@ -473,6 +496,54 @@ export function AddCompanyModal({
               <span className="hint">Names already on the dashboard are skipped. Add sectors and links afterwards.</span>
               <button className="btn primary" type="button" onClick={addBulk} disabled={saving || !bulk.trim()}>
                 Add to Invested
+              </button>
+            </div>
+          </details>
+        )}
+        {!invested && (
+          <details className="bulk" open={rejOpen} onToggle={(e) => setRejOpen(e.currentTarget.open)}>
+            <summary>Add several rejected companies at once</summary>
+            <label className="field">
+              <span>Rejected companies, one per line</span>
+              <textarea
+                className="ta"
+                style={{ minHeight: 120 }}
+                placeholder={"Company A\nCompany B\nCompany C"}
+                value={rej.names}
+                onChange={(e) => setRej((s) => ({ ...s, names: e.target.value }))}
+              />
+            </label>
+            <div className="grid2" style={{ marginTop: 8 }}>
+              <label className="field">
+                <span>Reason for rejecting (applies to all)</span>
+                <input
+                  className="inp"
+                  type="text"
+                  placeholder="e.g. Passed earlier, valuation"
+                  value={rej.reason}
+                  onChange={(e) => setRej((s) => ({ ...s, reason: e.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span>Rejected on</span>
+                <input
+                  className="inp"
+                  type="date"
+                  max={todayISO()}
+                  value={rej.on}
+                  onChange={(e) => setRej((s) => ({ ...s, on: e.target.value || todayISO() }))}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 8 }}>
+              <span className="hint">Names already on the dashboard are skipped. Add sectors and decks afterwards.</span>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={addRejectedBulk}
+                disabled={saving || !rej.names.trim() || !rej.reason.trim()}
+              >
+                Add to Rejected
               </button>
             </div>
           </details>

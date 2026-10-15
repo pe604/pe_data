@@ -246,6 +246,50 @@ export async function bulkAddInvested(text: string) {
   });
 }
 
+/** Bulk-add companies straight to Rejected (e.g. older passes), sharing one reason and rejection date. */
+export async function bulkAddRejected(text: string, reason: string, rejectedOn: string) {
+  return run<{ added: CompanyRow[]; skipped: string[] }>(async () => {
+    const me = await requireRole();
+    const names = parseBulkNames(z.string().max(20000).parse(text)).slice(0, 300);
+    const r = z.string().trim().min(1, "Add a reason").max(5000).parse(reason);
+    const on = isoDate.parse(rejectedOn);
+    if (on > todayISO()) throw new UserError("The rejection date can't be in the future.");
+    const existing = await db.company.findMany({ select: { name: true } });
+    const seen = new Set<string>();
+    const toAdd: string[] = [];
+    const skipped: string[] = [];
+    for (const n of names) {
+      const k = normCompany(n);
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      const dup = existing.find((c) => isDuplicateName(n, c.name));
+      if (dup) skipped.push(dup.name);
+      else toAdd.push(n.slice(0, 200));
+    }
+    const ids = await db.$transaction(async (tx) => {
+      const out: string[] = [];
+      for (const name of toAdd) {
+        const c = await tx.company.create({
+          data: {
+            name,
+            status: "REJECTED",
+            rejectReason: r,
+            exitAt: isoToDate(on),
+            exitStage: "NOT_ASSIGNED",
+            nameEdited: true,
+            createdById: me.id,
+          },
+        });
+        await tx.rejection.create({ data: { companyId: c.id, reason: r, stageAtRejection: "NOT_ASSIGNED", byId: me.id } });
+        await audit(tx, c.id, me.id, [{ note: "Added directly to Rejected: " + r }]);
+        out.push(c.id);
+      }
+      return out;
+    });
+    return { added: await Promise.all(ids.map((i) => getRow(i))), skipped };
+  });
+}
+
 // ─── Exits (SPEC §10.3) ──────────────────────────────────────────────────────
 
 export async function rejectCompany(companyId: string, reason: string) {

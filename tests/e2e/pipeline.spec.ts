@@ -186,6 +186,26 @@ test("bulk add to Invested skips duplicates", async ({ page }) => {
   await expect(row(page, a)).toContainText("Added directly");
 });
 
+test("bulk add to Rejected with one reason and date, skipping duplicates", async ({ page }) => {
+  const a = uniq("Rejone");
+  const b = uniq("Rejtwo");
+  await page.goto("/");
+  await openTab(page, "Rejected");
+  await page.getByRole("button", { name: "Add company" }).first().click();
+  const dlg = page.getByRole("dialog");
+  const box = dlg.locator("details", { hasText: "Add several rejected companies at once" });
+  await expect(box).toHaveAttribute("open", "");
+  await box.locator("textarea").fill(`1. ${a}\n- ${b}\nVoltaris Grid Systems\n`);
+  const add = box.getByRole("button", { name: "Add to Rejected" });
+  await expect(add).toBeDisabled();
+  await box.getByLabel("Reason for rejecting (applies to all)").fill("Passed in 2025, valuation");
+  await box.locator('input[type="date"]').fill("2025-11-20");
+  await add.click();
+  await expect(page.getByRole("status")).toContainText("Added 2 to Rejected. Skipped 1 already on the dashboard: Voltaris Grid Systems");
+  await expect(row(page, a)).toContainText("Passed in 2025, valuation");
+  await expect(row(page, b)).toContainText("20 Nov 2025");
+});
+
 test("OneDrive link: rejects javascript:, warns for other hosts, saves", async ({ page }) => {
   const name = uniq("Linkco");
   await page.goto("/");

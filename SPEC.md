@@ -53,6 +53,7 @@ Env vars:
 
 - There is no read-only Viewer role for now.
 - **While there is no login, everyone is an Editor** (the shared "Team" user). Adding sectors is unavailable until a login exists.
+- **Bulk add to Rejected** (2026-10-15): Add company (Pipeline target, opened automatically from the Rejected tab) → "Add several rejected companies at once": one name per line, one shared reason (required) and a "Rejected on" date (default today, not in the future). Names already on the dashboard are skipped; stage at exit is Not Assigned; each company gets a Rejection row and a History note.
 - **Permanent delete is open to Editors** (decision of 2026-10-01): drawer → Delete → reason → "Delete permanently". It removes the company, its files (from storage too), summaries, comments and history; a `DeletionLog` row keeps the name and reason.
 
 - Enforce roles on **every** API route and server action, not just in the UI.

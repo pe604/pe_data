@@ -195,6 +195,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       {addOpen && (
         <AddCompanyModal
           initialTarget={view.tab === "invested" ? "invested" : "pipeline"}
+          openRejectedBulk={view.tab === "rejected"}
           onClose={() => setAddOpen(false)}
           onAdded={(target) => setView((v) => ({ ...v, tab: target }))}
         />
