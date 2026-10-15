@@ -5,6 +5,7 @@ import { setPeople, updateCompany } from "@/actions/companies";
 import { addSector } from "@/actions/misc";
 import type { PersonRole } from "@/lib/domain/constants";
 import { todayISO } from "@/lib/domain/dates";
+import { parseCr } from "@/lib/domain/money";
 import { checkLink } from "@/lib/domain/onedrive";
 import type { CompanyRow } from "@/lib/domain/types";
 import { useStore } from "../store";
@@ -151,6 +152,45 @@ export function DatePopover({ c, anchor, onClose }: Base) {
           Cancel
         </button>
         <button className="btn sm primary" type="button" onClick={save}>
+          Save
+        </button>
+      </div>
+    </Popover>
+  );
+}
+
+/** Amount invested in ₹ Cr (Invested tab). */
+export function AmountPopover({ c, anchor, onClose }: Base) {
+  const { mutate } = useStore();
+  const [v, setV] = useState(c.amountInvested === null ? "" : String(c.amountInvested));
+  const parsed = parseCr(v);
+  const save = () => {
+    if (parsed === undefined) return;
+    onClose();
+    if (parsed !== c.amountInvested) {
+      void mutate(c.id, { amountInvested: parsed }, () => updateCompany(c.id, { amountInvested: parsed }));
+    }
+  };
+  return (
+    <Popover anchor={anchor} onClose={onClose} width={260} label="Amount invested">
+      <h4>Amount invested (₹ Cr)</h4>
+      <input
+        className="inp"
+        type="text"
+        inputMode="decimal"
+        aria-label="Amount invested in crore"
+        placeholder="e.g. 12.5"
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        autoFocus
+        onKeyDown={(e) => e.key === "Enter" && save()}
+      />
+      {parsed === undefined && <p className="hint" style={{ color: "var(--brick)" }}>Enter an amount in ₹ Cr, like 12.5</p>}
+      <div className="foot">
+        <button className="btn-ghost sm" type="button" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn sm primary" type="button" onClick={save} disabled={parsed === undefined}>
           Save
         </button>
       </div>

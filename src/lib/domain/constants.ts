@@ -88,6 +88,7 @@ export const FIELD_LABELS: Record<string, string> = {
   research: "Assigned Research",
   via: "Via",
   dateReceived: "Date received",
+  amountInvested: "Amount invested",
   oneDriveUrl: "OneDrive link",
   status: "Status",
   peTeam: "PE team order",

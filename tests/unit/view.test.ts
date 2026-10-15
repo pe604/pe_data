@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { CompanyRow } from "@/lib/domain/types";
-import { applyFilters, emptyFilters, queryToView, sortRows, viewToQuery } from "@/lib/domain/view";
+import { applyFilters, emptyFilters, filtersForTab, queryToView, sortRows, sortsForTab, viewToQuery } from "@/lib/domain/view";
+
+describe("per-tab filters and sorts", () => {
+  it("Invested hides Priority, Stage and Via and offers amount sorting", () => {
+    expect(filtersForTab("invested")).toEqual(["sector", "pe", "research", "onedrive"]);
+    const inv = sortsForTab("invested").map(([k]) => k);
+    expect(inv).toContain("amount-high");
+    expect(inv.some((k) => k.startsWith("priority") || k.startsWith("stage"))).toBe(false);
+    const pipe = sortsForTab("pipeline").map(([k]) => k);
+    expect(pipe).toContain("priority");
+    expect(pipe.some((k) => k.startsWith("amount"))).toBe(false);
+  });
+});
 import { checkLink } from "@/lib/domain/onedrive";
 
 const row = (p: Partial<CompanyRow>): CompanyRow => ({
@@ -16,6 +28,7 @@ const row = (p: Partial<CompanyRow>): CompanyRow => ({
   exitAt: null,
   exitStage: null,
   directInvested: false,
+  amountInvested: null,
   rejectReason: null,
   oneDriveUrl: null,
   pe: [],

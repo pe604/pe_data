@@ -52,9 +52,23 @@ export const SORTS = [
   ["name-za", "Company Z–A"],
   ["sector-az", "Sector A–Z"],
   ["sector-za", "Sector Z–A"],
+  ["amount-high", "Amount invested, highest first"],
+  ["amount-low", "Amount invested, lowest first"],
 ] as const;
 export type SortKey = (typeof SORTS)[number][0];
 export const DEFAULT_SORT: SortKey = "priority";
+
+/** Invested tab hides Priority, Stage at exit and Via; amount sorting is Invested-only. */
+export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
+  return SORTS.filter(([k]) =>
+    tab === "invested" ? !k.startsWith("priority") && !k.startsWith("stage") : !k.startsWith("amount"),
+  );
+}
+
+/** Filter buttons shown per tab. */
+export function filtersForTab(tab: Tab): SetKey[] {
+  return tab === "invested" ? SET_KEYS.filter((k) => k !== "priority" && k !== "stage" && k !== "via") : [...SET_KEYS];
+}
 
 /** Column header → [first click, second click]. */
 export const HEADER_SORTS: Record<string, [SortKey, SortKey]> = {
@@ -64,6 +78,7 @@ export const HEADER_SORTS: Record<string, [SortKey, SortKey]> = {
   pri: ["priority", "priority-desc"],
   date: ["date-new", "date-old"],
   days: ["days-most", "days-least"],
+  amount: ["amount-high", "amount-low"],
 };
 
 export function activeFilterCount(f: Filters): number {
@@ -150,6 +165,10 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
       return out.sort(blanksLast((c) => c.sector || null, str));
     case "sector-za":
       return out.sort(blanksLast((c) => c.sector || null, (x, y) => str(y, x)));
+    case "amount-high":
+      return out.sort(blanksLast((c) => c.amountInvested, (x, y) => y - x));
+    case "amount-low":
+      return out.sort(blanksLast((c) => c.amountInvested, num));
   }
   return out;
 }

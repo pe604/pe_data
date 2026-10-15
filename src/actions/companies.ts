@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { STAGES, type PersonRole } from "@/lib/domain/constants";
 import { dateToISO, isISODate, isoToDate, todayISO } from "@/lib/domain/dates";
 import { isDuplicateName, normCompany, parseBulkNames } from "@/lib/domain/names";
+import { fmtCr } from "@/lib/domain/money";
 import { checkLink } from "@/lib/domain/onedrive";
 import type { CompanyDetail, CompanyRow, DashboardData } from "@/lib/domain/types";
 import { run, UserError } from "@/lib/server/action";
@@ -49,6 +50,8 @@ const patchSchema = z
     priority,
     dateReceived: isoDate.nullable(),
     oneDriveUrl: z.string().trim().max(2000).nullable(),
+    /** ₹ Cr, up to 2 decimals. */
+    amountInvested: z.number().finite().min(0).max(1_000_000).nullable(),
   })
   .partial();
 
@@ -91,6 +94,15 @@ export async function updateCompany(companyId: string, patch: z.input<typeof pat
         assertReceivedNotFuture(p.dateReceived);
         data.dateReceived = isoToDate(p.dateReceived);
         changes.push({ field: "dateReceived", from: fmtDay(dateToISO(c.dateReceived)), to: fmtDay(p.dateReceived) });
+      }
+      if (p.amountInvested !== undefined) {
+        const next = p.amountInvested === null ? null : Math.round(p.amountInvested * 100) / 100;
+        const cur = c.amountInvested === null ? null : Number(c.amountInvested);
+        if (next !== cur) {
+          if (c.status !== "INVESTED") throw new UserError("Amount invested is only for companies in Invested.");
+          data.amountInvested = next;
+          changes.push({ field: "amountInvested", from: fmtCr(cur), to: fmtCr(next) });
+        }
       }
       if (p.oneDriveUrl !== undefined) {
         let url: string | null = null;

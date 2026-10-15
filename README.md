@@ -23,7 +23,7 @@ Your IP must be allowed in the RDS security group to connect from your machine.
 npm run typecheck
 npm run lint
 npm test                      # unit tests (dates, names, markdown, sorting)
-npm run test:e2e              # Playwright on :3100; needs E2E_DATABASE_URL = an empty, disposable DB named *_test (wiped every run; refuses the real DB)
+npm run test:e2e              # Playwright on :3100; needs E2E_DATABASE_URL = an empty, disposable UTF8 DB named *_test (wiped every run; refuses the real DB)
 npm run verify:export         # downloads the Excel export from the running dev server and checks its formatting (read-only)
 ```
 

@@ -53,6 +53,7 @@ Env vars:
 
 - There is no read-only Viewer role for now.
 - **While there is no login, everyone is an Editor** (the shared "Team" user). Adding sectors is unavailable until a login exists.
+- **Invested tab columns** (2026-10-15): no Priority, Stage at exit or Via (hidden in the table, filter buttons, sort list and the Excel Invested sheet; switching to Invested clears those filters). Instead an **Amount invested (₹ Cr)** column after Sector: click to edit (accepts "12.5", "1,250", "₹ 20 Cr"; blank clears; ≥ 0, 2 decimals), Indian digit grouping, sortable (highest/lowest first, blanks last; default sort on Invested), a **Total** row for the companies shown, and a History entry on every change. Stored as `Company.amountInvested` (Decimal 14,2); editable only while the company is in Invested.
 - **Bulk add to Rejected** (2026-10-15): Add company (Pipeline target, opened automatically from the Rejected tab) → "Add several rejected companies at once": one name per line, one shared reason (required) and a "Rejected on" date (default today, not in the future). Names already on the dashboard are skipped; stage at exit is Not Assigned; each company gets a Rejection row and a History note.
 - **Permanent delete is open to Editors** (decision of 2026-10-01): drawer → Delete → reason → "Delete permanently". It removes the company, its files (from storage too), summaries, comments and history; a `DeletionLog` row keeps the name and reason.
 

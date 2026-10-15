@@ -19,6 +19,12 @@ async function resetTestDb() {
   const cfg = dbConfig(E2E_DB_ENV);
   const db = new Client({ connectionString: cfg.url, ssl: pgSsl(cfg) });
   await db.connect();
+  // Production (RDS) is UTF8; a WIN1252/LATIN1 test DB can't store "₹" and fails in misleading ways.
+  const enc = (await db.query("select pg_encoding_to_char(encoding) e from pg_database where datname = current_database()")).rows[0].e;
+  if (enc !== "UTF8") {
+    await db.end();
+    throw new Error(`The E2E database must be UTF8 (it is ${enc}). Create it with: CREATE DATABASE x_test ENCODING 'UTF8' TEMPLATE template0`);
+  }
   const tables = (await db.query(`select tablename from pg_tables where schemaname = 'public' and tablename <> '_prisma_migrations'`)).rows
     .map((r) => `"${r.tablename}"`)
     .join(", ");

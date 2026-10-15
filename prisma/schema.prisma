@@ -129,6 +129,8 @@ model Company {
   exitAt         DateTime?     @db.Date
   exitStage      Stage?
   directInvested Boolean       @default(false)
+  /// Invested tab: total amount Niveshaay invested, in ₹ Cr (null = not entered).
+  amountInvested Decimal?      @db.Decimal(14, 2)
 
   // Other
   rejectReason    String?

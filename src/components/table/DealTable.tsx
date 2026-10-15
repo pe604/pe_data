@@ -6,7 +6,8 @@ import { STAGE_LABELS, STAGES, stageIndex, type PersonRole, type Stage } from "@
 import { ageClass, daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
 import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, emptyFilters, HEADER_SORTS, sortRows, type ViewState } from "@/lib/domain/view";
-import { DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
+import { fmtCrNumber, totalCr } from "@/lib/domain/money";
+import { AmountPopover, DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
 import { useStore } from "../store";
 import { CloudFill, CloudLine } from "../ui/icons";
 
@@ -17,7 +18,7 @@ type Props = {
   openId: string | null;
 };
 
-type Pop = { kind: "sector" | "date" | "od" | PersonRole; id: string; el: HTMLElement };
+type Pop = { kind: "sector" | "date" | "od" | "amount" | PersonRole; id: string; el: HTMLElement };
 
 const EMPTY = {
   pipeline: ["No companies in the pipeline yet", "Add a deck to start tracking your first deal."],
@@ -31,6 +32,9 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   const today = todayISO();
   const list = useMemo(() => sortRows(applyFilters(rows, view.f), view.sort, today), [rows, view.f, view.sort, today]);
   const exited = view.tab !== "pipeline";
+  // Invested: no Priority, Stage at exit or Via; an Amount invested column instead.
+  const invested = view.tab === "invested";
+  const colCount = invested ? 9 : 11;
 
   if (!rows.length) {
     const [h, p] = EMPTY[view.tab];
@@ -93,12 +97,13 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             {th("c-co", "Company", "co")}
             {th("c-od", "OneDrive")}
             {th("c-sec", "Sector & sub-sector", "sector")}
-            {th("c-stage", exited ? "Stage at exit" : "Stage", "stage")}
-            {th("c-pri", "Priority", "pri")}
+            {invested && th("c-amt", "Amount invested (₹ Cr)", "amount")}
+            {!invested && th("c-stage", exited ? "Stage at exit" : "Stage", "stage")}
+            {!invested && th("c-pri", "Priority", "pri")}
             {th("c-pe", "Assigned PE")}
             {th("c-re", "Assigned Research")}
             {th("c-cm", view.tab === "rejected" ? "Rejection reason" : "Comment")}
-            {th("c-via", "Via")}
+            {!invested && th("c-via", "Via")}
             {th("c-date", "Date", "date")}
             {th("c-days", "Days", "days")}
           </tr>
@@ -106,7 +111,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
         <tbody>
           {!list.length && (
             <tr>
-              <td colSpan={11}>
+              <td colSpan={colCount}>
                 <div className="empty" style={{ padding: 40 }}>
                   <p>No companies match these filters.</p>
                   <button className="btn" type="button" onClick={() => setView((v) => ({ ...v, f: emptyFilters() }))}>
@@ -184,9 +189,17 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                     <span className="ph">Add sector</span>
                   )}
                 </td>
+                {invested && (
+                  <td className="c-amt editable num" {...editable("amount")}>
+                    {c.amountInvested === null ? <span className="ph">Add</span> : fmtCrNumber(c.amountInvested)}
+                  </td>
+                )}
+                {!invested && (
                 <td className="c-stage">
                   <StageCell c={c} onChange={(s) => mutate(c.id, { stage: s }, () => updateCompany(c.id, { stage: s }))} />
                 </td>
+                )}
+                {!invested && (
                 <td className="c-pri">
                   <select
                     className={"pri-sel p" + (c.priority ?? 0)}
@@ -205,6 +218,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                     ))}
                   </select>
                 </td>
+                )}
                 <td className="c-pe editable" {...editable("PE")}>
                   <Chips names={c.pe} />
                 </td>
@@ -220,9 +234,11 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                 >
                   <CommentCell c={c} />
                 </td>
-                <td className="c-via editable" {...editable("VIA")}>
-                  <Chips names={c.via} placeholder="Add" />
-                </td>
+                {!invested && (
+                  <td className="c-via editable" {...editable("VIA")}>
+                    <Chips names={c.via} placeholder="Add" />
+                  </td>
+                )}
                 <td className="c-date editable" {...editable("date")}>
                   {c.dateReceived ? fmtDate(c.dateReceived) : <span className="ph">Set date</span>}
                 </td>
@@ -243,11 +259,23 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             );
           })}
         </tbody>
+        {invested && list.length > 0 && (
+          <tfoot>
+            <tr className="total-row">
+              <td className="c-co">Total ({list.length})</td>
+              <td />
+              <td />
+              <td className="c-amt num">{fmtCrNumber(totalCr(list.map((c) => c.amountInvested)) ?? 0)}</td>
+              <td colSpan={colCount - 4} />
+            </tr>
+          </tfoot>
+        )}
       </table>
       {pop && popRow && (
         <>
           {pop.kind === "sector" && <SectorPopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
           {pop.kind === "date" && <DatePopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
+          {pop.kind === "amount" && <AmountPopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
           {pop.kind === "od" && <OneDrivePopover c={popRow} anchor={pop.el} onClose={() => setPop(null)} />}
           {(pop.kind === "PE" || pop.kind === "RESEARCH" || pop.kind === "VIA") && (
             <PeoplePopover key={pop.kind + pop.id} c={popRow} role={pop.kind} anchor={pop.el} onClose={() => setPop(null)} />

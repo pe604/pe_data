@@ -4,7 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/domain/constants";
 import { addDays, todayISO } from "@/lib/domain/dates";
 import type { CompanyRow } from "@/lib/domain/types";
-import { activeFilterCount, emptyFilters, SORTS, type Filters, type SetKey, type SortKey, type ViewState } from "@/lib/domain/view";
+import {
+  activeFilterCount,
+  emptyFilters,
+  filtersForTab,
+  sortsForTab,
+  type Filters,
+  type SetKey,
+  type SortKey,
+  type ViewState,
+} from "@/lib/domain/view";
 import { IconCaret, IconSearch } from "../ui/icons";
 import { Popover } from "../ui/overlay";
 
@@ -79,7 +88,7 @@ export function Toolbar({ rows, view, setView }: Props) {
         <IconSearch />
         <input type="search" placeholder="Search companies and comments" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {BUTTONS.map(([k, label]) => {
+      {BUTTONS.filter(([k]) => k === "date" || filtersForTab(view.tab).includes(k)).map(([k, label]) => {
         const n = count(k);
         return (
           <button
@@ -120,7 +129,7 @@ export function Toolbar({ rows, view, setView }: Props) {
           value={view.sort}
           onChange={(e) => setView((v) => ({ ...v, sort: e.target.value as SortKey }))}
         >
-          {SORTS.map(([k, l]) => (
+          {sortsForTab(view.tab).map(([k, l]) => (
             <option key={k} value={k}>
               {l}
             </option>

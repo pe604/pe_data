@@ -14,6 +14,8 @@ export interface CompanyRow {
   exitAt: string | null;
   exitStage: Stage | null;
   directInvested: boolean;
+  /** ₹ Cr; Invested tab only. */
+  amountInvested: number | null;
   rejectReason: string | null;
   oneDriveUrl: string | null;
   pe: string[];

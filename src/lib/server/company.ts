@@ -37,6 +37,7 @@ export function toRow(c: RowSource): CompanyRow {
     exitAt: dateToISO(c.exitAt),
     exitStage: c.exitStage,
     directInvested: c.directInvested,
+    amountInvested: c.amountInvested === null ? null : Number(c.amountInvested),
     rejectReason: c.rejectReason,
     oneDriveUrl: safeHref(c.oneDriveUrl),
     pe: people("PE"),

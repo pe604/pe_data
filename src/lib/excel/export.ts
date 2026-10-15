@@ -70,12 +70,12 @@ function columns(status: Status, today: string): Col[] {
       { h: "Days in pipeline", w: 11, t: "num", v: (c) => days(c) ?? "" },
       od,
     ];
+  // Invested: no Priority, Stage at exit or Via (as on the dashboard); Amount invested instead.
   return [
     ...base,
-    { h: "Stage at exit", w: 20, v: stageAtExit },
-    ...people,
+    { h: "Amount invested (₹ Cr)", w: 16, t: "num", v: (c) => c.amountInvested ?? "" },
+    ...people.filter((p) => p.h !== "Priority"),
     latest,
-    via,
     received,
     { h: "Invested on", w: 15, t: "date", v: (c) => xDate(c.exitAt) },
     { h: "Days in pipeline", w: 11, t: "num", v: (c) => days(c) ?? "" },

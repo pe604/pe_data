@@ -4,7 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDashboard } from "@/actions/companies";
 import { addNamesToTeam, namePools } from "@/lib/domain/team";
 import type { CompanyRow, DashboardData } from "@/lib/domain/types";
-import { TAB_STATUS, queryToView, viewToQuery, type Tab, type ViewState } from "@/lib/domain/view";
+import {
+  DEFAULT_SORT,
+  SET_KEYS,
+  TAB_STATUS,
+  filtersForTab,
+  queryToView,
+  sortsForTab,
+  viewToQuery,
+  type Tab,
+  type ViewState,
+} from "@/lib/domain/view";
 import { AddCompanyModal } from "./add/AddCompanyModal";
 import { PeBar, StagesBar } from "./bars/Bars";
 import { Drawer } from "./drawer/Drawer";
@@ -145,7 +155,15 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   );
 
   const setTab = (tab: Tab) => {
-    setView((v) => ({ ...v, tab, f: { ...v.f, stage: [] } }));
+    setView((v) => {
+      // Filters and sorts a tab doesn't show must not keep applying there (Invested hides Priority, Stage, Via).
+      const shown = filtersForTab(tab);
+      const f = { ...v.f, stage: [] as string[] };
+      for (const k of SET_KEYS) if (!shown.includes(k)) f[k] = [];
+      const sorts = sortsForTab(tab).map(([k]) => k);
+      const sort = sorts.includes(v.sort) ? v.sort : tab === "invested" ? "amount-high" : DEFAULT_SORT;
+      return { ...v, tab, f, sort };
+    });
   };
 
   const inTab = useMemo(() => companies.filter((c) => c.status === TAB_STATUS[view.tab]), [companies, view.tab]);

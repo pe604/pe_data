@@ -404,3 +404,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .pdf-frame{flex:1;width:100%;min-height:70vh;border:0;background:var(--paper)}
 .grid td.editable:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
 @media (max-width:760px){.me .me-out{display:none}}
+
+/* Invested tab: amount invested column and total row */
+.c-amt{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;min-width:120px}
+.grid th.c-amt{text-align:right}
+.grid tfoot .total-row td{border-top:2px solid var(--rule);font-weight:600;background:var(--paper);padding-top:10px;padding-bottom:10px}

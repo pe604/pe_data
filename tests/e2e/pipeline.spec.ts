@@ -183,7 +183,39 @@ test("bulk add to Invested skips duplicates", async ({ page }) => {
   await dlg.locator("textarea").fill(`1. ${a}\n- Mokobara Pvt Ltd\n`);
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
   await expect(page.getByRole("status")).toContainText("Added 1 to Invested. Skipped 1 already on the dashboard: Mokobara");
-  await expect(row(page, a)).toContainText("Added directly");
+  await expect(row(page, a)).toBeVisible();
+});
+
+test("Invested tab: no Priority/Stage/Via, amount invested is editable and totalled", async ({ page }) => {
+  const a = uniq("Amtone");
+  await page.goto("/");
+  await openTab(page, "Invested");
+  const head = page.locator("table.grid thead");
+  await expect(head).toContainText("Amount invested (₹ Cr)");
+  for (const h of ["Priority", "Stage at exit", "Via"]) await expect(head.getByRole("columnheader", { name: h, exact: true })).toHaveCount(0);
+  for (const b of ["Priority", "Stage", "Via"]) await expect(page.locator(".toolbar").getByRole("button", { name: b, exact: true })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add company" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByText("Add several portfolio companies at once").click();
+  await dlg.locator("textarea").fill(a);
+  await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
+  await expect(row(page, a)).toBeVisible();
+
+  await row(page, a).locator("td.c-amt").click();
+  const input = page.getByLabel("Amount invested in crore");
+  await input.fill("abc");
+  await expect(page.locator(".pop").getByRole("button", { name: "Save" })).toBeDisabled();
+  await input.fill("1,250.5");
+  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
+  await expect(row(page, a).locator("td.c-amt")).toHaveText("1,250.5");
+  await expect(page.locator("tfoot .total-row")).toContainText("1,250.5");
+  await page.reload();
+  await expect(row(page, a).locator("td.c-amt")).toHaveText("1,250.5");
+
+  await openCompany(page, a);
+  await page.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText("₹ 1,250.5 Cr");
 });
 
 test("bulk add to Rejected with one reason and date, skipping duplicates", async ({ page }) => {
