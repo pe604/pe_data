@@ -47,25 +47,33 @@ export const QUARTER_FILE_KINDS = ["MIS", "RESULT_NOTE"] as const;
 export type QuarterFileKind = (typeof QUARTER_FILE_KINDS)[number];
 
 // Sector master list (SPEC §8). Added on app start if missing; existing names are never renamed (companies use them).
-// Oct 2026: added the themes Indian PE/VC deals cluster in that the first list lumped together or missed.
+// Oct 2026: added the themes Indian PE/VC deals cluster in that the first list lumped together or missed, and the
+// firm's own portfolio sector names (Energy Transition, Recycling, Consumer, Water Infrastructure, …).
 export const SEED_SECTORS = [
   "Aerospace & Defence",
   "Agri & Food",
   "AI & Deep Tech",
   "Auto & Auto Components",
+  "Automotive Component",
   "Building Materials",
   "Business Services & Staffing",
   "Chemicals & Materials",
+  "Consumer",
   "Consumer & Retail",
   "Consumer Internet & E-commerce",
+  "Defence, Aerospace & Drones",
   "Education",
+  "Electronics & EMS",
   "Electronics & Semiconductors",
+  "Energy Transition",
   "EV & Battery Tech",
   "Financial Services & Fintech",
   "Healthcare & Pharma",
+  "Industrial Products",
   "Industrials & Manufacturing",
   "Infrastructure & EPC",
   "IT Services & BPM",
+  "Logistics & Supply Chain",
   "Media & Entertainment",
   "MedTech & Diagnostics",
   "Metals & Mining",
@@ -73,12 +81,14 @@ export const SEED_SECTORS = [
   "Packaging",
   "Power & T&D",
   "Real Estate & Hospitality",
+  "Recycling",
   "Renewables & Climate",
   "Space Tech",
   "Technology & SaaS",
   "Telecom & Data Centres",
   "Textiles & Apparel",
   "Water & Waste Management",
+  "Water Infrastructure",
   "Other",
 ];
 
