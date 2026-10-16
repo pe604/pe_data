@@ -74,10 +74,9 @@ function columns(status: Status, today: string): Col[] {
   return [
     ...base,
     { h: "Invested (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.invested ?? "" },
+    { h: "Hedgehogs (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.byFund.Hedgehogs || "" },
+    { h: "Sambhav (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.byFund.Sambhav || "" },
     { h: "Rounds", w: 8, t: "num", v: (c) => c.holding?.rounds || "" },
-    { h: "Current value (₹ Cr)", w: 16, t: "num", v: (c) => c.holding?.currentValue ?? "" },
-    { h: "MOIC", w: 8, t: "num", v: (c) => c.holding?.moic ?? "" },
-    { h: "Valuation as of", w: 15, t: "date", v: (c) => xDate(c.holding?.markDate ?? null) },
     ...people.filter((p) => p.h !== "Priority"),
     latest,
     received,

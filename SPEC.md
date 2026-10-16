@@ -53,7 +53,7 @@ Env vars:
 
 - There is no read-only Viewer role for now.
 - **While there is no login, everyone is an Editor** (the shared "Team" user). Adding sectors is unavailable until a login exists.
-- **Invested tab columns** (2026-10-15): no Priority, Stage at exit or Via (hidden in the table, filter buttons, sort list and the Excel Invested sheet; switching to Invested clears those filters). Portfolio columns, rounds and valuations: see section 15.
+- **Invested tab columns** (2026-10-15): no Priority, Stage at exit or Via (hidden in the table, filter buttons, sort list and the Excel Invested sheet; switching to Invested clears those filters). Amount invested by fund, quarterly tracker, contacts and meetings: see section 15.
 - **Bulk add to Rejected** (2026-10-15): Add company (Pipeline target, opened automatically from the Rejected tab) → "Add several rejected companies at once": one name per line, one shared reason (required) and a "Rejected on" date (default today, not in the future). Names already on the dashboard are skipped; stage at exit is Not Assigned; each company gets a Rejection row and a History note.
 - **Permanent delete is open to Editors** (decision of 2026-10-01): drawer → Delete → reason → "Delete permanently". It removes the company, its files (from storage too), summaries, comments and history; a `DeletionLog` row keeps the name and reason.
 
@@ -403,41 +403,34 @@ Decks shared in the team's WhatsApp group are added to the pipeline automaticall
   7. The bot **replies in the group**, e.g. "Added *FreshBus* to the pipeline, via Arvind Sir (shared by Raghav), received 30 Sep 2026." or "Added this deck to *FreshBus*, already in Rejected." If a deck can't be handled it replies with the reason (too large, unreadable).
 - Deck contents are never written to logs; the reply never quotes deck contents beyond the company name.
 
-## 15. Portfolio tracking (Invested tab, Phase 1, 2026-10-16)
+## 15. Portfolio tracking (Invested tab)
 
-All amounts are **₹ Cr**, shown as "₹ 12.5 Cr" with Indian digit grouping.
+All amounts are **₹ Cr**, shown as "₹ 12.5 Cr" with Indian digit grouping. Current value, MOIC and valuation marks were removed on 2026-10-16 (not tracked).
 
-- **Rounds** (`InvestmentRound`): any number per Invested company. Date (not in the future), round name (free text with suggestions: Seed, Pre-Series A, Series A–D, Pre-IPO, Bridge, Secondary), instrument (Equity, CCPS, CCD, Convertible note, Other), amount (> 0, required), pre-money valuation (optional), stake bought % (optional, entered; the form offers amount ÷ (pre-money + amount) as a one-click suggestion). Add, edit, remove.
-- **Valuation marks** (`ValuationMark`): date, company valuation (100%), our stake % at that date (after dilution; pre-filled from the previous mark, else the sum of stakes bought), source (New round, Fair value report, Auditor, Other), optional note. Full history is kept; the **latest by date** is used.
-- **Per company:** Invested = sum of rounds; Current value = latest valuation × our stake; MOIC = current value ÷ invested ("–" without a valuation).
-- **Invested table:** one column, **Invested** (total of all rounds, with "N rounds"), in place of Priority, Stage at exit and Via. Current value and MOIC are **not** in the table (decision of 2026-10-16); they are on the company's **Investment** tab, which opens when the Invested cell is clicked. Sorts: Invested highest/lowest first (default); blanks last. A **Total** row sums Invested for the companies shown.
-- **Portfolio cards** above the table (respect filters and search): Total invested, Current value, MOIC; split by sector and by Indian financial year of the first investment. Companies without a valuation count **at cost** in current value and overall MOIC (shown as "N at cost").
-- **Company file:** an **Investment** tab (first tab for Invested companies) with the summary, the rounds table + form, and the valuation history + form. Removing a round or valuation needs a second click to confirm.
-- Rounds and valuations can only be changed while the company is in Invested. Every add/edit/remove writes a History note. The Excel Invested sheet has Invested, Rounds, Current value, MOIC and Valuation as of.
-- The earlier single "Amount invested" field was migrated into one round per company (dated the invested date) and removed.
+### 15.1 Amount invested, by fund
+- **Rounds** (`InvestmentRound`): any number per Invested company. **Fund** (required: **Hedgehogs** or **Sambhav**), date (not in the future), round name (free text with suggestions), instrument (Equity, CCPS, CCD, Convertible note, Other), amount (> 0, required), pre-money valuation (optional), stake bought % (optional; one-click suggestion amount ÷ (pre-money + amount)). Add, edit, remove (two clicks). A company can have rounds from both funds. Rounds entered before funds existed show **Fund not set** (amber) until edited.
+- **Invested table:** one column, **Invested**: the total of all rounds, with the split underneath ("Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr"); clicking opens the company file on **Investment**. Sorts: Invested highest/lowest first (default). A **Total** row with the same split. No Priority, Stage at exit or Via on this tab.
+- **Cards** above the table (respect filters/search): Total invested, Hedgehogs, Sambhav (with % of invested); split by sector and by Indian FY of first investment.
+- **Excel** Invested sheet: Invested, Hedgehogs, Sambhav, Rounds.
 
-### 15.2 Quarterly tracker and meetings (2026-10-17)
+### 15.2 Quarterly tracker, contacts and meetings
+The Invested tab has three views: **Portfolio**, **Quarterly tracker**, **Meetings**.
 
-The Invested tab has three views: **Portfolio** (the table above), **Quarterly tracker**, **Meetings**.
+- **Quarterly tracker** (replaces the "Team Allocation - Results" sheet). Indian FY quarters (Q1 Apr–Jun … Q4 Jan–Mar), keys like `FY27-Q2`; opens on the last ended quarter, picker shows the current quarter and the 8 before it. Columns: Company (opens the company file on Investment), **Handled by** (Assigned PE), **POC** (primary contact), **MIS received**, **Result note**, **Remarks**.
+  - **MIS received** and **Result note** are **uploads from the cell**: click → the files for that company and quarter (View for PDF/images, Download) and **Upload file** / **Upload another file**. Files are stored like any other (encrypted), with type MIS or Result note and the quarter, and also appear in Materials.
+  - The tick is the India date of the first upload: MIS shows "✓ 12 Nov" once received, else "Due <date>" and **Overdue** after the due date; Result note shows "✓ Made 20 Nov", else **Not made**. A result note is marked made **only** by uploading it.
+  - Header: **MIS due date** for the quarter, editable (default quarter end + 45 days; "Reset to default"), and progress ("MIS received: 14/22", "Result notes made: 9/22", "MIS overdue: 3").
+  - Not included: Result made by, IPO/Exit tracking, Result update, Quarterly calls, Shared with BDO.
+- **Contacts** (`CompanyContact`): several per Invested company on the Investment tab: name (required), designation, email (validated), phone; one is **Primary** (the first one automatically; marking another moves it). Used for the tracker's POC column and, later, a mail merge asking for MIS/data.
+- **Meetings**: per company, date, type (Plant visit, Management meeting, Quarterly call, Other), status (Planned, Done, Cancelled; Done can't be in the future), who is going, notes / next steps. The Meetings view lists all portfolio meetings in **Needs updating** (planned, date passed), **Upcoming**, **Past**, filterable by person and company; Add, Mark done, Edit, Remove. Each Invested company's file has a **Meetings** tab.
+- Every upload, remark, MIS due date change, contact and meeting change writes a History note.
+- **Next: reminders** (weekly WhatsApp digest) and a mail merge to POCs requesting data.
 
-- **Quarterly tracker** replaces the "Team Allocation - Results" sheet. Indian FY quarters (Q1 Apr–Jun … Q4 Jan–Mar), keys like `FY27-Q2`. Opens on the last ended quarter; a picker shows the current quarter and the 8 before it. One row per Invested company (A–Z):
-  - Company (opens the company file on Meetings), **Handled by** = Assigned PE (read-only here).
-  - **MIS/FS received**, **Result note**, **Result update**, **Shared with BDO**: ticks stored as the date done (not in the future). Click → date + "Mark done" / "Not done". MIS shows "Due <date>" until received and **Overdue** (brick) after the due date.
-  - **Quarterly calls**: meetings with the company in the quarter's **results period** (the three months after it ends), e.g. "1 done · 1 planned"; click opens the company's Meetings tab.
-  - **Remarks**: free text for the quarter.
-  - Header: **MIS due date** for the quarter, editable (default quarter end + 45 days; "Reset to default"), and progress counts ("MIS/FS received: 14/22", "MIS overdue: 3").
-  - "Result made by" and "IPO/Exit tracking" from the sheet are intentionally not included. MIS files are uploaded to the company's Materials (AI reading of MIS numbers is a later step).
-- **Meetings**: per company, date, type (Plant visit, Management meeting, Quarterly call, Other), status (Planned, Done, Cancelled; Done can't be in the future), who is going (names, PE suggestions), notes / next steps. The Meetings view lists all portfolio meetings in **Needs updating** (planned, date passed), **Upcoming**, **Past**, filterable by person and company, with Add, Mark done (opens the form as Done for notes), Edit and Remove (two clicks). Each Invested company's file has a **Meetings** tab with the same, for that company.
-- Every tick, remark, MIS due date change and meeting add/edit/remove writes a History note.
-- **Next: reminders** (weekly WhatsApp digest of meetings this week, meetings not marked done, MIS overdue, checklist gaps).
-
-### 15.3 MIS reader (2026-10-18)
-
-- On the company's **Investment** tab, section **Quarterly financials (MIS)**: pick the quarter (default: last ended), **Upload MIS** (PDF, .xlsx, .xlsm; .xls is converted via LibreOffice) or **Enter manually**. The file is stored like any other (encrypted) with the new file type **MIS** and appears in Materials.
-- **Reading:** the model only *copies* the quarter's figures exactly as printed, plus the unit printed (Cr, Lakh, Mn, Thousand, Rupees): the quarter total if printed, else each of the three months (actuals only; never YTD, full-year or budget columns). Revenue = revenue from operations (not other income); EBITDA as labelled; PAT; cash and bank at quarter end. The code (not the model) converts to ₹ Cr and adds the three months when there's no quarter total (never a partial quarter). Every copied figure is checked against the file's text; misses are listed for checking.
-- **Review before saving:** the form is pre-filled (with "quarter total" / "sum of the 3 months" / "not found" per figure, and the EBITDA margin); nothing is saved until **Save figures**. Losses as -12.5 or (12.5). Saving replaces that quarter's figures (`MisFigure`, one per company per quarter), ticks **MIS/FS received** in the tracker if not yet ticked, and writes a History note.
-- **Table:** last 6 quarters with figures: Revenue, Revenue YoY (vs the same quarter a year earlier), EBITDA, EBITDA %, PAT, Cash and bank; Edit and Remove per quarter.
-- Deck-vs-actual comparison is not included yet.
+### 15.3 Quarterly files and MIS reader (company file → Investment)
+- **Quarterly MIS and results**: each quarter with its MIS and Result note files (View, Download), **Upload MIS** for a chosen quarter, and **Read figures** on any MIS file.
+- **Reading:** the model only *copies* the quarter's figures exactly as printed, plus the unit printed (Cr, Lakh, Mn, Thousand, Rupees): the quarter total if printed, else each of the three months (actuals only; never YTD, full-year or budget). Revenue = revenue from operations (not other income); EBITDA as labelled; PAT; cash and bank at quarter end. The code converts to ₹ Cr and adds the three months when there's no quarter total (never a partial quarter). Every copied figure is checked against the file's text; misses are listed.
+- **Review before saving**; nothing is saved until **Save figures** (`MisFigure`, one per company per quarter). Losses as -12.5 or (12.5). **Enter manually** also works.
+- **Table:** last 6 quarters: Revenue, Revenue YoY, EBITDA, EBITDA %, PAT, Cash and bank; Edit and Remove per quarter.
 
 ## 16. Non-goals (for now)
 

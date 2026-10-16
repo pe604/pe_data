@@ -7,7 +7,7 @@ import { ageClass, daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
 import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, emptyFilters, HEADER_SORTS, sortRows, type ViewState } from "@/lib/domain/view";
 import { fmtCr } from "@/lib/domain/money";
-import { portfolioSummary } from "@/lib/domain/portfolio";
+import { portfolioSummary, splitParts, type FundSplit } from "@/lib/domain/portfolio";
 import { DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
 import { useStore } from "../store";
 import { CloudFill, CloudLine } from "../ui/icons";
@@ -272,7 +272,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   );
 }
 
-/** Invested tab: total invested with round count. Click opens the Investment tab (current value and MOIC are there). */
+/** Invested tab: total invested with the Hedgehogs / Sambhav split underneath. Click opens the Investment tab. */
 function HoldingCells({ c, open }: { c: CompanyRow; open: () => void }) {
   const h = c.holding;
   const cell = {
@@ -293,9 +293,7 @@ function HoldingCells({ c, open }: { c: CompanyRow; open: () => void }) {
         {h?.invested ? (
           <>
             <div className="amt">{fmtCr(h.invested)}</div>
-            <div className="sub">
-              {h.rounds} round{h.rounds > 1 ? "s" : ""}
-            </div>
+            <FundSplitLine split={h.byFund} />
           </>
         ) : (
           <span className="ph">Add rounds</span>
@@ -305,18 +303,38 @@ function HoldingCells({ c, open }: { c: CompanyRow; open: () => void }) {
   );
 }
 
-/** Total invested for the rows shown. */
+/** Total invested for the rows shown, with the fund split. */
 function TotalRow({ rows, colCount }: { rows: CompanyRow[]; colCount: number }) {
+  const s = portfolioSummary(rows);
   return (
     <tfoot>
       <tr className="total-row">
         <td className="c-co">Total ({rows.length})</td>
         <td />
         <td />
-        <td className="c-amt">{fmtCr(portfolioSummary(rows).invested)}</td>
+        <td className="c-amt">
+          <div className="amt">{fmtCr(s.invested)}</div>
+          <FundSplitLine split={s.byFund} />
+        </td>
         <td colSpan={colCount - 4} />
       </tr>
     </tfoot>
+  );
+}
+
+/** "Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr" (rounds without a fund flagged). */
+function FundSplitLine({ split }: { split: FundSplit }) {
+  const parts = splitParts(split);
+  if (!parts.length) return null;
+  return (
+    <div className="sub fund-split">
+      {parts.map(([k, v], i) => (
+        <span key={k} className={k === "unset" ? "warn-text" : undefined}>
+          {i > 0 && " · "}
+          {k === "unset" ? "Fund not set" : k} {fmtCr(v)}
+        </span>
+      ))}
+    </div>
   );
 }
 

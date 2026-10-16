@@ -5,16 +5,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { dateToISO, fmtDate, isISODate, todayISO } from "@/lib/domain/dates";
-import {
-  defaultMisDue,
-  isQuarterKey,
-  MEETING_STATUS_LABELS,
-  MEETING_STATUSES,
-  MEETING_TYPES,
-  meetingSummary,
-  quarterLabel,
-  resultsPeriod,
-} from "@/lib/domain/quarters";
+import { defaultMisDue, isQuarterKey, MEETING_STATUS_LABELS, MEETING_STATUSES, MEETING_TYPES, quarterLabel } from "@/lib/domain/quarters";
 import type { MeetingItem, QuarterView } from "@/lib/domain/types";
 import { run, UserError } from "@/lib/server/action";
 import { audit } from "@/lib/server/company";
@@ -22,16 +13,7 @@ import { audit } from "@/lib/server/company";
 const id = z.string().min(1).max(40);
 const quarter = z.string().refine(isQuarterKey, "Invalid quarter");
 const isoDate = z.string().refine(isISODate, "Invalid date");
-const pastDate = isoDate.refine((d) => d <= todayISO(), "The date can't be in the future.");
 const day = (iso: string) => new Date(iso + "T00:00:00Z");
-
-const CHECK_FIELDS = {
-  misAt: "MIS/FS received",
-  resultNoteAt: "Result note",
-  resultUpdateAt: "Result update",
-  bdoAt: "Shared with BDO",
-} as const;
-type CheckField = keyof typeof CHECK_FIELDS;
 
 async function investedCompany(companyId: string) {
   const c = await db.company.findUnique({ where: { id: companyId }, select: { id: true, status: true } });
@@ -40,8 +22,11 @@ async function investedCompany(companyId: string) {
   return c;
 }
 
+/** Ticks come from uploads: the quarter is "received"/"made" on the India date of its first file. */
+const firstDate = (files: { uploadedAt: Date }[]) =>
+  files.length ? todayISO(files.reduce((a, f) => (f.uploadedAt < a ? f.uploadedAt : a), files[0].uploadedAt)) : null;
+
 async function loadQuarter(q: string): Promise<QuarterView> {
-  const period = resultsPeriod(q);
   const [companies, setting] = await Promise.all([
     db.company.findMany({
       where: { status: "INVESTED" },
@@ -51,7 +36,12 @@ async function loadQuarter(q: string): Promise<QuarterView> {
         name: true,
         people: { where: { role: "PE" }, orderBy: { position: "asc" }, select: { teamMember: { select: { name: true } } } },
         checks: { where: { quarter: q } },
-        meetings: { where: { date: { gte: day(period.start), lte: day(period.end) } }, select: { date: true, status: true } },
+        files: {
+          where: { quarter: q, kind: { in: ["MIS", "RESULT_NOTE"] } },
+          orderBy: { uploadedAt: "asc" },
+          select: { id: true, originalName: true, mime: true, kind: true, uploadedAt: true },
+        },
+        contacts: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], take: 1, select: { name: true } },
       },
     }),
     db.quarterSetting.findUnique({ where: { quarter: q } }),
@@ -62,20 +52,20 @@ async function loadQuarter(q: string): Promise<QuarterView> {
     misDueIsDefault: !setting,
     rows: companies.map((c) => {
       const k = c.checks[0];
+      const mis = c.files.filter((f) => f.kind === "MIS");
+      const notes = c.files.filter((f) => f.kind === "RESULT_NOTE");
+      const item = (f: (typeof c.files)[number]) => ({ id: f.id, name: f.originalName, mime: f.mime, uploadedAt: f.uploadedAt.toISOString() });
       return {
         companyId: c.id,
         name: c.name,
         pe: c.people.map((p) => p.teamMember.name),
-        misAt: dateToISO(k?.misAt),
-        resultNoteAt: dateToISO(k?.resultNoteAt),
-        resultUpdateAt: dateToISO(k?.resultUpdateAt),
-        bdoAt: dateToISO(k?.bdoAt),
+        poc: c.contacts[0]?.name ?? null,
+        // Older quarters may have a hand-ticked date without a file.
+        misAt: firstDate(mis) ?? dateToISO(k?.misAt),
+        resultNoteAt: firstDate(notes),
+        misFiles: mis.map(item),
+        resultFiles: notes.map(item),
         remarks: k?.remarks ?? null,
-        meetings: meetingSummary(
-          c.meetings.map((m) => ({ date: dateToISO(m.date) ?? "", status: m.status as MeetingItem["status"] })),
-          period.start,
-          period.end,
-        ),
       };
     }),
   };
@@ -87,30 +77,6 @@ export async function getQuarterView(q: string) {
     return loadQuarter(quarter.parse(q));
   });
 }
-
-/** Ticks (date) or clears one checklist item. */
-export async function setQuarterCheck(companyId: string, q: string, field: CheckField, date: string | null) {
-  return run<QuarterView>(async () => {
-    const me = await requireRole();
-    const cid = id.parse(companyId);
-    const qk = quarter.parse(q);
-    const f = z.enum(Object.keys(CHECK_FIELDS) as [CheckField, ...CheckField[]]).parse(field);
-    const d = date === null ? null : pastDate.parse(date);
-    await investedCompany(cid);
-    await db.$transaction(async (tx) => {
-      await tx.quarterCheck.upsert({
-        where: { companyId_quarter: { companyId: cid, quarter: qk } },
-        create: { companyId: cid, quarter: qk, [f]: d ? day(d) : null },
-        update: { [f]: d ? day(d) : null },
-      });
-      await audit(tx, cid, me.id, [
-        { note: `Updated ${quarterLabel(qk)} checklist: ${CHECK_FIELDS[f]} ${d ? "done on " + fmtDate(d) : "marked not done"}` },
-      ]);
-    });
-    return loadQuarter(qk);
-  });
-}
-
 export async function setQuarterRemarks(companyId: string, q: string, remarks: string | null) {
   return run<QuarterView>(async () => {
     const me = await requireRole();

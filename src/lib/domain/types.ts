@@ -1,5 +1,5 @@
 import type { FileKind, Stage, Status } from "./constants";
-import type { Holding } from "./portfolio";
+import type { Fund, Holding } from "./portfolio";
 
 /** One table row. Serialisable; sent from server to client. */
 export interface CompanyRow {
@@ -70,6 +70,8 @@ export interface FileItem {
   sizeBytes: number;
   uploadedBy: string;
   uploadedAt: string;
+  /** MIS / result-note files: the quarter they are for (e.g. "FY27-Q2"). */
+  quarter: string | null;
 }
 
 export interface SummaryItem {
@@ -119,7 +121,7 @@ export interface CompanyDetail {
   history: HistoryItem[];
   activeJob: JobItem | null;
   rounds: RoundItem[];
-  marks: MarkItem[];
+  contacts: ContactItem[];
   /** Quarterly financials from MIS, oldest quarter first (₹ Cr). */
   mis: MisItem[];
 }
@@ -150,6 +152,7 @@ export interface MisReadResult {
 export interface RoundItem {
   id: string;
   date: string;
+  fund: Fund | null;
   round: string | null;
   instrument: string | null;
   amount: number;
@@ -162,13 +165,31 @@ export interface QuarterRow {
   companyId: string;
   name: string;
   pe: string[];
+  /** Primary (else first) contact's name. */
+  poc: string | null;
+  /** Date received: the first MIS upload for the quarter. */
   misAt: string | null;
+  /** Date made: the first result-note upload for the quarter. */
   resultNoteAt: string | null;
-  resultUpdateAt: string | null;
-  bdoAt: string | null;
+  misFiles: QuarterFile[];
+  resultFiles: QuarterFile[];
   remarks: string | null;
-  /** Meetings in the results period, e.g. "1 done · 1 planned". */
-  meetings: string | null;
+}
+
+export interface QuarterFile {
+  id: string;
+  name: string;
+  mime: string;
+  uploadedAt: string;
+}
+
+export interface ContactItem {
+  id: string;
+  name: string;
+  designation: string | null;
+  email: string | null;
+  phone: string | null;
+  isPrimary: boolean;
 }
 
 export interface QuarterView {
@@ -190,14 +211,6 @@ export interface MeetingItem {
   by: string;
 }
 
-export interface MarkItem {
-  id: string;
-  date: string;
-  valuation: number;
-  stakePct: number;
-  source: string;
-  note: string | null;
-  by: string;
-}
+
 
 export type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error: string };

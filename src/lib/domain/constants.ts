@@ -33,14 +33,18 @@ export const STATUS_LABELS: Record<Status, string> = {
 export const PERSON_ROLES = ["PE", "RESEARCH", "VIA"] as const;
 export type PersonRole = (typeof PERSON_ROLES)[number];
 
-export const FILE_KINDS = ["DECK", "MODEL", "MIS", "OTHER"] as const;
+export const FILE_KINDS = ["DECK", "MODEL", "MIS", "RESULT_NOTE", "OTHER"] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 export const FILE_KIND_LABELS: Record<FileKind, string> = {
   DECK: "Deck",
   MODEL: "Model",
   MIS: "MIS",
+  RESULT_NOTE: "Result note",
   OTHER: "Other",
 };
+/** File types that belong to a quarter (uploaded from the quarterly tracker). */
+export const QUARTER_FILE_KINDS = ["MIS", "RESULT_NOTE"] as const;
+export type QuarterFileKind = (typeof QUARTER_FILE_KINDS)[number];
 
 // Sector master list (SPEC §8). Added on app start if missing; existing names are never renamed (companies use them).
 // Oct 2026: added the themes Indian PE/VC deals cluster in that the first list lumped together or missed.

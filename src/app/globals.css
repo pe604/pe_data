@@ -493,3 +493,26 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .mis-table .sub-row td{color:var(--muted);font-size:12px;padding-top:2px}
 .mis-table .acts-row td{border-bottom:0;padding-top:4px}
 .mis-table .acts-row .btn-ghost{padding:2px 4px}
+/* Funds, quarterly files, contacts (SPEC §15) */
+.warn-text{color:var(--amber)}
+.fund-split{font-size:12px;white-space:nowrap}
+.pf-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pf-note{margin:6px 0 0}
+.inv-sum.one{grid-template-columns:minmax(0,1fr)}
+.qfiles{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.qfiles-q{border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:8px 12px}
+.qfiles-head{font-weight:600;font-size:13px;margin-bottom:4px}
+.qfiles-row{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;font-size:13px;padding:3px 0}
+.qfiles-kind{color:var(--muted)}
+.qfiles-row ul,.qfiles-pop{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.qfiles-row li,.qfiles-pop li{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.qfiles-row .fname,.qfiles-pop .fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qfiles-pop{margin:4px 0 8px}
+.qfiles-pop .sub{font-size:12px;color:var(--muted)}
+.contacts{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:8px;background:var(--surface)}
+.contacts li{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-top:1px solid var(--rule-2);font-size:13.5px}
+.contacts li:first-child{border-top:0}
+.contacts .tag{margin-left:6px;font-size:11px;background:var(--green-soft);color:var(--green);border-radius:4px;padding:1px 5px}
+.contacts .sub{font-size:12.5px;color:var(--muted)}
+.contacts .acts{white-space:nowrap;align-self:start}
+@media (max-width:760px){.pf-cards{grid-template-columns:1fr}.qfiles-row{grid-template-columns:1fr}}

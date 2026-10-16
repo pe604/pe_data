@@ -1,13 +1,13 @@
 "use server";
 
-// Portfolio tracking (SPEC §15): investment rounds and valuation marks for Invested companies. Amounts in ₹ Cr.
+// Portfolio tracking (SPEC §15): investment rounds (with fund) for Invested companies. Amounts in ₹ Cr.
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { db, type Tx } from "@/lib/db";
 import { dateToISO, fmtDate, isISODate, todayISO } from "@/lib/domain/dates";
 import { fmtCr } from "@/lib/domain/money";
-import { INSTRUMENTS, MARK_SOURCES } from "@/lib/domain/portfolio";
-import type { CompanyRow } from "@/lib/domain/types";
+import { FUNDS, INSTRUMENTS } from "@/lib/domain/portfolio";
+import type { CompanyRow, ContactItem } from "@/lib/domain/types";
 import { run, UserError } from "@/lib/server/action";
 import { audit, getRow } from "@/lib/server/company";
 
@@ -20,6 +20,7 @@ const crore = z.number().finite().max(10_000_000);
 const pct = z.number().finite().min(0).max(100);
 
 const roundSchema = z.object({
+  fund: z.enum(FUNDS, { message: "Choose the fund: Hedgehogs or Sambhav" }),
   date: pastDate,
   round: z.string().trim().max(60).nullable(),
   instrument: z.enum(INSTRUMENTS).nullable(),
@@ -28,13 +29,6 @@ const roundSchema = z.object({
   stakePct: pct.nullable(),
 });
 
-const markSchema = z.object({
-  date: pastDate,
-  valuation: crore.min(0),
-  stakePct: pct.gt(0, "Enter our stake"),
-  source: z.enum(MARK_SOURCES),
-  note: z.string().trim().max(500).nullable(),
-});
 
 /** Calendar day (validated YYYY-MM-DD) as a UTC midnight Date for a DATE column. */
 const day = (iso: string) => new Date(iso + "T00:00:00Z");
@@ -43,12 +37,12 @@ const r4 = (n: number) => Math.round(n * 10000) / 10000;
 
 async function investedCompany(tx: Tx, companyId: string) {
   const c = await tx.company.findUniqueOrThrow({ where: { id: companyId }, select: { id: true, status: true } });
-  if (c.status !== "INVESTED") throw new UserError("Rounds and valuations are only for companies in Invested.");
+  if (c.status !== "INVESTED") throw new UserError("Rounds are only for companies in Invested.");
   return c;
 }
 
-const roundText = (r: { round: string | null; amount: number; date: string }) =>
-  `${r.round || "round"}: ${fmtCr(r.amount)} on ${fmtDate(r.date)}`;
+const roundText = (r: { fund: string | null; round: string | null; amount: number; date: string }) =>
+  `${r.round || "round"}${r.fund ? ` (${r.fund})` : ""}: ${fmtCr(r.amount)} on ${fmtDate(r.date)}`;
 
 // ─── Rounds ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +54,7 @@ export async function saveRound(companyId: string, roundId: string | null, input
     const rid = roundId === null ? null : id.parse(roundId);
     const p = roundSchema.parse(input);
     const data = {
+      fund: p.fund,
       date: day(p.date),
       round: p.round || null,
       instrument: p.instrument,
@@ -94,54 +89,84 @@ export async function deleteRound(companyId: string, roundId: string) {
       if (!r) throw new UserError("That round no longer exists. Reload the page.");
       await tx.investmentRound.delete({ where: { id: rid } });
       const date = dateToISO(r.date) ?? "";
-      await audit(tx, cid, me.id, [{ note: "Removed investment " + roundText({ round: r.round, amount: Number(r.amount), date }) }]);
+      await audit(tx, cid, me.id, [{ note: "Removed investment " + roundText({ fund: r.fund, round: r.round, amount: Number(r.amount), date }) }]);
       return getRow(cid, tx);
     });
   });
 }
 
-// ─── Valuation marks ─────────────────────────────────────────────────────────
+// ─── Contacts (company POCs) ─────────────────────────────────────────────────
 
-export async function addMark(companyId: string, input: z.input<typeof markSchema>) {
-  return run<CompanyRow>(async () => {
+const contactSchema = z.object({
+  name: z.string().trim().min(1, "Enter a name").max(120),
+  designation: z.string().trim().max(120).nullable(),
+  email: z.string().trim().max(200).email("Enter a valid email").nullable().or(z.literal("").transform(() => null)),
+  phone: z.string().trim().max(40).nullable(),
+  isPrimary: z.boolean(),
+});
+
+async function loadContacts(companyId: string): Promise<ContactItem[]> {
+  const rows = await db.companyContact.findMany({
+    where: { companyId },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+  });
+  return rows.map((c) => ({ id: c.id, name: c.name, designation: c.designation, email: c.email, phone: c.phone, isPrimary: c.isPrimary }));
+}
+
+/** Adds (contactId null) or edits a contact. The first contact is primary; marking one primary unmarks the others. */
+export async function saveContact(companyId: string, contactId: string | null, input: z.input<typeof contactSchema>) {
+  return run<ContactItem[]>(async () => {
     const me = await requireRole();
     const cid = id.parse(companyId);
-    const p = markSchema.parse(input);
-    return db.$transaction(async (tx) => {
+    const ctid = contactId === null ? null : id.parse(contactId);
+    let p: z.infer<typeof contactSchema>;
+    try {
+      p = contactSchema.parse(input);
+    } catch (e) {
+      const msg = e instanceof z.ZodError ? e.issues[0]?.message : undefined;
+      throw msg && !msg.startsWith("Invalid") ? new UserError(msg) : e;
+    }
+    const data = { name: p.name, designation: p.designation || null, email: p.email || null, phone: p.phone || null };
+    await db.$transaction(async (tx) => {
       await investedCompany(tx, cid);
-      await tx.valuationMark.create({
-        data: {
-          companyId: cid,
-          date: day(p.date),
-          valuation: r2(p.valuation),
-          stakePct: r4(p.stakePct),
-          source: p.source,
-          note: p.note || null,
-          createdById: me.id,
-        },
-      });
-      await audit(tx, cid, me.id, [
-        { note: `Added valuation mark (${p.source}): company ${fmtCr(r2(p.valuation))}, our stake ${r4(p.stakePct)}%, as of ${fmtDate(p.date)}` },
-      ]);
-      return getRow(cid, tx);
+      const count = await tx.companyContact.count({ where: { companyId: cid } });
+      const primary = p.isPrimary || count === 0 || (ctid !== null && count === 1);
+      if (primary) await tx.companyContact.updateMany({ where: { companyId: cid }, data: { isPrimary: false } });
+      if (ctid) {
+        const before = await tx.companyContact.findFirst({ where: { id: ctid, companyId: cid } });
+        if (!before) throw new UserError("That contact no longer exists. Reload the page.");
+        await tx.companyContact.update({ where: { id: ctid }, data: { ...data, isPrimary: primary } });
+        await audit(tx, cid, me.id, [{ note: `Updated contact ${p.name}` }]);
+      } else {
+        await tx.companyContact.create({ data: { ...data, companyId: cid, isPrimary: primary } });
+        await audit(tx, cid, me.id, [{ note: `Added contact ${p.name}${p.designation ? ` (${p.designation})` : ""}` }]);
+      }
+      // Always keep one primary contact.
+      if (!(await tx.companyContact.count({ where: { companyId: cid, isPrimary: true } }))) {
+        const first = await tx.companyContact.findFirst({ where: { companyId: cid }, orderBy: { createdAt: "asc" } });
+        if (first) await tx.companyContact.update({ where: { id: first.id }, data: { isPrimary: true } });
+      }
     });
+    return loadContacts(cid);
   });
 }
 
-export async function deleteMark(companyId: string, markId: string) {
-  return run<CompanyRow>(async () => {
+export async function deleteContact(companyId: string, contactId: string) {
+  return run<ContactItem[]>(async () => {
     const me = await requireRole();
     const cid = id.parse(companyId);
-    const mid = id.parse(markId);
-    return db.$transaction(async (tx) => {
+    const ctid = id.parse(contactId);
+    await db.$transaction(async (tx) => {
       await investedCompany(tx, cid);
-      const m = await tx.valuationMark.findFirst({ where: { id: mid, companyId: cid } });
-      if (!m) throw new UserError("That valuation no longer exists. Reload the page.");
-      await tx.valuationMark.delete({ where: { id: mid } });
-      await audit(tx, cid, me.id, [
-        { note: `Removed valuation mark: company ${fmtCr(Number(m.valuation))} as of ${fmtDate(dateToISO(m.date) ?? "")}` },
-      ]);
-      return getRow(cid, tx);
+      const c = await tx.companyContact.findFirst({ where: { id: ctid, companyId: cid } });
+      if (!c) throw new UserError("That contact no longer exists. Reload the page.");
+      await tx.companyContact.delete({ where: { id: ctid } });
+      if (c.isPrimary) {
+        const first = await tx.companyContact.findFirst({ where: { companyId: cid }, orderBy: { createdAt: "asc" } });
+        if (first) await tx.companyContact.update({ where: { id: first.id }, data: { isPrimary: true } });
+      }
+      await audit(tx, cid, me.id, [{ note: `Removed contact ${c.name}` }]);
     });
+    return loadContacts(cid);
   });
 }

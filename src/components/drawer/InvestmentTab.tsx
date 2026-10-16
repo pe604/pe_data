@@ -1,22 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { addMark, deleteMark, deleteRound, saveRound } from "@/actions/portfolio";
+import { deleteContact, deleteRound, saveContact, saveRound } from "@/actions/portfolio";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import { fmtCr, fmtCrNumber, parseCr } from "@/lib/domain/money";
-import {
-  fmtMoic,
-  holdingOf,
-  INSTRUMENTS,
-  MARK_SOURCES,
-  suggestedMarkStake,
-  suggestedStake,
-} from "@/lib/domain/portfolio";
-import type { CompanyDetail, MarkItem, RoundItem } from "@/lib/domain/types";
+import { FUNDS, holdingOf, INSTRUMENTS, splitParts, suggestedStake, type Fund } from "@/lib/domain/portfolio";
+import type { CompanyDetail, ContactItem, RoundItem } from "@/lib/domain/types";
 import { useStore } from "../store";
 import { MisSection } from "./MisSection";
 
-// Investment rounds and valuation marks for an Invested company (SPEC §15). Amounts in ₹ Cr.
+// Investment tab for an Invested company (SPEC §15): amount invested (by fund), contacts, quarterly MIS and
+// result notes, rounds. Amounts in ₹ Cr.
 
 const ROUND_NAMES = ["Seed", "Pre-Series A", "Series A", "Series B", "Series C", "Series D", "Pre-IPO", "Bridge", "Secondary"];
 
@@ -30,13 +24,13 @@ function parsePct(s: string): number | null | undefined {
 }
 
 const fmtPct = (n: number | null) => (n === null ? "–" : `${n.toLocaleString("en-IN", { maximumFractionDigits: 4 })}%`);
+export const fundLabel = (k: Fund | "unset") => (k === "unset" ? "Fund not set" : k);
 
 export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reload: () => Promise<void> }) {
   const { putRow, toast } = useStore();
   const c = detail.row;
-  const h = c.holding ?? holdingOf([], null);
+  const h = c.holding ?? holdingOf([]);
   const [editing, setEditing] = useState<RoundItem | "new" | null>(detail.rounds.length ? null : "new");
-  const [markOpen, setMarkOpen] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const after = async (r: { ok: true; data: Parameters<typeof putRow>[0] } | { ok: false; error: string }, msg: string) => {
@@ -55,34 +49,23 @@ export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reloa
     setConfirm(null);
     await after(await deleteRound(c.id, r.id), "Round removed.");
   };
-  const removeMark = async (m: MarkItem) => {
-    if (confirm !== m.id) return setConfirm(m.id);
-    setConfirm(null);
-    await after(await deleteMark(c.id, m.id), "Valuation removed.");
-  };
 
   return (
     <div className="inv">
-      <div className="inv-sum" role="group" aria-label="Investment summary">
+      <div className="inv-sum one" role="group" aria-label="Investment summary">
         <div>
           <span className="lab">Invested</span>
           <strong>{fmtCr(h.invested) ?? "–"}</strong>
           <span className="sub">
-            {h.rounds} round{h.rounds === 1 ? "" : "s"}
+            {splitParts(h.byFund).map(([k, v]) => `${fundLabel(k)} ${fmtCr(v)}`).join(" · ") || "No rounds yet"}
+            {h.rounds ? ` · ${h.rounds} round${h.rounds === 1 ? "" : "s"}` : ""}
           </span>
-        </div>
-        <div>
-          <span className="lab">Current value</span>
-          <strong>{fmtCr(h.currentValue) ?? "–"}</strong>
-          <span className="sub">{h.markDate ? `as of ${fmtDate(h.markDate)}` : "no valuation yet"}</span>
-        </div>
-        <div>
-          <span className="lab">MOIC</span>
-          <strong className={h.moic === null ? "" : h.moic >= 1 ? "moic up" : "moic down"}>{fmtMoic(h.moic) ?? "–"}</strong>
         </div>
       </div>
 
-      <MisSection companyId={c.id} items={detail.mis} reload={reload} />
+      <Contacts companyId={c.id} initial={detail.contacts} />
+
+      <MisSection companyId={c.id} items={detail.mis} files={detail.files} reload={reload} />
 
       <section>
         <div className="inv-head">
@@ -99,6 +82,7 @@ export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reloa
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Fund</th>
                   <th>Round</th>
                   <th>Instrument</th>
                   <th className="num">Amount</th>
@@ -111,6 +95,7 @@ export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reloa
                 {detail.rounds.map((r) => (
                   <tr key={r.id}>
                     <td>{fmtDate(r.date)}</td>
+                    <td>{r.fund ?? <span className="warn-text">Fund not set</span>}</td>
                     <td>{r.round ?? "–"}</td>
                     <td>{r.instrument ?? "–"}</td>
                     <td className="num">{fmtCr(r.amount)}</td>
@@ -147,74 +132,6 @@ export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reloa
         )}
         {!detail.rounds.length && editing === null && <p className="muted">No rounds yet. Add the first investment.</p>}
       </section>
-
-      <section>
-        <div className="inv-head">
-          <h3>Valuation</h3>
-          {!markOpen && (
-            <button className="btn sm" type="button" onClick={() => setMarkOpen(true)} disabled={!detail.rounds.length}>
-              Add valuation
-            </button>
-          )}
-        </div>
-        <p className="hint">
-          Current value = company valuation × our stake at the latest valuation date. Add one whenever there is a new round or a
-          fair value report.
-        </p>
-        {markOpen && (
-          <MarkForm
-            suggestedStake={suggestedMarkStake(
-              detail.rounds,
-              detail.marks[0] ? { date: detail.marks[0].date, valuation: detail.marks[0].valuation, stakePct: detail.marks[0].stakePct } : null,
-            )}
-            onCancel={() => setMarkOpen(false)}
-            onSave={async (v) => {
-              const ok = await after(await addMark(c.id, v), "Valuation added.");
-              if (ok) setMarkOpen(false);
-              return ok;
-            }}
-          />
-        )}
-        {detail.marks.length > 0 && (
-          <div className="inv-scroll">
-            <table className="inv-table">
-              <thead>
-                <tr>
-                  <th>As of</th>
-                  <th className="num">Company value</th>
-                  <th className="num">Our stake</th>
-                  <th className="num">Our value</th>
-                  <th>Source</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {detail.marks.map((m, i) => (
-                  <tr key={m.id} className={i === 0 ? "latest" : undefined}>
-                    <td>
-                      {fmtDate(m.date)}
-                      {i === 0 && <span className="tag">Latest</span>}
-                    </td>
-                    <td className="num">{fmtCr(m.valuation)}</td>
-                    <td className="num">{fmtPct(m.stakePct)}</td>
-                    <td className="num">{fmtCr(Math.round(m.valuation * m.stakePct) / 100)}</td>
-                    <td>
-                      {m.source}
-                      {m.note && <div className="sub">{m.note}</div>}
-                      <div className="sub">by {m.by}</div>
-                    </td>
-                    <td className="acts">
-                      <button className="btn-ghost sm danger-text" type="button" onClick={() => removeMark(m)}>
-                        {confirm === m.id ? "Confirm remove" : "Remove"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
@@ -231,6 +148,7 @@ function RoundForm({
   onSave: (v: RoundInput) => Promise<boolean>;
 }) {
   const [f, setF] = useState({
+    fund: (initial?.fund ?? "") as Fund | "",
     date: initial?.date ?? todayISO(),
     round: initial?.round ?? "",
     instrument: initial?.instrument ?? "",
@@ -243,17 +161,20 @@ function RoundForm({
   const preMoney = parseCr(f.preMoney);
   const stake = parsePct(f.stake);
   const suggestion = suggestedStake(amount ?? null, preMoney ?? null);
-  const valid = !!f.date && f.date <= todayISO() && typeof amount === "number" && amount > 0 && preMoney !== undefined && stake !== undefined;
+  const valid =
+    !!f.fund && !!f.date && f.date <= todayISO() && typeof amount === "number" && amount > 0 && preMoney !== undefined && stake !== undefined;
   const set = (p: Partial<typeof f>) => setF((s) => ({ ...s, ...p }));
 
   return (
     <form
       className="inv-form"
+      aria-label={initial ? "Edit round" : "Add round"}
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!valid || typeof amount !== "number") return;
+        if (!valid || typeof amount !== "number" || !f.fund) return;
         setSaving(true);
         await onSave({
+          fund: f.fund,
           date: f.date,
           round: f.round.trim() || null,
           instrument: (f.instrument || null) as RoundInput["instrument"],
@@ -265,6 +186,17 @@ function RoundForm({
       }}
     >
       <div className="grid3">
+        <label className="field">
+          <span>Fund</span>
+          <select className="sel" value={f.fund} onChange={(e) => set({ fund: e.target.value as Fund | "" })} required>
+            <option value="">Choose…</option>
+            {FUNDS.map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="field">
           <span>Date</span>
           <input className="inp" type="date" max={todayISO()} value={f.date} onChange={(e) => set({ date: e.target.value })} required />
@@ -307,6 +239,7 @@ function RoundForm({
           )}
         </label>
       </div>
+      {!f.fund && <p className="hint">Choose the fund: Hedgehogs or Sambhav.</p>}
       {(amount === undefined || preMoney === undefined) && <p className="hint err">Enter amounts in ₹ Cr, like 12.5 or 1,250.</p>}
       {stake === undefined && <p className="hint err">Enter the stake as a percentage between 0 and 100.</p>}
       <div className="foot">
@@ -321,80 +254,154 @@ function RoundForm({
   );
 }
 
-type MarkInput = Parameters<typeof addMark>[1];
+// ─── Contacts ────────────────────────────────────────────────────────────────
 
-function MarkForm({
-  suggestedStake: suggested,
+function Contacts({ companyId, initial }: { companyId: string; initial: ContactItem[] }) {
+  const { toast } = useStore();
+  const [list, setList] = useState(initial);
+  const [editing, setEditing] = useState<ContactItem | "new" | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  return (
+    <section>
+      <div className="inv-head">
+        <h3>Contacts</h3>
+        {editing === null && (
+          <button className="btn sm" type="button" onClick={() => setEditing("new")}>
+            Add contact
+          </button>
+        )}
+      </div>
+      {list.length > 0 && (
+        <ul className="contacts">
+          {list.map((p) => (
+            <li key={p.id}>
+              <div>
+                <strong>{p.name}</strong>
+                {p.isPrimary && <span className="tag">Primary</span>}
+                {p.designation && <span className="sub"> · {p.designation}</span>}
+                <div className="sub">
+                  {[p.email, p.phone].filter(Boolean).join(" · ") || "No email or phone"}
+                </div>
+              </div>
+              <div className="acts">
+                <button className="btn-ghost sm" type="button" onClick={() => setEditing(p)}>
+                  Edit
+                </button>
+                <button
+                  className="btn-ghost sm danger-text"
+                  type="button"
+                  onClick={async () => {
+                    if (confirm !== p.id) return setConfirm(p.id);
+                    setConfirm(null);
+                    const r = await deleteContact(companyId, p.id);
+                    if (!r.ok) return toast(r.error);
+                    setList(r.data);
+                    toast("Contact removed.");
+                  }}
+                >
+                  {confirm === p.id ? "Confirm remove" : "Remove"}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {editing !== null && (
+        <ContactForm
+          key={editing === "new" ? "new" : editing.id}
+          initial={editing === "new" ? null : editing}
+          first={!list.length}
+          onCancel={() => setEditing(null)}
+          onSave={async (v) => {
+            const r = await saveContact(companyId, editing === "new" ? null : editing.id, v);
+            if (!r.ok) {
+              toast(r.error);
+              return;
+            }
+            setList(r.data);
+            setEditing(null);
+            toast(editing === "new" ? "Contact added." : "Contact updated.");
+          }}
+        />
+      )}
+      {!list.length && editing === null && <p className="muted">No contacts yet. Add the person who sends the MIS and financials.</p>}
+    </section>
+  );
+}
+
+type ContactInput = Parameters<typeof saveContact>[2];
+
+function ContactForm({
+  initial,
+  first,
   onCancel,
   onSave,
 }: {
-  suggestedStake: number | null;
+  initial: ContactItem | null;
+  first: boolean;
   onCancel: () => void;
-  onSave: (v: MarkInput) => Promise<boolean>;
+  onSave: (v: ContactInput) => Promise<void>;
 }) {
   const [f, setF] = useState({
-    date: todayISO(),
-    valuation: "",
-    stake: suggested === null ? "" : String(suggested),
-    source: MARK_SOURCES[0] as string,
-    note: "",
+    name: initial?.name ?? "",
+    designation: initial?.designation ?? "",
+    email: initial?.email ?? "",
+    phone: initial?.phone ?? "",
+    isPrimary: initial?.isPrimary ?? first,
   });
   const [saving, setSaving] = useState(false);
-  const valuation = parseCr(f.valuation);
-  const stake = parsePct(f.stake);
-  const ours = typeof valuation === "number" && typeof stake === "number" ? Math.round(valuation * stake) / 100 : null;
-  const valid = !!f.date && f.date <= todayISO() && typeof valuation === "number" && typeof stake === "number" && stake > 0;
+  const emailOk = !f.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim());
+  const valid = !!f.name.trim() && emailOk;
   const set = (p: Partial<typeof f>) => setF((s) => ({ ...s, ...p }));
 
   return (
     <form
       className="inv-form"
+      aria-label={initial ? "Edit contact" : "Add contact"}
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!valid || typeof valuation !== "number" || typeof stake !== "number") return;
+        if (!valid) return;
         setSaving(true);
-        await onSave({ date: f.date, valuation, stakePct: stake, source: f.source as MarkInput["source"], note: f.note.trim() || null });
+        await onSave({
+          name: f.name.trim(),
+          designation: f.designation.trim() || null,
+          email: f.email.trim() || null,
+          phone: f.phone.trim() || null,
+          isPrimary: f.isPrimary,
+        });
         setSaving(false);
       }}
     >
       <div className="grid3">
         <label className="field">
-          <span>As of</span>
-          <input className="inp" type="date" max={todayISO()} value={f.date} onChange={(e) => set({ date: e.target.value })} required />
+          <span>Name</span>
+          <input className="inp" type="text" value={f.name} onChange={(e) => set({ name: e.target.value })} required />
         </label>
         <label className="field">
-          <span>Company valuation (₹ Cr)</span>
-          <input className="inp" type="text" inputMode="decimal" placeholder="e.g. 600" value={f.valuation} onChange={(e) => set({ valuation: e.target.value })} required />
+          <span>Designation</span>
+          <input className="inp" type="text" placeholder="e.g. CFO" value={f.designation} onChange={(e) => set({ designation: e.target.value })} />
         </label>
         <label className="field">
-          <span>Our stake (%)</span>
-          <input className="inp" type="text" inputMode="decimal" value={f.stake} onChange={(e) => set({ stake: e.target.value })} required />
+          <span>Email</span>
+          <input className="inp" type="email" value={f.email} onChange={(e) => set({ email: e.target.value })} />
         </label>
         <label className="field">
-          <span>Source</span>
-          <select className="sel" value={f.source} onChange={(e) => set({ source: e.target.value })}>
-            {MARK_SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <span>Phone</span>
+          <input className="inp" type="tel" value={f.phone} onChange={(e) => set({ phone: e.target.value })} />
         </label>
-        <label className="field" style={{ gridColumn: "span 2" }}>
-          <span>Note</span>
-          <input className="inp" type="text" placeholder="optional, e.g. Series B led by X" value={f.note} onChange={(e) => set({ note: e.target.value })} />
+        <label className="ck" style={{ alignSelf: "end" }}>
+          <input type="checkbox" checked={f.isPrimary} onChange={(e) => set({ isPrimary: e.target.checked })} />
+          Primary contact
         </label>
       </div>
-      <p className="hint">
-        {ours !== null ? `Our value: ${fmtCr(ours)}.` : "Our value = company valuation × our stake."} The stake is pre-filled from the previous
-        valuation or the stakes bought; adjust it for any dilution.
-      </p>
+      {!emailOk && <p className="hint err">Enter a valid email address.</p>}
       <div className="foot">
         <button className="btn-ghost sm" type="button" onClick={onCancel}>
           Cancel
         </button>
         <button className="btn sm primary" type="submit" disabled={!valid || saving}>
-          {saving ? "Saving…" : "Add valuation"}
+          {saving ? "Saving…" : initial ? "Save contact" : "Add contact"}
         </button>
       </div>
     </form>

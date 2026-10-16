@@ -53,6 +53,7 @@ enum FileKind {
   MODEL
   OTHER
   MIS
+  RESULT_NOTE
 }
 
 enum SummaryJobStatus {
@@ -89,7 +90,6 @@ model User {
   auditLogs         AuditLog[]
   deletionLogs      DeletionLog[]
   roundsCreated     InvestmentRound[]
-  marksCreated      ValuationMark[]
   meetingsCreated   Meeting[]
   misEntered        MisFigure[]
 }
@@ -160,7 +160,7 @@ model Company {
   rejections  Rejection[]
   auditLogs   AuditLog[]
   rounds      InvestmentRound[]
-  marks       ValuationMark[]
+  contacts    CompanyContact[]
   checks      QuarterCheck[]
   meetings    Meeting[]
   misFigures  MisFigure[]
@@ -209,6 +209,8 @@ model File {
   uploadedById String
   uploadedBy   User     @relation(fields: [uploadedById], references: [id])
   uploadedAt   DateTime @default(now())
+  /// MIS and result-note files: the FY quarter they are for, e.g. "FY27-Q2".
+  quarter      String?
 
   summaries   Summary[]
   summaryJobs SummaryJob[]
@@ -216,6 +218,7 @@ model File {
 
   @@index([companyId, uploadedAt])
   @@index([companyId, kind])
+  @@index([companyId, quarter])
 }
 
 // ─── AI summaries ────────────────────────────────────────────────────────────
@@ -379,6 +382,8 @@ model InvestmentRound {
   round       String?
   /// Equity, CCPS, CCD, Convertible note, Other
   instrument  String?
+  /// Hedgehogs or Sambhav (null only for rounds entered before funds existed)
+  fund        String?
   amount      Decimal  @db.Decimal(14, 2)
   /// Company pre-money valuation for this round, INR crore.
   preMoney    Decimal? @db.Decimal(16, 2)
@@ -391,25 +396,7 @@ model InvestmentRound {
   @@index([companyId, date])
 }
 
-/// A valuation of a portfolio company at a date; the latest one gives current value and MOIC.
-model ValuationMark {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  date        DateTime @db.Date
-  /// Company valuation (100%), INR crore.
-  valuation   Decimal  @db.Decimal(16, 2)
-  /// Niveshaay's stake at this date, % (after any dilution).
-  stakePct    Decimal  @db.Decimal(7, 4)
-  /// New round, Fair value report, Auditor, Other
-  source      String
-  note        String?
-  createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
 
-  @@index([companyId, date])
-}
 /// Quarterly checklist per portfolio company (replaces the "Team Allocation - Results" sheet). SPEC §15.
 /// Each tick is the date it was done (null = not done).
 model QuarterCheck {
@@ -420,8 +407,6 @@ model QuarterCheck {
   quarter        String
   misAt          DateTime? @db.Date
   resultNoteAt   DateTime? @db.Date
-  resultUpdateAt DateTime? @db.Date
-  bdoAt          DateTime? @db.Date
   remarks        String?
   updatedAt      DateTime  @updatedAt
 
@@ -477,4 +462,20 @@ model MisFigure {
   updatedAt    DateTime @updatedAt
 
   @@unique([companyId, quarter])
+}
+
+/// People to contact at a portfolio company (for MIS / data requests). Several per company, one primary.
+model CompanyContact {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  designation String?
+  email       String?
+  phone       String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
 }

@@ -6,7 +6,6 @@ import { prepareMis, readMisFile } from "@/lib/ai/mis";
 import { AiError } from "@/lib/ai/provider";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { todayISO } from "@/lib/domain/dates";
 import { draftFromExtract, unmatchedFigures } from "@/lib/domain/mis";
 import { fmtCr } from "@/lib/domain/money";
 import { isQuarterKey, quarterLabel } from "@/lib/domain/quarters";
@@ -70,7 +69,7 @@ const valuesSchema = z.object({
 
 const r2 = (n: number | null) => (n === null ? null : Math.round(n * 100) / 100);
 
-/** Saves (replaces) a quarter's figures. Also ticks "MIS/FS received" in the tracker if it isn't yet. */
+/** Saves (replaces) a quarter's figures. (The tracker's "MIS received" tick comes from the uploaded file.) */
 export async function saveMis(companyId: string, q: string, values: z.input<typeof valuesSchema>, sourceFileId: string | null) {
   return run<MisItem[]>(async () => {
     const me = await requireRole();
@@ -90,15 +89,6 @@ export async function saveMis(companyId: string, q: string, values: z.input<type
         create: { ...data, companyId: cid, quarter: qk, createdById: me.id },
         update: data,
       });
-      const check = await tx.quarterCheck.findUnique({ where: { companyId_quarter: { companyId: cid, quarter: qk } } });
-      if (!check?.misAt) {
-        const today = new Date(todayISO() + "T00:00:00Z");
-        await tx.quarterCheck.upsert({
-          where: { companyId_quarter: { companyId: cid, quarter: qk } },
-          create: { companyId: cid, quarter: qk, misAt: today },
-          update: { misAt: today },
-        });
-      }
       const parts = [
         `revenue ${fmtCr(data.revenue) ?? "–"}`,
         `EBITDA ${fmtCr(data.ebitda) ?? "–"}`,

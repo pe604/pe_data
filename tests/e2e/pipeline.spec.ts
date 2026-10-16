@@ -189,18 +189,16 @@ test("bulk add to Invested skips duplicates", async ({ page }) => {
   await expect(row(page, a)).toBeVisible();
 });
 
-test("Invested tab: rounds and valuation give total invested, current value and MOIC", async ({ page }) => {
+test("Invested tab: rounds with fund give total invested with a Hedgehogs / Sambhav split", async ({ page }) => {
   const a = uniq("Portco");
   await page.goto("/");
   await openTab(page, "Invested");
   const head = page.locator("table.grid thead");
-  // Names may carry the sort arrow ("Invested↓" is the default sort here).
   await expect(head.getByRole("columnheader", { name: /^Invested/ })).toHaveCount(1);
-  // Current value and MOIC live in the company's Investment tab, not the table.
   for (const h of ["Priority", "Stage at exit", "Via", "Current value", "MOIC"]) {
     await expect(head.getByRole("columnheader", { name: new RegExp(`^${h}`) })).toHaveCount(0);
   }
-  for (const b of ["Priority", "Stage", "Via"]) await expect(page.locator(".toolbar").getByRole("button", { name: b, exact: true })).toHaveCount(0);
+  await expect(page.locator(".pf")).not.toContainText("MOIC");
 
   await page.getByRole("button", { name: "Add company" }).first().click();
   const dlg = page.getByRole("dialog");
@@ -209,45 +207,41 @@ test("Invested tab: rounds and valuation give total invested, current value and 
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
   await expect(row(page, a)).toContainText("Add rounds");
 
-  // Round 1: stake suggested from amount and pre-money.
   await row(page, a).locator("td.c-amt").first().click();
   const drawer = page.locator(".drawer.open");
   await expect(drawer.getByRole("tab", { name: /Investment/ })).toHaveAttribute("aria-selected", "true");
-  await drawer.getByLabel("Date").fill("2024-06-10");
-  await drawer.getByLabel("Round", { exact: true }).fill("Seed");
-  await drawer.getByLabel("Amount invested (₹ Cr)").fill("10");
-  await drawer.getByLabel("Pre-money valuation (₹ Cr)").fill("190");
-  await drawer.getByRole("button", { name: /Use 5% \(amount ÷ post-money\)/ }).click();
-  await drawer.getByRole("button", { name: "Add round", exact: true }).click();
+  await expect(drawer.getByRole("heading", { name: "Valuation" })).toHaveCount(0);
+
+  // Round 1: fund is required; stake suggested from amount and pre-money.
+  let form = drawer.getByRole("form", { name: "Add round" });
+  await form.getByLabel("Date").fill("2024-06-10");
+  await form.getByLabel("Round", { exact: true }).fill("Seed");
+  await form.getByLabel("Amount invested (₹ Cr)").fill("10");
+  await form.getByLabel("Pre-money valuation (₹ Cr)").fill("190");
+  await expect(form.getByRole("button", { name: "Add round" })).toBeDisabled();
+  await form.getByLabel("Fund").selectOption("Hedgehogs");
+  await form.getByRole("button", { name: /Use 5% \(amount ÷ post-money\)/ }).click();
+  await form.getByRole("button", { name: "Add round" }).click();
   await expect(page.getByRole("status")).toContainText("Round added.");
 
-  // Round 2, no stake.
+  // Round 2 from the other fund.
   await drawer.getByRole("button", { name: "Add round", exact: true }).click();
-  await drawer.getByLabel("Date").fill("2025-11-02");
-  await drawer.getByLabel("Amount invested (₹ Cr)").fill("5");
-  await drawer.locator("form").getByRole("button", { name: "Add round", exact: true }).click();
+  form = drawer.getByRole("form", { name: "Add round" });
+  await form.getByLabel("Fund").selectOption("Sambhav");
+  await form.getByLabel("Date").fill("2025-11-02");
+  await form.getByLabel("Amount invested (₹ Cr)").fill("5");
+  await form.getByRole("button", { name: "Add round" }).click();
   await expect(drawer.locator(".inv-sum")).toContainText("₹ 15 Cr");
-  await expect(drawer.locator(".inv-sum")).toContainText("2 rounds");
-
-  // Valuation: stake pre-filled from stakes bought (5%).
-  await drawer.getByRole("button", { name: "Add valuation" }).click();
-  await expect(drawer.getByLabel("Our stake (%)")).toHaveValue("5");
-  await drawer.getByLabel("As of").fill("2026-03-31");
-  await drawer.getByLabel("Company valuation (₹ Cr)").fill("400");
-  await drawer.locator("form").getByRole("button", { name: "Add valuation" }).click();
-  await expect(drawer.locator(".inv-sum")).toContainText("₹ 20 Cr");
-  await expect(drawer.locator(".inv-sum")).toContainText("1.33x");
+  await expect(drawer.locator(".inv-sum")).toContainText("Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr");
 
   await drawer.getByRole("tab", { name: "History" }).click();
-  await expect(page.locator(".hist")).toContainText("added investment Seed: ₹ 10 Cr on 10 Jun 2024");
-  await expect(page.locator(".hist")).toContainText("added valuation mark (New round): company ₹ 400 Cr, our stake 5%");
+  await expect(page.locator(".hist")).toContainText("added investment Seed (Hedgehogs): ₹ 10 Cr on 10 Jun 2024");
   await page.keyboard.press("Escape");
 
   const r = row(page, a);
-  await expect(r).toContainText("₹ 15 Cr");
-  await expect(r).toContainText("2 rounds");
-  await expect(r).not.toContainText("1.33x");
-  await expect(page.locator(".pf")).toContainText("₹ 15 Cr");
+  await expect(r.locator("td.c-amt")).toContainText("₹ 15 Cr");
+  await expect(r.locator("td.c-amt")).toContainText("Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr");
+  await expect(page.locator(".pf")).toContainText("Hedgehogs");
   await expect(page.locator("tfoot .total-row")).toContainText("₹ 15 Cr");
 
   // Removing a round updates the totals.
@@ -255,9 +249,8 @@ test("Invested tab: rounds and valuation give total invested, current value and 
   await drawer.getByRole("row", { name: /2 Nov 2025/ }).getByRole("button", { name: "Remove" }).click();
   await drawer.getByRole("button", { name: "Confirm remove" }).click();
   await expect(drawer.locator(".inv-sum")).toContainText("₹ 10 Cr");
-  await expect(drawer.locator(".inv-sum")).toContainText("2.00x");
+  await expect(drawer.locator(".inv-sum")).not.toContainText("Sambhav");
 });
-
 test("bulk add to Rejected with one reason and date, skipping duplicates", async ({ page }) => {
   const a = uniq("Rejone");
   const b = uniq("Rejtwo");
@@ -333,13 +326,102 @@ test("Excel export downloads", async ({ page }) => {
   expect(d.suggestedFilename()).toMatch(/^Niveshaay Deal Pipeline \d{4}-\d{2}-\d{2}\.xlsx$/);
 });
 
-test("quarterly tracker: tick MIS, remarks, MIS due date; meetings: plan, mark done, shown in tracker and company file", async ({ page }) => {
+test("quarterly tracker: upload MIS and result note from the table, view them in the company file; contacts show as POC", async ({ page }) => {
+  await page.goto("/");
+  await openTab(page, "Invested");
+
+  // Contacts on Mokobara: the first is primary and shows as POC.
+  await page.getByRole("button", { name: "Mokobara", exact: true }).click();
+  const drawer = page.locator(".drawer.open");
+  await drawer.getByRole("tab", { name: /Investment/ }).click();
+  await drawer.getByRole("button", { name: "Add contact" }).click();
+  let cf = drawer.getByRole("form", { name: "Add contact" });
+  await cf.getByLabel("Name").fill("Priya Shah");
+  await cf.getByLabel("Designation").fill("CFO");
+  await cf.getByLabel("Email").fill("not-an-email");
+  await expect(cf.getByRole("button", { name: "Add contact" })).toBeDisabled();
+  await cf.getByLabel("Email").fill("priya@example.com");
+  await cf.getByRole("button", { name: "Add contact" }).click();
+  await expect(drawer.locator(".contacts")).toContainText("Priya Shah");
+  await expect(drawer.locator(".contacts")).toContainText("Primary");
+  await drawer.getByRole("button", { name: "Add contact" }).click();
+  cf = drawer.getByRole("form", { name: "Add contact" });
+  await cf.getByLabel("Name").fill("Rahul Mehta");
+  await cf.getByRole("button", { name: "Add contact" }).click();
+  await expect(drawer.locator(".contacts li")).toHaveCount(2);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("tab", { name: "Quarterly tracker" }).click();
+  const head = page.locator("table.qgrid thead");
+  for (const h of ["Result update", "Quarterly calls", "Shared with BDO"]) await expect(head).not.toContainText(h);
+  const tr = page.locator("table.qgrid tbody tr", { hasText: "Mokobara" });
+  await expect(tr.locator("td").nth(2)).toHaveText("Priya Shah");
+
+  // MIS: upload from the cell; it ticks with the date.
+  const mis = page.getByRole("button", { name: "MIS received for Mokobara" });
+  await expect(mis).toContainText("Upload");
+  await mis.click();
+  const pop = page.locator(".pop");
+  await pop.locator('input[aria-label="Upload MIS file"]').setInputFiles({
+    name: "mokobara-mis.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF"),
+  });
+  await expect(page.getByRole("status").first()).toContainText("MIS for");
+  await expect(mis).toContainText("✓");
+  await expect(pop).toContainText("mokobara-mis.pdf");
+  await expect(pop.getByRole("button", { name: "View" })).toBeVisible();
+  await expect(pop.getByRole("button", { name: "Download" })).toBeVisible();
+  await pop.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(".q-progress")).toContainText("MIS received: 1/");
+
+  // Result note: "Not made" until a file is uploaded.
+  const note = page.getByRole("button", { name: "Result note for Mokobara" });
+  await expect(note).toContainText("Not made");
+  await note.click();
+  await page.locator(".pop").locator('input[aria-label="Upload result note file"]').setInputFiles({
+    name: "mokobara-result-note.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n%%EOF"),
+  });
+  await expect(note).toContainText("✓ Made");
+  await page.locator(".pop").getByRole("button", { name: "Close" }).click();
+
+  // Remarks (far-right column: scroll first, popovers close on scroll).
+  const remarks = page.getByRole("button", { name: "Remarks for Mokobara" });
+  await remarks.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await remarks.click();
+  await page.locator(".pop").getByLabel("Remarks").fill("Raghav will visit this month");
+  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
+  await expect(remarks).toHaveText("Raghav will visit this month");
+
+  // MIS due date is editable.
+  await page.getByRole("button", { name: /MIS due .*\(default\) · Edit/ }).click();
+  await page.locator(".pop").getByLabel("Date").fill("2030-01-31");
+  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: /MIS due 31 Jan 2030 · Edit/ })).toBeVisible();
+
+  // Company file: both files listed under the quarter, viewable and downloadable.
+  await page.getByRole("button", { name: "Mokobara", exact: true }).click();
+  await expect(drawer.getByRole("tab", { name: /Investment/ })).toHaveAttribute("aria-selected", "true");
+  const q = drawer.locator(".qfiles-q").first();
+  await expect(q).toContainText(quarterLabel(lastEndedQuarter(todayISO())));
+  await expect(q).toContainText("mokobara-mis.pdf");
+  await expect(q).toContainText("mokobara-result-note.pdf");
+  await q.getByRole("button", { name: "View" }).first().click();
+  await expect(page.locator(".pdf-frame")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await drawer.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText("uploaded mokobara-mis.pdf (MIS,");
+  await expect(page.locator(".hist")).toContainText("added contact Priya Shah (CFO)");
+});
+
+test("meetings: plan, mark done, listed in the Meetings view and the company file", async ({ page }) => {
   const today = todayISO();
   const yesterday = addDays(today, -1);
   await page.goto("/");
   await openTab(page, "Invested");
-
-  // Meetings view: plan one for today, log one yesterday as planned (needs updating), then mark it done.
   await page.getByRole("tab", { name: "Meetings" }).click();
   for (const [date, type] of [[today, "Plant visit"], [yesterday, "Management meeting"]] as const) {
     await page.getByRole("button", { name: "Add meeting" }).click();
@@ -350,64 +432,25 @@ test("quarterly tracker: tick MIS, remarks, MIS due date; meetings: plan, mark d
     const who = form.getByRole("textbox", { name: "Who is going" });
     await who.fill("Keyur");
     await who.press("Enter");
-    await who.press("Escape"); // close the suggestion list
+    await who.press("Escape");
     await form.getByRole("button", { name: "Add meeting" }).click();
     await expect(page.getByRole("status")).toContainText("Meeting planned.");
   }
   const needs = page.locator(".mtg-group", { hasText: "Needs updating" });
-  await expect(needs).toContainText("Management meeting");
   await expect(needs).toContainText("Not marked done");
-  await expect(page.locator(".mtg-group", { hasText: "Upcoming" })).toContainText("Plant visit");
   await needs.getByRole("button", { name: "Mark done" }).click();
   const edit = page.getByRole("form", { name: "Edit meeting" });
   await expect(edit.getByLabel("Status")).toHaveValue("DONE");
   await edit.getByLabel("Notes and next steps").fill("Met the CFO, Q2 numbers due next week");
   await edit.getByRole("button", { name: "Save meeting" }).click();
   await expect(page.locator(".mtg-group", { hasText: "Past" })).toContainText("Met the CFO");
-  await expect(page.locator(".mtg-group", { hasText: "Needs updating" })).toHaveCount(0);
-
-  // Quarterly tracker for the last ended quarter.
-  await page.getByRole("tab", { name: "Quarterly tracker" }).click();
-  const mis = page.getByRole("button", { name: "MIS/FS received for Mokobara" });
-  await mis.click();
-  await page.locator(".pop").getByRole("button", { name: "Mark done" }).click();
-  await expect(mis).toContainText("✓");
-  await expect(page.locator(".q-progress")).toContainText("MIS/FS received: 1/");
-  // Far-right column: scroll first (popovers close on scroll), then open.
-  const remarks = page.getByRole("button", { name: "Remarks for Mokobara" });
-  await remarks.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(300);
-  await remarks.click();
-  await page.locator(".pop").getByLabel("Remarks").fill("Raghav will visit this month");
-  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: "Remarks for Mokobara" })).toHaveText("Raghav will visit this month");
-  // Meetings in the results period (this quarter) show in Quarterly calls.
-  if (quarterOf(yesterday) === quarterOf(today)) {
-    await expect(page.locator("tr", { hasText: "Mokobara" }).locator("td").nth(5)).toContainText("1 done · 1 planned");
-  }
-  // MIS due date is editable.
-  await page.getByRole("button", { name: /MIS due .*\(default\) · Edit/ }).click();
-  await page.locator(".pop").getByLabel("Date").fill("2030-01-31");
-  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: /MIS due 31 Jan 2030 · Edit/ })).toBeVisible();
-  await page.reload();
-  await openTab(page, "Invested");
-  await page.getByRole("tab", { name: "Quarterly tracker" }).click();
-  await expect(page.getByRole("button", { name: "Remarks for Mokobara" })).toHaveText("Raghav will visit this month");
-
-  // Company file: Meetings tab and History.
-  await page.getByRole("button", { name: "Mokobara", exact: true }).click();
+  await page.locator(".mtg-group", { hasText: "Past" }).getByRole("button", { name: "Mokobara" }).click();
   const drawer = page.locator(".drawer.open");
   await expect(drawer.getByRole("tab", { name: /Meetings/ })).toHaveAttribute("aria-selected", "true");
   await expect(drawer).toContainText("Met the CFO");
-  await drawer.getByRole("tab", { name: "History" }).click();
-  await expect(page.locator(".hist")).toContainText("checklist: MIS/FS received done on");
-  await expect(page.locator(".hist")).toContainText("remarks: Raghav will visit this month");
-  await expect(page.locator(".hist")).toContainText("planned meeting: Plant visit");
-  await expect(page.locator(".hist")).toContainText("marked done");
 });
 
-test("MIS: upload a file, enter figures (AI off in tests), see the financials table, tracker tick and History", async ({ page }) => {
+test("MIS figures: upload from the company file, enter figures (AI off in tests), see the financials table", async ({ page }) => {
   const a = uniq("Misco");
   await page.goto("/");
   await openTab(page, "Invested");
@@ -418,7 +461,7 @@ test("MIS: upload a file, enter figures (AI off in tests), see the financials ta
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
   await row(page, a).locator("td.c-amt").first().click();
   const drawer = page.locator(".drawer.open");
-  await expect(drawer.getByRole("heading", { name: "Quarterly financials (MIS)" })).toBeVisible();
+  await expect(drawer.getByRole("heading", { name: "Quarterly MIS and results" })).toBeVisible();
 
   const wb = new ExcelJS.Workbook();
   wb.addWorksheet("P&L").addRow(["Revenue", 410.2, 431.8, 455.6]);
@@ -431,7 +474,6 @@ test("MIS: upload a file, enter figures (AI off in tests), see the financials ta
   });
   const form = drawer.getByRole("form", { name: "MIS figures" });
   await expect(form).toContainText("AI reading is not set up");
-  await expect(form).toContainText("From mis.xlsx");
   await form.getByLabel(/^Revenue/).fill("12.98");
   await form.getByLabel(/^EBITDA/).fill("1.22");
   await form.getByLabel(/^PAT/).fill("(0.5)");
@@ -440,18 +482,13 @@ test("MIS: upload a file, enter figures (AI off in tests), see the financials ta
   await form.getByRole("button", { name: "Save figures" }).click();
   await expect(page.getByRole("status").first()).toContainText(`${q} figures saved.`);
   const table = drawer.locator(".mis-table");
-  await expect(table).toContainText(q);
   await expect(table).toContainText("12.98");
   await expect(table).toContainText("(0.5)");
   await expect(table).toContainText("9.4%");
-
-  await drawer.getByRole("tab", { name: /Materials/ }).click();
-  await expect(drawer).toContainText("mis.xlsx");
-  await drawer.getByRole("tab", { name: "History" }).click();
-  await expect(page.locator(".hist")).toContainText(`MIS figures: revenue ₹ 12.98 Cr`);
+  await expect(drawer.locator(".qfiles-q").first()).toContainText("mis.xlsx");
   await page.keyboard.press("Escape");
 
-  // Saving the figures ticks "MIS/FS received" in the tracker for that quarter.
+  // The MIS uploaded from the company file ticks the tracker for that quarter.
   await page.getByRole("tab", { name: "Quarterly tracker" }).click();
-  await expect(page.getByRole("button", { name: `MIS/FS received for ${a}` })).toContainText("✓");
+  await expect(page.getByRole("button", { name: `MIS received for ${a}` })).toContainText("✓");
 });

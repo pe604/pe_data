@@ -6,7 +6,8 @@ import { todayISO } from "@/lib/domain/dates";
 import { marginPct, MIS_METRIC_LABELS } from "@/lib/domain/mis";
 import { fmtCrNumber, parseSignedCr } from "@/lib/domain/money";
 import { lastEndedQuarter, quarterLabel, quarterOptions, shiftQuarter } from "@/lib/domain/quarters";
-import type { MisItem, MisReadResult } from "@/lib/domain/types";
+import type { FileItem, MisItem, MisReadResult } from "@/lib/domain/types";
+import { canView, downloadFile, FileViewer, type ViewableFile } from "../ui/FileViewer";
 import { useStore } from "../store";
 import { uploadFile } from "../ui/upload";
 
@@ -45,7 +46,17 @@ const blank = (quarter: string): Draft => ({
 });
 const str = (n: number | null) => (n === null ? "" : String(n));
 
-export function MisSection({ companyId, items, reload }: { companyId: string; items: MisItem[]; reload: () => Promise<void> }) {
+export function MisSection({
+  companyId,
+  items,
+  files,
+  reload,
+}: {
+  companyId: string;
+  items: MisItem[];
+  files: FileItem[];
+  reload: () => Promise<void>;
+}) {
   const { toast, aiEnabled } = useStore();
   const today = todayISO();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -55,34 +66,43 @@ export function MisSection({ companyId, items, reload }: { companyId: string; it
   const fileInput = useRef<HTMLInputElement>(null);
   const cols = items.slice(-6);
   const byQ = new Map(items.map((m) => [m.quarter, m]));
+  const [viewing, setViewing] = useState<ViewableFile | null>(null);
+  // MIS and result-note files by quarter, newest quarter first.
+  const quarterFiles = files.filter((f) => f.quarter && (f.kind === "MIS" || f.kind === "RESULT_NOTE"));
+  const fileQuarters = [...new Set(quarterFiles.map((f) => f.quarter as string))].sort().reverse();
 
   const onFile = async (file: File) => {
     const q = uploadQuarter;
     setBusy("Uploading the MIS…");
-    const up = await uploadFile(file, { kind: "MIS", companyId });
+    const up = await uploadFile(file, { kind: "MIS", companyId, quarter: q });
     if (!up.ok) {
       setBusy(null);
       return toast(up.error);
     }
-    const base = { ...blank(q), fileId: up.file.id, fileName: up.file.originalName };
+    void reload(); // the file now shows under Quarterly files and in Materials
+    await readFile(up.file.id, up.file.originalName, q);
+  };
+
+  /** AI-reads a stored MIS file into the review form (nothing is saved until "Save figures"). */
+  const readFile = async (fileId: string, fileName: string, q: string) => {
+    const base = { ...blank(q), fileId, fileName };
     if (!aiEnabled) {
       setBusy(null);
       setDraft({ ...base, readError: "AI reading is not set up. Enter the figures from the file." });
       return;
     }
     setBusy(`Reading ${quarterLabel(q)} figures from the MIS…`);
-    const r = await readMis(companyId, up.file.id, q);
+    const r = await readMis(companyId, fileId, q);
     setBusy(null);
     if (!r.ok) return setDraft({ ...base, readError: r.error });
     const d = r.data;
     setDraft({ ...base, revenue: str(d.revenue), ebitda: str(d.ebitda), pat: str(d.pat), cash: str(d.cash), read: d });
-    void reload(); // the file now shows in Materials
   };
 
   return (
     <section>
       <div className="inv-head">
-        <h3>Quarterly financials (MIS)</h3>
+        <h3>Quarterly MIS and results</h3>
         {!draft && !busy && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <select className="sel" aria-label="Quarter for the MIS" value={uploadQuarter} onChange={(e) => setUploadQuarter(e.target.value)}>
@@ -113,7 +133,51 @@ export function MisSection({ companyId, items, reload }: { companyId: string; it
           </div>
         )}
       </div>
-      <p className="hint">Upload the MIS (PDF or Excel) and the figures are read for you to check before saving. Amounts in ₹ Cr.</p>
+      <p className="hint">MIS and result notes uploaded here or from the Quarterly tracker. Read figures pulls revenue, EBITDA, PAT and cash from an MIS for you to check before saving (₹ Cr).</p>
+      {fileQuarters.length > 0 && (
+        <div className="qfiles">
+          {fileQuarters.map((q) => (
+            <div key={q} className="qfiles-q">
+              <div className="qfiles-head">{quarterLabel(q)}</div>
+              {(["MIS", "RESULT_NOTE"] as const).map((kind) => {
+                const list = quarterFiles.filter((f) => f.quarter === q && f.kind === kind);
+                return (
+                  <div key={kind} className="qfiles-row">
+                    <span className="qfiles-kind">{kind === "MIS" ? "MIS" : "Result note"}</span>
+                    {list.length ? (
+                      <ul>
+                        {list.map((f) => (
+                          <li key={f.id}>
+                            <span className="fname" title={f.originalName}>
+                              {f.originalName}
+                            </span>
+                            {canView(f) && (
+                              <button className="btn-ghost sm" type="button" onClick={() => setViewing({ id: f.id, name: f.originalName, mime: f.mime })}>
+                                View
+                              </button>
+                            )}
+                            <button className="btn-ghost sm" type="button" onClick={() => downloadFile(f.id)}>
+                              Download
+                            </button>
+                            {kind === "MIS" && !draft && !busy && (
+                              <button className="btn-ghost sm" type="button" onClick={() => void readFile(f.id, f.originalName, q)}>
+                                Read figures
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="muted">{kind === "MIS" ? "Not received" : "Not made"}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
       {busy && (
         <p className="muted" role="status">
           {busy}

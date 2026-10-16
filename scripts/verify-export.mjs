@@ -20,7 +20,7 @@ check(wb.worksheets.map((w) => w.name).join(",") === "Pipeline,Rejected,Invested
 const expectHeaders = {
   Pipeline: ["Sr. No.", "Company", "Sector", "Sub-sector", "Stage", "Priority", "Assigned PE", "Assigned Research", "Latest comment", "Comments", "Via", "Date received", "Days", "OneDrive", "Files"],
   Rejected: ["Sr. No.", "Company", "Sector", "Sub-sector", "Stage at exit", "Priority", "Assigned PE", "Assigned Research", "Rejection reason", "Rejected on", "Via", "Date received", "Days in pipeline", "OneDrive"],
-  Invested: ["Sr. No.", "Company", "Sector", "Sub-sector", "Invested (₹ Cr)", "Rounds", "Current value (₹ Cr)", "MOIC", "Valuation as of", "Assigned PE", "Assigned Research", "Latest comment", "Date received", "Invested on", "Days in pipeline", "OneDrive"],
+  Invested: ["Sr. No.", "Company", "Sector", "Sub-sector", "Invested (₹ Cr)", "Hedgehogs (₹ Cr)", "Sambhav (₹ Cr)", "Rounds", "Assigned PE", "Assigned Research", "Latest comment", "Date received", "Invested on", "Days in pipeline", "OneDrive"],
 };
 
 for (const ws of wb.worksheets) {

@@ -2,11 +2,11 @@
 
 import { useMemo } from "react";
 import { fmtCr } from "@/lib/domain/money";
-import { fmtMoic, portfolioSummary } from "@/lib/domain/portfolio";
+import { FUNDS, portfolioSummary } from "@/lib/domain/portfolio";
 import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, type ViewState } from "@/lib/domain/view";
 
-/** Invested tab: portfolio totals and splits for the companies shown (filters apply). SPEC §15. */
+/** Invested tab: amount invested for the companies shown (filters apply), by fund, sector and year. SPEC §15. */
 export function PortfolioBar({ rows, view }: { rows: CompanyRow[]; view: ViewState }) {
   const s = useMemo(() => portfolioSummary(applyFilters(rows, view.f)), [rows, view.f]);
   const pct = (n: number) => (s.invested ? Math.round((n / s.invested) * 100) : 0);
@@ -20,17 +20,15 @@ export function PortfolioBar({ rows, view }: { rows: CompanyRow[]; view: ViewSta
             {s.companies} compan{s.companies === 1 ? "y" : "ies"}
           </span>
         </div>
-        <div className="pf-card">
-          <span className="lab">Current value</span>
-          <strong>{fmtCr(s.currentValue)}</strong>
-          <span className="sub">{s.unmarked ? `${s.unmarked} without a valuation, at cost` : "all at latest valuation"}</span>
-        </div>
-        <div className="pf-card">
-          <span className="lab">MOIC</span>
-          <strong className={s.moic === null ? "" : s.moic >= 1 ? "moic up" : "moic down"}>{fmtMoic(s.moic) ?? "–"}</strong>
-          <span className="sub">current value ÷ invested</span>
-        </div>
+        {FUNDS.map((f) => (
+          <div className="pf-card" key={f}>
+            <span className="lab">{f}</span>
+            <strong>{fmtCr(s.byFund[f])}</strong>
+            <span className="sub">{pct(s.byFund[f])}% of invested</span>
+          </div>
+        ))}
       </div>
+      {s.byFund.unset > 0 && <p className="hint warn-text pf-note">{fmtCr(s.byFund.unset)} is in rounds without a fund. Edit those rounds to choose Hedgehogs or Sambhav.</p>}
       {s.invested > 0 && (
         <div className="pf-splits">
           <Split

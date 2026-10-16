@@ -6,12 +6,13 @@ export type UploadResult = { ok: true; file: FileItem; jobId: string | null } | 
 /** POST /api/files. Without companyId the file is staged for the Add company flow. */
 export async function uploadFile(
   file: File,
-  opts: { kind: FileKind; companyId: string | null; summarise?: boolean },
+  opts: { kind: FileKind; companyId: string | null; summarise?: boolean; quarter?: string },
 ): Promise<UploadResult> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("kind", opts.kind);
   if (opts.companyId) fd.append("companyId", opts.companyId);
+  if (opts.quarter) fd.append("quarter", opts.quarter);
   if (opts.summarise) fd.append("summarise", "1");
   try {
     const res = await fetch("/api/files", { method: "POST", body: fd });

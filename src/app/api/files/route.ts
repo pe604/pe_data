@@ -3,7 +3,8 @@ import { createJob } from "@/lib/ai/jobs";
 import { isDeckFile } from "@/lib/ai/deck";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { FILE_KIND_LABELS, FILE_KINDS } from "@/lib/domain/constants";
+import { FILE_KIND_LABELS, FILE_KINDS, QUARTER_FILE_KINDS } from "@/lib/domain/constants";
+import { isQuarterKey, quarterLabel } from "@/lib/domain/quarters";
 import type { FileItem } from "@/lib/domain/types";
 import { aiConfigured, env, maxUploadBytes } from "@/lib/env";
 import { UserError } from "@/lib/server/action";
@@ -19,6 +20,8 @@ const fields = z.object({
   companyId: z.string().min(1).max(40).nullable(),
   /** Start a summary job when the file is a deck. */
   summarise: z.enum(["0", "1"]).default("0"),
+  /** MIS / result-note files from the quarterly tracker: the quarter they are for. */
+  quarter: z.string().refine(isQuarterKey, "Invalid quarter").nullable(),
 });
 
 /**
@@ -41,7 +44,13 @@ export async function POST(req: Request) {
       kind: form.get("kind") ?? "OTHER",
       companyId: form.get("companyId") || null,
       summarise: form.get("summarise") ?? "0",
+      quarter: form.get("quarter") || null,
     });
+    if (p.quarter) {
+      if (!p.companyId || !(QUARTER_FILE_KINDS as readonly string[]).includes(p.kind)) throw new UserError("Only MIS and result-note files belong to a quarter.");
+      const c = await db.company.findUnique({ where: { id: p.companyId }, select: { status: true } });
+      if (c?.status !== "INVESTED") throw new UserError("Quarterly files are only for companies in Invested.");
+    }
     const name = file.name.replace(/[\\/]/g, "_").slice(0, 200) || "file";
     if (file.size > maxUploadBytes) throw new UserError(`That file is over ${env.MAX_UPLOAD_MB} MB. Compress it and try again.`);
     if (file.size === 0) throw new UserError("That file is empty.");
@@ -63,9 +72,10 @@ export async function POST(req: Request) {
             sizeBytes: buf.length,
             storageKey: key,
             uploadedById: me.id,
+            quarter: p.quarter,
           },
         });
-        if (p.companyId) await audit(tx, p.companyId, me.id, [{ note: `Uploaded ${name} (${FILE_KIND_LABELS[p.kind]})` }]);
+        if (p.companyId) await audit(tx, p.companyId, me.id, [{ note: `Uploaded ${name} (${FILE_KIND_LABELS[p.kind]}${p.quarter ? `, ${quarterLabel(p.quarter)}` : ""})` }]);
         return f;
       });
     } catch (e) {
@@ -90,6 +100,7 @@ export async function POST(req: Request) {
       sizeBytes: saved.sizeBytes,
       uploadedBy: me.name,
       uploadedAt: saved.uploadedAt.toISOString(),
+      quarter: saved.quarter,
     };
     return Response.json({ file: item, jobId });
   } catch (e) {
