@@ -93,3 +93,70 @@ export function portfolioSummary(rows: { sector: string | null; holding: Holding
     byYear: [...year].map(([fy, v]) => ({ fy, invested: r2(v.invested), companies: v.companies })).sort((a, b) => a.fy.localeCompare(b.fy)),
   };
 }
+
+// ─── Allocation pie (SPEC §15.1) ─────────────────────────────────────────────
+
+export type FundFilter = Fund | "all";
+
+/** One pie slice. `members` = what an "Other" slice folds together. */
+export interface Slice {
+  key: string;
+  label: string;
+  value: number;
+  companies: number;
+  members?: string[];
+}
+
+export const OTHER_KEY = "__other";
+const amountFor = (h: Holding | null, fund: FundFilter) => (h ? (fund === "all" ? (h.invested ?? 0) : h.byFund[fund]) : 0);
+const bySize = (a: Slice, b: Slice) => b.value - a.value || a.label.localeCompare(b.label);
+
+/** Amount invested per sector (largest first), optionally only the given sectors. Zero slices are dropped. */
+export function sectorSlices(
+  rows: { sector: string | null; holding: Holding | null }[],
+  fund: FundFilter,
+  only?: string[],
+): Slice[] {
+  const m = new Map<string, Slice>();
+  for (const r of rows) {
+    const v = amountFor(r.holding, fund);
+    if (v <= 0) continue;
+    const name = r.sector || "No sector";
+    if (only && !only.includes(name)) continue;
+    const s = m.get(name) ?? { key: name, label: name, value: 0, companies: 0 };
+    s.value = r2(s.value + v);
+    s.companies++;
+    m.set(name, s);
+  }
+  return [...m.values()].sort(bySize);
+}
+
+/** Amount invested per company in one sector (largest first). */
+export function companySlices(
+  rows: { id: string; name: string; sector: string | null; holding: Holding | null }[],
+  sector: string,
+  fund: FundFilter,
+): Slice[] {
+  return rows
+    .filter((r) => (r.sector || "No sector") === sector)
+    .map((r) => ({ key: r.id, label: r.name, value: r2(amountFor(r.holding, fund)), companies: 1 }))
+    .filter((s) => s.value > 0)
+    .sort(bySize);
+}
+
+/** At most `max` slices: the largest `max - 1` plus one "Other" slice holding the rest (pies stay readable). */
+export function foldSlices(slices: Slice[], max = 8): Slice[] {
+  if (slices.length <= max) return slices;
+  const keep = slices.slice(0, max - 1);
+  const rest = slices.slice(max - 1);
+  return [
+    ...keep,
+    {
+      key: OTHER_KEY,
+      label: `Other (${rest.length})`,
+      value: r2(rest.reduce((a, s) => a + s.value, 0)),
+      companies: rest.reduce((a, s) => a + s.companies, 0),
+      members: rest.map((s) => s.key),
+    },
+  ];
+}

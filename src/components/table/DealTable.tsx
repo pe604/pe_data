@@ -9,7 +9,7 @@ import { applyFilters, emptyFilters, HEADER_SORTS, sortRows, type ViewState } fr
 import { fmtCr } from "@/lib/domain/money";
 import { portfolioSummary, splitParts, type FundSplit } from "@/lib/domain/portfolio";
 import { DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
-import { useStore } from "../store";
+import { useStore, type DrawerTab } from "../store";
 import { CloudFill, CloudLine } from "../ui/icons";
 
 type Props = {
@@ -103,7 +103,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             {!invested && th("c-pri", "Priority", "pri")}
             {th("c-pe", "Assigned PE")}
             {th("c-re", "Assigned Research")}
-            {th("c-cm", view.tab === "rejected" ? "Rejection reason" : "Comment")}
+            {th("c-cm", view.tab === "rejected" ? "Rejection reason" : invested ? "Latest update" : "Comment")}
             {!invested && th("c-via", "Via")}
             {th("c-date", "Date", "date")}
             {th("c-days", "Days", "days")}
@@ -226,8 +226,8 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                   className="c-cm editable"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openDrawer(c.id, c.status === "REJECTED" ? "summary" : "comments")}
-                  onKeyDown={(e) => e.key === "Enter" && openDrawer(c.id, c.status === "REJECTED" ? "summary" : "comments")}
+                  onClick={() => openDrawer(c.id, cmTab(c))}
+                  onKeyDown={(e) => e.key === "Enter" && openDrawer(c.id, cmTab(c))}
                 >
                   <CommentCell c={c} />
                 </td>
@@ -388,6 +388,9 @@ function StageCell({ c, onChange }: { c: CompanyRow; onChange: (s: Stage) => voi
   );
 }
 
+/** Drawer tab the Comment column opens: Summary (Rejected), Updates (Invested), else Comments. */
+const cmTab = (c: CompanyRow): DrawerTab => (c.status === "REJECTED" ? "summary" : c.status === "INVESTED" ? "updates" : "comments");
+
 function CommentCell({ c }: { c: CompanyRow }) {
   if (c.status === "REJECTED")
     return (
@@ -396,6 +399,19 @@ function CommentCell({ c }: { c: CompanyRow }) {
         <div className="cm-meta">Rejected {fmtDate(c.exitAt)}</div>
       </>
     );
+  // Invested: the Comment column shows the latest company update instead (SPEC §15.4).
+  if (c.status === "INVESTED") {
+    if (!c.latestUpdate) return <span className="ph">Add update</span>;
+    return (
+      <>
+        <div className="cm-text">{c.latestUpdate.text}</div>
+        <div className="cm-meta">
+          {fmtDate(c.latestUpdate.date)}, {c.latestUpdate.author}
+          {c.updateCount > 1 ? ` · ${c.updateCount} updates` : ""}
+        </div>
+      </>
+    );
+  }
   if (!c.latestComment) return <span className="ph">Add comment</span>;
   return (
     <>

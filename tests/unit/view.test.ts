@@ -36,6 +36,8 @@ const row = (p: Partial<CompanyRow>): CompanyRow => ({
   via: [],
   latestComment: null,
   commentCount: 0,
+  latestUpdate: null,
+  updateCount: 0,
   fileCount: 0,
   commentSearch: "",
   ...p,

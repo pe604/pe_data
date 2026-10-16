@@ -24,9 +24,21 @@ export interface CompanyRow {
   via: string[];
   latestComment: { text: string; author: string; at: string } | null;
   commentCount: number;
+  /** Invested companies: newest company update (SPEC §15.4). */
+  latestUpdate: { text: string; date: string; author: string } | null;
+  updateCount: number;
   fileCount: number;
-  /** All comment text, lower-cased, for search. */
+  /** All comment and update text, lower-cased, for search. */
   commentSearch: string;
+}
+
+export interface UpdateItem {
+  id: string;
+  date: string;
+  text: string;
+  author: string;
+  source: "MANUAL" | "WHATSAPP";
+  createdAt: string;
 }
 
 export interface SectorOption {

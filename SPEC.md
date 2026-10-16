@@ -412,6 +412,12 @@ All amounts are **₹ Cr**, shown as "₹ 12.5 Cr" with Indian digit grouping. C
 - **Invested table:** one column, **Invested**: the total of all rounds, with the split underneath ("Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr"); clicking opens the company file on **Investment**. Sorts: Invested highest/lowest first (default). A **Total** row with the same split. No Priority, Stage at exit or Via on this tab.
 - **Cards** above the table (respect filters/search): Total invested, Hedgehogs, Sambhav (with % of invested); split by sector and by Indian FY of first investment.
 - **Excel** Invested sheet: Invested, Hedgehogs, Sambhav, Rounds.
+- **Sector allocation** (button above the cards): a pie of amount invested by sector for the companies shown, with **Both funds / Hedgehogs / Sambhav**. At most 8 slices (largest 7 + **Other**, neutral grey). Click a sector (slice or legend row) → a pie of that sector's companies; click **Other** → a pie of the folded sectors; click a company → opens its company file. Breadcrumb and Back return up. Hover shows amount, % and companies. The legend lists every slice's ₹ and %; colours are a validated colour-blind-safe categorical palette in fixed order, light and dark.
+
+### 15.4 Company updates
+- A dated news log per Invested company (fundraise, new plant, key hire, results…): date (not in the future), text; who added it. No categories, attachments or portfolio-wide feed (decision of 2026-10-20). Company file → **Updates** tab: add, edit, remove (two clicks), newest first; History notes.
+- Invested table: the Comment column becomes **Latest update** (text, date, author, "N updates"), clicking opens the Updates tab. Update text is searchable. Excel Invested sheet: Latest update, Update date.
+- Each update records its source (MANUAL now; WHATSAPP when WhatsApp intake for updates is added).
 
 ### 15.2 Quarterly tracker, contacts and meetings
 The Invested tab has three views: **Portfolio**, **Quarterly tracker**, **Meetings**.

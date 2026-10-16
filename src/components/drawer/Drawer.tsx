@@ -19,6 +19,7 @@ import { IconX } from "../ui/icons";
 import { ReasonModal } from "../ui/overlay";
 import { CommentsTab, HistoryTab } from "./CommentsHistory";
 import { InvestmentTab } from "./InvestmentTab";
+import { UpdatesTab } from "./UpdatesTab";
 import { CompanyMeetings } from "../portfolio/MeetingsView";
 import { MaterialsTab } from "./MaterialsTab";
 import { SummaryTab } from "./SummaryTab";
@@ -193,9 +194,9 @@ function DrawerBody({
   // Invested companies get an Investment tab (rounds and valuations), first.
   if (st === "INVESTED") {
     tabs.unshift(["investment", "Investment", detail?.rounds.length ?? c.holding?.rounds ?? null]);
-    tabs.splice(1, 0, ["meetings", "Meetings", null]);
+    tabs.splice(1, 0, ["updates", "Updates", c.updateCount || null], ["meetings", "Meetings", null]);
   }
-  const portfolioOnly = tab === "investment" || tab === "meetings";
+  const portfolioOnly = tab === "investment" || tab === "updates" || tab === "meetings";
   const current: DrawerTab = portfolioOnly && st !== "INVESTED" ? "summary" : tab;
 
   return (
@@ -308,6 +309,8 @@ function DrawerBody({
           <p className="muted">Loading…</p>
         ) : current === "investment" ? (
           <InvestmentTab detail={detail} reload={reload} />
+        ) : current === "updates" ? (
+          <UpdatesTab companyId={c.id} />
         ) : current === "meetings" ? (
           <CompanyMeetings companyId={c.id} />
         ) : current === "summary" ? (

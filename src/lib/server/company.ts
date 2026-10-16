@@ -21,6 +21,11 @@ export const rowInclude = {
   },
   _count: { select: { files: true } },
   rounds: { select: { date: true, amount: true, fund: true } },
+  // Newest first: the latest shows in the Invested table; all are searchable.
+  updates: {
+    select: { date: true, text: true, createdBy: { select: { name: true } } },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+  },
 } satisfies Prisma.CompanyInclude;
 
 /** Prisma Decimal | null → number | null. */
@@ -69,8 +74,10 @@ export function toRow(c: RowSource): CompanyRow {
       ? { text: latest.text, author: latest.author.name, at: latest.createdAt.toISOString() }
       : null,
     commentCount: c.comments.length,
+    latestUpdate: c.updates[0] ? { text: c.updates[0].text, date: dateToISO(c.updates[0].date) ?? "", author: c.updates[0].createdBy.name } : null,
+    updateCount: c.updates.length,
     fileCount: c._count.files,
-    commentSearch: c.comments.map((x) => x.text).join("\n").toLowerCase(),
+    commentSearch: [...c.comments.map((x) => x.text), ...c.updates.map((u) => u.text)].join("\n").toLowerCase(),
   };
 }
 

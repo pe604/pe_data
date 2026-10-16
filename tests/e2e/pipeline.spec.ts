@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import { addByName, openCompany, openTab, row, uniq } from "./helpers";
 import { addDays, todayISO } from "../../src/lib/domain/dates";
-import { lastEndedQuarter, quarterLabel, quarterOf } from "../../src/lib/domain/quarters";
+import { lastEndedQuarter, quarterLabel } from "../../src/lib/domain/quarters";
 import ExcelJS from "exceljs";
 
 test("add a company with a deck, review, and it appears in Pipeline", async ({ page }) => {
@@ -491,4 +491,58 @@ test("MIS figures: upload from the company file, enter figures (AI off in tests)
   // The MIS uploaded from the company file ticks the tracker for that quarter.
   await page.getByRole("tab", { name: "Quarterly tracker" }).click();
   await expect(page.getByRole("button", { name: `MIS received for ${a}` })).toContainText("✓");
+});
+
+test("company updates replace the comment column on Invested; sector allocation pie drills into companies", async ({ page }) => {
+  const a = uniq("Updco");
+  await page.goto("/");
+  await openTab(page, "Invested");
+  const head = page.locator("table.grid thead");
+  await expect(head.getByRole("columnheader", { name: "Latest update" })).toHaveCount(1);
+  await expect(head.getByRole("columnheader", { name: "Comment" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add company" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByText("Add several portfolio companies at once").click();
+  await dlg.locator("textarea").fill(a);
+  await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
+
+  // Update from the table cell.
+  await expect(row(page, a).locator("td.c-cm")).toContainText("Add update");
+  await row(page, a).locator("td.c-cm").click();
+  const drawer = page.locator(".drawer.open");
+  await expect(drawer.getByRole("tab", { name: /Updates/ })).toHaveAttribute("aria-selected", "true");
+  const form = drawer.getByRole("form", { name: "Add update" });
+  await form.getByLabel("New update").fill("Raised ₹40 Cr Series B led by X");
+  await form.getByLabel("Update date").fill("2026-09-15");
+  await form.getByRole("button", { name: "Add update" }).click();
+  await expect(drawer.locator(".updates")).toContainText("Raised ₹40 Cr Series B led by X");
+  await form.getByLabel("New update").fill("New plant in Hosur commissioned");
+  await form.getByRole("button", { name: "Add update" }).click();
+  await expect(drawer.locator(".updates li").first()).toContainText("New plant in Hosur commissioned");
+
+  // A round so the company shows in the allocation pie.
+  await drawer.getByRole("tab", { name: /Investment/ }).click();
+  const rf = drawer.getByRole("form", { name: "Add round" });
+  await rf.getByLabel("Fund").selectOption("Sambhav");
+  await rf.getByLabel("Amount invested (₹ Cr)").fill("7");
+  await rf.getByRole("button", { name: "Add round" }).click();
+  await expect(page.getByRole("status")).toContainText("Round added.");
+  await page.keyboard.press("Escape");
+  await expect(row(page, a).locator("td.c-cm")).toContainText("New plant in Hosur commissioned");
+  await expect(row(page, a).locator("td.c-cm")).toContainText("2 updates");
+
+  // Pie: sectors → this company's sector ("No sector") → the company → opens it.
+  await page.getByRole("button", { name: "Sector allocation" }).click();
+  const modal = page.getByRole("dialog", { name: "Portfolio allocation" });
+  await expect(modal.locator(".alloc-pie svg")).toBeVisible();
+  await modal.getByRole("button", { name: /^No sector:/ }).click();
+  await expect(modal.locator(".alloc-crumbs")).toContainText("No sector");
+  await expect(modal.getByRole("button", { name: new RegExp(`^${a}:`) })).toBeVisible();
+  await modal.getByRole("tab", { name: "Hedgehogs" }).click();
+  await expect(modal.getByRole("button", { name: new RegExp(`^${a}:`) })).toHaveCount(0);
+  await modal.getByRole("tab", { name: "Sambhav" }).click();
+  await modal.getByRole("button", { name: new RegExp(`^${a}:`) }).click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.locator(".drawer.open .dh-name")).toHaveText(a);
 });

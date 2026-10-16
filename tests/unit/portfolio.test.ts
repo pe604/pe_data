@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fyOf, holdingOf, portfolioSummary, splitParts, suggestedStake } from "@/lib/domain/portfolio";
+import { companySlices, foldSlices, fyOf, holdingOf, OTHER_KEY, portfolioSummary, sectorSlices, splitParts, suggestedStake } from "@/lib/domain/portfolio";
 
 const rounds = [
   { date: "2024-06-10", amount: 10, fund: "Hedgehogs" as const },
@@ -52,5 +52,39 @@ describe("portfolio summary", () => {
   it("FY labels", () => {
     expect(fyOf("2025-03-31")).toBe("FY25");
     expect(fyOf("2025-04-01")).toBe("FY26");
+  });
+});
+
+describe("allocation pie", () => {
+  const H = (amount: number, fund: "Hedgehogs" | "Sambhav") => holdingOf([{ date: "2025-01-01", amount, fund }]);
+  const rows = [
+    { id: "a", name: "Alpha", sector: "Consumer & Retail", holding: H(10, "Hedgehogs") },
+    { id: "b", name: "Beta", sector: "Consumer & Retail", holding: H(5, "Sambhav") },
+    { id: "c", name: "Gamma", sector: "Space Tech", holding: H(8, "Sambhav") },
+    { id: "d", name: "Delta", sector: null, holding: H(2, "Hedgehogs") },
+    { id: "e", name: "Eps", sector: "Space Tech", holding: holdingOf([]) },
+  ];
+
+  it("sums by sector, largest first, per fund", () => {
+    expect(sectorSlices(rows, "all")).toEqual([
+      { key: "Consumer & Retail", label: "Consumer & Retail", value: 15, companies: 2 },
+      { key: "Space Tech", label: "Space Tech", value: 8, companies: 1 },
+      { key: "No sector", label: "No sector", value: 2, companies: 1 },
+    ]);
+    expect(sectorSlices(rows, "Sambhav").map((s) => [s.key, s.value])).toEqual([["Space Tech", 8], ["Consumer & Retail", 5]]);
+    expect(sectorSlices(rows, "all", ["Space Tech"]).map((s) => s.key)).toEqual(["Space Tech"]);
+  });
+
+  it("drills into a sector's companies", () => {
+    expect(companySlices(rows, "Consumer & Retail", "all").map((s) => [s.label, s.value])).toEqual([["Alpha", 10], ["Beta", 5]]);
+    expect(companySlices(rows, "Consumer & Retail", "Hedgehogs").map((s) => s.label)).toEqual(["Alpha"]);
+  });
+
+  it("folds small slices into Other", () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({ key: "s" + i, label: "S" + i, value: 10 - i, companies: 1 }));
+    const f = foldSlices(many);
+    expect(f).toHaveLength(8);
+    expect(f[7]).toMatchObject({ key: OTHER_KEY, label: "Other (3)", value: 6, companies: 3, members: ["s7", "s8", "s9"] });
+    expect(foldSlices(many.slice(0, 3))).toHaveLength(3);
   });
 });

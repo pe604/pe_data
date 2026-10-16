@@ -1,17 +1,26 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { fmtCr } from "@/lib/domain/money";
 import { FUNDS, portfolioSummary } from "@/lib/domain/portfolio";
 import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, type ViewState } from "@/lib/domain/view";
+import { AllocationChart } from "./AllocationChart";
 
 /** Invested tab: amount invested for the companies shown (filters apply), by fund, sector and year. SPEC §15. */
 export function PortfolioBar({ rows, view }: { rows: CompanyRow[]; view: ViewState }) {
-  const s = useMemo(() => portfolioSummary(applyFilters(rows, view.f)), [rows, view.f]);
+  const shown = useMemo(() => applyFilters(rows, view.f), [rows, view.f]);
+  const s = useMemo(() => portfolioSummary(shown), [shown]);
+  const [chart, setChart] = useState(false);
   const pct = (n: number) => (s.invested ? Math.round((n / s.invested) * 100) : 0);
   return (
     <section className="pf" aria-label="Portfolio summary">
+      <div className="pf-actions">
+        <button className="btn sm" type="button" onClick={() => setChart(true)} disabled={!s.invested}>
+          Sector allocation
+        </button>
+      </div>
+      {chart && <AllocationChart rows={shown} onClose={() => setChart(false)} />}
       <div className="pf-cards">
         <div className="pf-card">
           <span className="lab">Total invested</span>

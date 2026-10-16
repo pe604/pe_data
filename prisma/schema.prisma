@@ -91,6 +91,7 @@ model User {
   deletionLogs      DeletionLog[]
   roundsCreated     InvestmentRound[]
   meetingsCreated   Meeting[]
+  updatesAdded      CompanyUpdate[]
   misEntered        MisFigure[]
 }
 
@@ -161,6 +162,7 @@ model Company {
   auditLogs   AuditLog[]
   rounds      InvestmentRound[]
   contacts    CompanyContact[]
+  updates     CompanyUpdate[]
   checks      QuarterCheck[]
   meetings    Meeting[]
   misFigures  MisFigure[]
@@ -478,4 +480,22 @@ model CompanyContact {
   updatedAt   DateTime @updatedAt
 
   @@index([companyId])
+}
+
+/// News about a portfolio company ("raised Series B", "new plant commissioned"), newest first. SPEC §15.4.
+model CompanyUpdate {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// When it happened
+  date        DateTime @db.Date
+  text        String
+  /// MANUAL now; WHATSAPP once updates come in from WhatsApp
+  source      String   @default("MANUAL")
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId, date])
 }
