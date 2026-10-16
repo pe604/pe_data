@@ -9,6 +9,7 @@ import { lastEndedQuarter, quarterLabel, quarterOptions, shiftQuarter } from "@/
 import type { FileItem, MisItem, MisReadResult } from "@/lib/domain/types";
 import { canView, downloadFile, FileViewer, type ViewableFile } from "../ui/FileViewer";
 import { useStore } from "../store";
+import { Popover } from "../ui/overlay";
 import { uploadFile } from "../ui/upload";
 
 // Investment tab → Quarterly financials from MIS (SPEC §15.3). Figures in ₹ Cr; losses in brackets.
@@ -67,6 +68,9 @@ export function MisSection({
   const cols = items.slice(-6);
   const byQ = new Map(items.map((m) => [m.quarter, m]));
   const [viewing, setViewing] = useState<ViewableFile | null>(null);
+  const [showOlder, setShowOlder] = useState(false);
+  const [qMenu, setQMenu] = useState<{ m: MisItem; el: HTMLElement } | null>(null);
+  const noteInput = useRef<HTMLInputElement>(null);
   // MIS and result-note files by quarter, newest quarter first.
   const quarterFiles = files.filter((f) => f.quarter && (f.kind === "MIS" || f.kind === "RESULT_NOTE"));
   const fileQuarters = [...new Set(quarterFiles.map((f) => f.quarter as string))].sort().reverse();
@@ -115,9 +119,27 @@ export function MisSection({
             <button className="btn sm primary" type="button" onClick={() => fileInput.current?.click()}>
               Upload MIS
             </button>
-            <button className="btn sm" type="button" onClick={() => setDraft(blank(uploadQuarter))}>
-              Enter manually
+            <button className="btn sm" type="button" onClick={() => noteInput.current?.click()}>
+              Upload result note
             </button>
+            <input
+              ref={noteInput}
+              type="file"
+              hidden
+              aria-label="Result note file"
+              accept=".pdf,.docx,.doc,.xlsx,.pptx"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                setBusy("Uploading the result note…");
+                const up = await uploadFile(f, { kind: "RESULT_NOTE", companyId, quarter: uploadQuarter });
+                setBusy(null);
+                if (!up.ok) return toast(up.error);
+                toast(`Result note for ${quarterLabel(uploadQuarter)} uploaded.`);
+                await reload();
+              }}
+            />
             <input
               ref={fileInput}
               type="file"
@@ -133,10 +155,10 @@ export function MisSection({
           </div>
         )}
       </div>
-      <p className="hint">MIS and result notes uploaded here or from the Quarterly tracker. Read figures pulls revenue, EBITDA, PAT and cash from an MIS for you to check before saving (₹ Cr).</p>
+      <p className="hint">Files uploaded here or from the Quarterly tracker.</p>
       {fileQuarters.length > 0 && (
         <div className="qfiles">
-          {fileQuarters.map((q) => (
+          {(showOlder ? fileQuarters : fileQuarters.slice(0, 2)).map((q) => (
             <div key={q} className="qfiles-q">
               <div className="qfiles-head">{quarterLabel(q)}</div>
               {(["MIS", "RESULT_NOTE"] as const).map((kind) => {
@@ -175,9 +197,22 @@ export function MisSection({
               })}
             </div>
           ))}
+          {fileQuarters.length > 2 && (
+            <button className="linkbtn" type="button" onClick={() => setShowOlder((v) => !v)}>
+              {showOlder ? "Show fewer quarters" : `Show older quarters (${fileQuarters.length - 2})`}
+            </button>
+          )}
         </div>
       )}
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
+      <div className="inv-head" style={{ marginTop: 18 }}>
+        <h3>Financials (₹ Cr)</h3>
+        {!draft && !busy && (
+          <button className="btn sm" type="button" onClick={() => setDraft(blank(uploadQuarter))}>
+            Enter manually
+          </button>
+        )}
+      </div>
       {busy && (
         <p className="muted" role="status">
           {busy}
@@ -211,7 +246,15 @@ export function MisSection({
                 <th>₹ Cr</th>
                 {cols.map((m) => (
                   <th key={m.quarter} className="num">
-                    {quarterLabel(m.quarter)}
+                    <button
+                      className="q-head-btn"
+                      type="button"
+                      aria-haspopup="menu"
+                      title={m.sourceFileName ? `From ${m.sourceFileName}. Edit or remove` : "Entered by hand. Edit or remove"}
+                      onClick={(e) => setQMenu({ m, el: e.currentTarget })}
+                    >
+                      {quarterLabel(m.quarter)} ▾
+                    </button>
                   </th>
                 ))}
               </tr>
@@ -269,51 +312,54 @@ export function MisSection({
                   </td>
                 ))}
               </tr>
-              <tr className="acts-row">
-                <td />
-                {cols.map((m) => (
-                  <td key={m.quarter} className="num">
-                    <button
-                      className="btn-ghost sm"
-                      type="button"
-                      title={m.sourceFileName ? `From ${m.sourceFileName}` : "Entered by hand"}
-                      onClick={() =>
-                        setDraft({
-                          ...blank(m.quarter),
-                          revenue: str(m.revenue),
-                          ebitda: str(m.ebitda),
-                          pat: str(m.pat),
-                          cash: str(m.cash),
-                          note: m.note ?? "",
-                          fileId: m.sourceFileId,
-                          fileName: m.sourceFileName,
-                        })
-                      }
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn-ghost sm danger-text"
-                      type="button"
-                      onClick={async () => {
-                        if (confirm !== m.quarter) return setConfirm(m.quarter);
-                        setConfirm(null);
-                        const r = await deleteMis(companyId, m.quarter);
-                        if (!r.ok) return toast(r.error);
-                        toast(`${quarterLabel(m.quarter)} figures removed.`);
-                        await reload();
-                      }}
-                    >
-                      {confirm === m.quarter ? "Confirm" : "Remove"}
-                    </button>
-                  </td>
-                ))}
-              </tr>
             </tbody>
           </table>
         </div>
       )}
-      {!cols.length && !draft && !busy && <p className="muted">No MIS figures yet.</p>}
+      {!cols.length && !draft && !busy && <p className="muted">No figures yet. Use Read figures on an MIS, or Enter manually.</p>}
+      {qMenu && (
+        <Popover anchor={qMenu.el} onClose={() => setQMenu(null)} width={220} label={`${quarterLabel(qMenu.m.quarter)} figures`}>
+          <div className="menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const m = qMenu.m;
+                setQMenu(null);
+                setDraft({
+                  ...blank(m.quarter),
+                  revenue: str(m.revenue),
+                  ebitda: str(m.ebitda),
+                  pat: str(m.pat),
+                  cash: str(m.cash),
+                  note: m.note ?? "",
+                  fileId: m.sourceFileId,
+                  fileName: m.sourceFileName,
+                });
+              }}
+            >
+              Edit figures
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="danger-text"
+              onClick={async () => {
+                const m = qMenu.m;
+                if (confirm !== m.quarter) return setConfirm(m.quarter);
+                setConfirm(null);
+                setQMenu(null);
+                const r = await deleteMis(companyId, m.quarter);
+                if (!r.ok) return toast(r.error);
+                toast(`${quarterLabel(m.quarter)} figures removed.`);
+                await reload();
+              }}
+            >
+              {confirm === qMenu.m.quarter ? "Confirm remove" : "Remove figures"}
+            </button>
+          </div>
+        </Popover>
+      )}
     </section>
   );
 }

@@ -25,6 +25,8 @@ export function QuarterlyTracker() {
   const [data, setData] = useState<QuarterView | null>(null);
   const [pop, setPop] = useState<Pop | null>(null);
   const [viewing, setViewing] = useState<ViewableFile | null>(null);
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const [order, setOrder] = useState<"action" | "az">("action");
 
   const load = useCallback(
     async (q: string) => {
@@ -47,9 +49,15 @@ export function QuarterlyTracker() {
     setData(r.data);
   };
 
-  const rows = data?.quarter === quarter ? data.rows : [];
-  const n = rows.length;
-  const overdue = data ? rows.filter((r) => misState(r.misAt, data.misDue, today) === "overdue").length : 0;
+  const all = data?.quarter === quarter ? data.rows : [];
+  // Needs action first: MIS overdue, then MIS pending, then result note pending, then done (A–Z within each).
+  const rank = (r: QuarterRow) =>
+    !data ? 0 : !r.misAt ? (misState(null, data.misDue, today) === "overdue" ? 0 : 1) : !r.resultNoteAt ? 2 : 3;
+  const rows = all
+    .filter((r) => !pendingOnly || !r.misAt || !r.resultNoteAt)
+    .sort((a, b) => (order === "action" ? rank(a) - rank(b) : 0) || a.name.localeCompare(b.name));
+  const n = all.length;
+  const overdue = data ? all.filter((r) => misState(r.misAt, data.misDue, today) === "overdue").length : 0;
   // Keep an open popover pointed at fresh row data after an upload.
   const popRow = pop && pop.kind !== "due" ? (rows.find((r) => r.companyId === pop.row.companyId) ?? pop.row) : null;
 
@@ -72,14 +80,25 @@ export function QuarterlyTracker() {
             {data.misDueIsDefault ? " (default)" : ""} · Edit
           </button>
         )}
+        <label className="ck q-pending">
+          <input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />
+          Pending only
+        </label>
+        <label className="sortwrap">
+          Order
+          <select className="sel" value={order} onChange={(e) => setOrder(e.target.value as "action" | "az")} aria-label="Order">
+            <option value="action">Needs action first</option>
+            <option value="az">Company A–Z</option>
+          </select>
+        </label>
         <span className="tb-spacer" />
         {data && n > 0 && (
           <div className="q-progress" aria-label="Progress">
             <span>
-              MIS received: <strong>{rows.filter((r) => r.misAt).length}</strong>/{n}
+              MIS received: <strong>{all.filter((r) => r.misAt).length}</strong>/{n}
             </span>
             <span>
-              Result notes made: <strong>{rows.filter((r) => r.resultNoteAt).length}</strong>/{n}
+              Result notes made: <strong>{all.filter((r) => r.resultNoteAt).length}</strong>/{n}
             </span>
             {overdue > 0 && <span className="bad">MIS overdue: {overdue}</span>}
           </div>
@@ -88,12 +107,14 @@ export function QuarterlyTracker() {
 
       {!data || data.quarter !== quarter ? (
         <p className="muted">Loading…</p>
-      ) : !n ? (
+      ) : !n || !rows.length ? (!n ? (
         <div className="empty">
           <h3>No portfolio companies</h3>
           <p>Companies in Invested appear here every quarter.</p>
         </div>
       ) : (
+        <p className="muted" style={{ margin: "8px 28px" }}>Nothing pending for this quarter.</p>
+      )) : (
         <div className="table-wrap">
           <table className="grid qgrid">
             <thead>
@@ -112,7 +133,7 @@ export function QuarterlyTracker() {
                   <td className="c-co">
                     <div className="co-line">
                       <span className="idx">{i + 1}</span>
-                      <button className="co-name" type="button" onClick={() => openDrawer(r.companyId, "investment")}>
+                      <button className="co-name" type="button" onClick={() => openDrawer(r.companyId, "mis")}>
                         {r.name}
                       </button>
                     </div>
@@ -120,7 +141,7 @@ export function QuarterlyTracker() {
                   <td className="q-pe">{r.pe.length ? r.pe.join(", ") : <span className="ph">–</span>}</td>
                   <td className="q-pe">
                     {r.poc ?? (
-                      <button className="linkbtn" type="button" onClick={() => openDrawer(r.companyId, "investment")}>
+                      <button className="ph-btn" type="button" onClick={() => openDrawer(r.companyId, "overview")}>
                         Add
                       </button>
                     )}
@@ -200,12 +221,13 @@ function FileCell({ row, kind, due, today, onOpen }: { row: QuarterRow; kind: Ki
           {count > 1 ? ` · ${count} files` : ""}
         </span>
       ) : state === "overdue" ? (
-        <span className="late">Overdue · Upload</span>
+        <span className="late">Overdue</span>
       ) : kind === "MIS" && due ? (
-        <span className="ph">Due {short(due)} · Upload</span>
+        <span className="ph">Due {short(due)}</span>
       ) : (
-        <span className="ph">Not made · Upload</span>
+        <span className="ph">Not made</span>
       )}
+      {!at && <span className="q-up">Upload</span>}
     </td>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companySlices, foldSlices, fyOf, holdingOf, OTHER_KEY, portfolioSummary, sectorSlices, splitParts, suggestedStake } from "@/lib/domain/portfolio";
+import { companiesInYear, companySlices, foldSlices, yearSlices, fyOf, holdingOf, OTHER_KEY, portfolioSummary, sectorSlices, splitParts, suggestedStake } from "@/lib/domain/portfolio";
 
 const rounds = [
   { date: "2024-06-10", amount: 10, fund: "Hedgehogs" as const },
@@ -86,5 +86,18 @@ describe("allocation pie", () => {
     expect(f).toHaveLength(8);
     expect(f[7]).toMatchObject({ key: OTHER_KEY, label: "Other (3)", value: 6, companies: 3, members: ["s7", "s8", "s9"] });
     expect(foldSlices(many.slice(0, 3))).toHaveLength(3);
+  });
+});
+
+describe("allocation by year", () => {
+  const rows = [
+    { id: "a", name: "Alpha", holding: holdingOf([{ date: "2024-06-01", amount: 10, fund: "Hedgehogs" }]) },
+    { id: "b", name: "Beta", holding: holdingOf([{ date: "2025-02-01", amount: 4, fund: "Sambhav" }]) },
+    { id: "c", name: "Gamma", holding: holdingOf([{ date: "2025-05-01", amount: 6, fund: "Sambhav" }]) },
+  ];
+  it("groups by FY of first investment and drills into companies", () => {
+    expect(yearSlices(rows, "all").map((s) => [s.key, s.value, s.companies])).toEqual([["FY25", 14, 2], ["FY26", 6, 1]]);
+    expect(yearSlices(rows, "Sambhav").map((s) => [s.key, s.value])).toEqual([["FY25", 4], ["FY26", 6]]);
+    expect(companiesInYear(rows, "FY25", "all").map((s) => s.label)).toEqual(["Alpha", "Beta"]);
   });
 });

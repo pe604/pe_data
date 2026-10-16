@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CompanyRow } from "@/lib/domain/types";
-import { applyFilters, emptyFilters, filtersForTab, queryToView, sortRows, sortsForTab, viewToQuery } from "@/lib/domain/view";
+import { applyFilters, defaultSortFor, emptyFilters, filtersForTab, queryToView, sortRows, sortsForTab, viewToQuery } from "@/lib/domain/view";
 
 describe("per-tab filters and sorts", () => {
   it("Invested hides Priority, Stage and Via and offers amount sorting", () => {
@@ -103,5 +103,24 @@ describe("checkLink (SPEC §6.4)", () => {
     const s = checkLink("https://niveshaay.sharepoint.com/sites/x");
     expect(s.ok && s.warn).toBeNull();
     expect(checkLink("https://1drv.ms/f/abc").ok).toBe(true);
+  });
+});
+
+describe("rejected and invested sorts", () => {
+  it("Rejected defaults to date rejected, oldest first, and only Rejected offers it", () => {
+    expect(defaultSortFor("rejected")).toBe("rejected-old");
+    expect(sortsForTab("rejected").map(([k]) => k)).toContain("rejected-new");
+    expect(sortsForTab("pipeline").map(([k]) => k)).not.toContain("rejected-old");
+    expect(queryToView("?tab=rejected").sort).toBe("rejected-old");
+    expect(viewToQuery({ tab: "rejected", sort: "rejected-old", f: emptyFilters() })).toBe("?tab=rejected");
+    const rows = [row({ name: "a", exitAt: "2026-03-01" }), row({ name: "b", exitAt: "2025-11-20" }), row({ name: "c", exitAt: null })];
+    expect(sortRows(rows, "rejected-old").map((r) => r.name)).toEqual(["b", "a", "c"]);
+    expect(sortRows(rows, "rejected-new").map((r) => r.name)).toEqual(["a", "b", "c"]);
+  });
+
+  it("Invested offers first-invested sorts, not date received or days", () => {
+    const inv = sortsForTab("invested").map(([k]) => k);
+    expect(inv).toEqual(expect.arrayContaining(["amount-high", "first-new", "first-old"]));
+    expect(inv.some((k) => k.startsWith("date") || k.startsWith("days"))).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { fmtCr } from "@/lib/domain/money";
-import { companySlices, foldSlices, FUNDS, OTHER_KEY, sectorSlices, type FundFilter, type Slice } from "@/lib/domain/portfolio";
+import { companiesInYear, companySlices, foldSlices, FUNDS, OTHER_KEY, sectorSlices, yearSlices, type FundFilter, type Slice } from "@/lib/domain/portfolio";
 import type { CompanyRow } from "@/lib/domain/types";
 import { useStore } from "../store";
 import { Modal, ModalHead } from "../ui/overlay";
@@ -11,7 +11,13 @@ import { Modal, ModalHead } from "../ui/overlay";
 // At most 8 slices (7 + "Other"); colours are the validated categorical palette (--pie-1..7) in fixed order;
 // the legend carries every value, so nothing depends on colour or slice size alone.
 
-type Level = { kind: "sectors"; only?: string[]; title: string } | { kind: "companies"; sector: string; title: string };
+type Level =
+  | { kind: "sectors"; only?: string[]; title: string }
+  | { kind: "companies"; sector: string; title: string }
+  | { kind: "years"; title: string }
+  | { kind: "yearCompanies"; fy: string; title: string };
+type Dim = "sector" | "year";
+const ROOT: Record<Dim, Level> = { sector: { kind: "sectors", title: "By sector" }, year: { kind: "years", title: "By year of first investment" } };
 
 const SIZE = 240;
 const R = 112;
@@ -29,14 +35,22 @@ const colorOf = (s: Slice, i: number) => (s.key === OTHER_KEY ? "var(--pie-other
 export function AllocationChart({ rows, onClose }: { rows: CompanyRow[]; onClose: () => void }) {
   const { openDrawer } = useStore();
   const [fund, setFund] = useState<FundFilter>("all");
-  const [stack, setStack] = useState<Level[]>([{ kind: "sectors", title: "By sector" }]);
+  const [dim, setDim] = useState<Dim>("sector");
+  const [stack, setStack] = useState<Level[]>([ROOT.sector]);
   // x < 0: highlight only (hovering the legend), no tooltip.
   const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const level = stack[stack.length - 1];
 
   const all = useMemo(
-    () => (level.kind === "sectors" ? sectorSlices(rows, fund, level.only) : companySlices(rows, level.sector, fund)),
+    () =>
+      level.kind === "sectors"
+        ? sectorSlices(rows, fund, level.only)
+        : level.kind === "companies"
+          ? companySlices(rows, level.sector, fund)
+          : level.kind === "years"
+            ? yearSlices(rows, fund)
+            : companiesInYear(rows, level.fy, fund),
     [rows, fund, level],
   );
   const slices = foldSlices(all);
@@ -48,9 +62,11 @@ export function AllocationChart({ rows, onClose }: { rows: CompanyRow[]; onClose
     if (level.kind === "sectors") {
       if (s.key === OTHER_KEY) setStack([...stack, { kind: "sectors", only: s.members, title: "Other sectors" }]);
       else setStack([...stack, { kind: "companies", sector: s.key, title: s.label }]);
+    } else if (level.kind === "years") {
+      if (s.key !== OTHER_KEY) setStack([...stack, { kind: "yearCompanies", fy: s.key, title: s.label }]);
     } else if (s.key !== OTHER_KEY) {
       onClose();
-      openDrawer(s.key, "investment");
+      openDrawer(s.key, "overview");
     }
   };
   const clickable = (s: Slice) => level.kind === "sectors" || s.key !== OTHER_KEY;
@@ -62,7 +78,7 @@ export function AllocationChart({ rows, onClose }: { rows: CompanyRow[]; onClose
 
   return (
     <Modal size="wide" onClose={onClose} labelledBy="alloc-title">
-      <ModalHead id="alloc-title" title="Portfolio allocation" sub="Amount invested. Click a sector to see its companies." onClose={onClose} />
+      <ModalHead id="alloc-title" title="Portfolio allocation" sub="Amount invested. Click a slice to see its companies." onClose={onClose} />
       <div className="m-content">
         <div className="alloc-bar">
           <nav className="alloc-crumbs" aria-label="Breadcrumb">
@@ -79,6 +95,23 @@ export function AllocationChart({ rows, onClose }: { rows: CompanyRow[]; onClose
               </span>
             ))}
           </nav>
+          <div className="seg-switch sm" role="tablist" aria-label="Group by">
+            {(["sector", "year"] as Dim[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                role="tab"
+                aria-selected={dim === d}
+                onClick={() => {
+                  setDim(d);
+                  setStack([ROOT[d]]);
+                  setHover(null);
+                }}
+              >
+                {d === "sector" ? "By sector" : "By year"}
+              </button>
+            ))}
+          </div>
           <div className="seg-switch sm" role="tablist" aria-label="Fund">
             {(["all", ...FUNDS] as FundFilter[]).map((f) => (
               <button key={f} type="button" role="tab" aria-selected={fund === f} onClick={() => setFund(f)}>
@@ -141,7 +174,7 @@ export function AllocationChart({ rows, onClose }: { rows: CompanyRow[]; onClose
                   </div>
                   <div className="sub">
                     {h.companies} compan{h.companies === 1 ? "y" : "ies"}
-                    {clickable(h) ? (level.kind === "sectors" ? " · click to open" : " · click to open company") : ""}
+                    {clickable(h) ? (level.kind === "sectors" || level.kind === "years" ? " · click to open" : " · click to open company") : ""}
                   </div>
                 </div>
               )}

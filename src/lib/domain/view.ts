@@ -54,19 +54,31 @@ export const SORTS = [
   ["sector-za", "Sector Z–A"],
   ["amount-high", "Invested, highest first"],
   ["amount-low", "Invested, lowest first"],
+  ["first-new", "First invested, newest first"],
+  ["first-old", "First invested, oldest first"],
+  ["rejected-old", "Date rejected, oldest first"],
+  ["rejected-new", "Date rejected, newest first"],
 ] as const;
 export type SortKey = (typeof SORTS)[number][0];
 export const DEFAULT_SORT: SortKey = "priority";
 
-/** Invested tab hides Priority, Stage at exit and Via; amount sorting is Invested-only. */
+const ONLY: Record<string, Tab> = { amount: "invested", first: "invested", rejected: "rejected" };
+
+/**
+ * Sorts offered per tab. Invested has no priority/stage/date-received/days (it sorts by amount and first investment);
+ * "Date rejected" is Rejected-only.
+ */
 export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
-  return SORTS.filter(([k]) =>
-    tab === "invested"
-      ? !k.startsWith("priority") && !k.startsWith("stage")
-      : !k.startsWith("amount"),
-  );
+  return SORTS.filter(([k]) => {
+    const group = k.split("-")[0];
+    if (ONLY[group]) return ONLY[group] === tab;
+    if (tab === "invested") return !["priority", "stage", "date", "days"].includes(group);
+    return true;
+  });
 }
 
+/** Default sort per tab: Pipeline by priority, Rejected by date rejected (oldest first), Invested by amount. */
+export const defaultSortFor = (tab: Tab): SortKey => (tab === "rejected" ? "rejected-old" : tab === "invested" ? "amount-high" : DEFAULT_SORT);
 /** Filter buttons shown per tab. */
 export function filtersForTab(tab: Tab): SetKey[] {
   return tab === "invested" ? SET_KEYS.filter((k) => k !== "priority" && k !== "stage" && k !== "via") : [...SET_KEYS];
@@ -80,7 +92,9 @@ export const HEADER_SORTS: Record<string, [SortKey, SortKey]> = {
   pri: ["priority", "priority-desc"],
   date: ["date-new", "date-old"],
   days: ["days-most", "days-least"],
-  amount: ["amount-high", "amount-low"],};
+  amount: ["amount-high", "amount-low"],
+  first: ["first-new", "first-old"],
+};
 
 export function activeFilterCount(f: Filters): number {
   return (
@@ -104,8 +118,10 @@ export function applyFilters(list: CompanyRow[], f: Filters, skip?: "stage" | "p
         (c.rejectReason ?? "").toLowerCase().includes(q),
     );
   }
-  if (f.from) out = out.filter((c) => !!c.dateReceived && c.dateReceived >= f.from);
-  if (f.to) out = out.filter((c) => !!c.dateReceived && c.dateReceived <= f.to);
+  // Date filter: date received, or the first investment date for Invested companies.
+  const when = (c: CompanyRow) => (c.status === "INVESTED" ? (c.holding?.firstDate ?? null) : c.dateReceived);
+  if (f.from) out = out.filter((c) => (when(c) ?? "") >= f.from && !!when(c));
+  if (f.to) out = out.filter((c) => !!when(c) && (when(c) ?? "") <= f.to);
   if (f.priority.length) out = out.filter((c) => f.priority.includes(c.priority ? String(c.priority) : "unset"));
   if (skip !== "stage" && f.stage.length) out = out.filter((c) => f.stage.includes(c.stage));
   if (f.sector.length) out = out.filter((c) => f.sector.includes(c.sector ?? ""));
@@ -169,7 +185,16 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
     case "amount-high":
       return out.sort(blanksLast((c) => c.holding?.invested ?? null, (x, y) => y - x));
     case "amount-low":
-      return out.sort(blanksLast((c) => c.holding?.invested ?? null, num));  }
+      return out.sort(blanksLast((c) => c.holding?.invested ?? null, num));
+    case "first-new":
+      return out.sort(blanksLast((c) => c.holding?.firstDate ?? null, (x, y) => y.localeCompare(x)));
+    case "first-old":
+      return out.sort(blanksLast((c) => c.holding?.firstDate ?? null, (x, y) => x.localeCompare(y)));
+    case "rejected-old":
+      return out.sort(blanksLast((c) => c.exitAt, (x, y) => x.localeCompare(y)));
+    case "rejected-new":
+      return out.sort(blanksLast((c) => c.exitAt, (x, y) => y.localeCompare(x)));
+  }
   return out;
 }
 
@@ -184,7 +209,7 @@ export interface ViewState {
 export function viewToQuery(v: ViewState): string {
   const p = new URLSearchParams();
   if (v.tab !== "pipeline") p.set("tab", v.tab);
-  if (v.sort !== DEFAULT_SORT) p.set("sort", v.sort);
+  if (v.sort !== defaultSortFor(v.tab)) p.set("sort", v.sort);
   if (v.f.q) p.set("q", v.f.q);
   if (v.f.from) p.set("from", v.f.from);
   if (v.f.to) p.set("to", v.f.to);
@@ -196,7 +221,8 @@ export function viewToQuery(v: ViewState): string {
 export function queryToView(search: string | URLSearchParams): ViewState {
   const p = typeof search === "string" ? new URLSearchParams(search) : search;
   const tab = (["pipeline", "rejected", "invested"] as const).find((t) => t === p.get("tab")) ?? "pipeline";
-  const sort = SORTS.find(([k]) => k === p.get("sort"))?.[0] ?? DEFAULT_SORT;
+  const allowed = sortsForTab(tab).map(([k]) => k);
+  const sort = allowed.find((k) => k === p.get("sort")) ?? defaultSortFor(tab);
   const f = emptyFilters();
   f.q = p.get("q") ?? "";
   f.from = p.get("from") ?? "";

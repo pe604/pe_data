@@ -556,3 +556,28 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .updates .sub{font-size:12px;color:var(--muted);margin-top:2px}
 .updates .acts{white-space:nowrap;align-self:start}
 @media (max-width:760px){.updates li{grid-template-columns:1fr}}
+/* Invested polish (SPEC §15): slim summary line, tracker, panel */
+.pf-line{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:4px 28px 10px;padding:10px 14px;background:var(--surface);border:1px solid var(--rule);border-radius:10px}
+.pf-figs{display:flex;flex-wrap:wrap;align-items:center;gap:6px 0;font-size:13.5px;color:var(--ink-2)}
+.pf-figs strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.pf-total strong{font-size:17px}
+.pf-figs small{color:var(--muted);margin-left:2px}
+.pf-sep{display:inline-block;width:1px;height:14px;background:var(--rule);margin:0 12px;vertical-align:middle}
+.pf-fund,.pf-figs>span{display:inline-flex;align-items:center;gap:4px}
+.qgrid td{vertical-align:middle}
+.qgrid .ph-btn{background:none;border:0;padding:0;color:var(--faint);font:inherit;cursor:pointer}
+.qgrid .ph-btn:hover{color:var(--green);text-decoration:underline}
+.qgrid td.q-c .q-up{display:none;margin-left:6px;color:var(--green);font-weight:500}
+.qgrid td.q-c:hover .q-up,.qgrid td.q-c:focus-visible .q-up{display:inline}
+.q-pending{margin:0;font-size:13px}
+.menu{display:flex;flex-direction:column;gap:2px}
+.menu button{background:none;border:0;text-align:left;padding:7px 8px;border-radius:6px;font-size:13.5px;color:var(--ink);cursor:pointer}
+.menu button:hover{background:var(--hover)}
+.q-head-btn{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
+.q-head-btn:hover{color:var(--green)}
+.deck-summary{margin-top:18px;border-top:1px solid var(--rule);padding-top:10px}
+.deck-summary>summary{cursor:pointer;font-size:13.5px;color:var(--green);font-weight:500;padding:4px 0}
+.sec-title{font-size:14px;margin:22px 0 8px}
+.latest-update{border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:10px 12px;font-size:13.5px}
+.latest-update .sub{font-size:12px;color:var(--muted);margin-top:3px}
+@media (max-width:760px){.pf-line{margin:4px 16px 10px}}@media (max-width:760px){.pf-figs{flex-direction:column;align-items:flex-start;gap:2px}.pf-figs .pf-sep{display:none}}

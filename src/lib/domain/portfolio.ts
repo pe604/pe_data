@@ -160,3 +160,27 @@ export function foldSlices(slices: Slice[], max = 8): Slice[] {
     },
   ];
 }
+
+/** Amount invested by Indian FY of each company's first investment (oldest first). */
+export function yearSlices(rows: { holding: Holding | null }[], fund: FundFilter): Slice[] {
+  const m = new Map<string, Slice>();
+  for (const r of rows) {
+    const v = amountFor(r.holding, fund);
+    if (v <= 0 || !r.holding?.firstDate) continue;
+    const fy = fyOf(r.holding.firstDate);
+    const s = m.get(fy) ?? { key: fy, label: fy, value: 0, companies: 0 };
+    s.value = r2(s.value + v);
+    s.companies++;
+    m.set(fy, s);
+  }
+  return [...m.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/** Companies first invested in one FY (largest first). */
+export function companiesInYear(rows: { id: string; name: string; holding: Holding | null }[], fy: string, fund: FundFilter): Slice[] {
+  return rows
+    .filter((r) => r.holding?.firstDate && fyOf(r.holding.firstDate) === fy)
+    .map((r) => ({ key: r.id, label: r.name, value: r2(amountFor(r.holding, fund)), companies: 1 }))
+    .filter((s) => s.value > 0)
+    .sort(bySize);
+}

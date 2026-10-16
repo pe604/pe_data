@@ -35,7 +35,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   const exited = view.tab !== "pipeline";
   // Invested: no Priority, Stage at exit or Via; an Amount invested column instead.
   const invested = view.tab === "invested";
-  const colCount = invested ? 9 : 11;
+  const colCount = invested ? 8 : 11;
 
   if (!rows.length) {
     const [h, p] = EMPTY[view.tab];
@@ -105,8 +105,8 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             {th("c-re", "Assigned Research")}
             {th("c-cm", view.tab === "rejected" ? "Rejection reason" : invested ? "Latest update" : "Comment")}
             {!invested && th("c-via", "Via")}
-            {th("c-date", "Date", "date")}
-            {th("c-days", "Days", "days")}
+            {invested ? th("c-date", "First invested", "first") : th("c-date", "Date", "date")}
+            {!invested && th("c-days", "Days", "days")}
           </tr>
         </thead>
         <tbody>
@@ -190,7 +190,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                     <span className="ph">Add sector</span>
                   )}
                 </td>
-                {invested && <HoldingCells c={c} open={() => openDrawer(c.id, "investment")} />}
+                {invested && <HoldingCells c={c} open={() => openDrawer(c.id, "overview")} />}
                 {!invested && (
                 <td className="c-stage">
                   <StageCell c={c} onChange={(s) => mutate(c.id, { stage: s }, () => updateCompany(c.id, { stage: s }))} />
@@ -236,9 +236,16 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                     <Chips names={c.via} placeholder="Add" />
                   </td>
                 )}
+                {invested ? (
+                  <td className="c-date editable" role="button" tabIndex={0} title="Date of the first round" onClick={() => openDrawer(c.id, "overview")} onKeyDown={(e) => e.key === "Enter" && openDrawer(c.id, "overview")}>
+                    {c.holding?.firstDate ? fmtDate(c.holding.firstDate) : <span className="ph">–</span>}
+                  </td>
+                ) : (
                 <td className="c-date editable" {...editable("date")}>
                   {c.dateReceived ? fmtDate(c.dateReceived) : <span className="ph">Set date</span>}
                 </td>
+                )}
+                {!invested && (
                 <td className="c-days">
                   {d === null ? (
                     <span className="ph">–</span>
@@ -252,6 +259,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                     </span>
                   )}
                 </td>
+                )}
               </tr>
             );
           })}

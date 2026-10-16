@@ -11,7 +11,23 @@ import type {
   TeamMemberOption,
 } from "@/lib/domain/types";
 
-export type DrawerTab = "summary" | "materials" | "comments" | "history" | "investment" | "updates" | "meetings";
+/**
+ * Company file tabs. Pipeline/Rejected: summary · materials · comments · history.
+ * Invested (SPEC §15): overview · mis · updates · meetings · files · history (comments sit in History, the deck
+ * summary in Files). `normaliseTab` maps a tab to the equivalent one for the company's status.
+ */
+export type DrawerTab = "summary" | "materials" | "comments" | "history" | "overview" | "mis" | "updates" | "meetings" | "files";
+
+export function normaliseTab(tab: DrawerTab, invested: boolean): DrawerTab {
+  if (invested) {
+    if (tab === "summary" || tab === "materials") return "files";
+    if (tab === "comments") return "history";
+    return tab;
+  }
+  if (tab === "files") return "materials";
+  if (tab === "overview" || tab === "mis" || tab === "updates" || tab === "meetings") return "summary";
+  return tab;
+}
 
 export interface Store {
   me: Me;

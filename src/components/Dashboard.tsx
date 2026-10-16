@@ -5,8 +5,8 @@ import { getDashboard } from "@/actions/companies";
 import { addNamesToTeam, namePools } from "@/lib/domain/team";
 import type { CompanyRow, DashboardData } from "@/lib/domain/types";
 import {
-  DEFAULT_SORT,
   SET_KEYS,
+  defaultSortFor,
   TAB_STATUS,
   filtersForTab,
   queryToView,
@@ -166,7 +166,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       const f = { ...v.f, stage: [] as string[] };
       for (const k of SET_KEYS) if (!shown.includes(k)) f[k] = [];
       const sorts = sortsForTab(tab).map(([k]) => k);
-      const sort = sorts.includes(v.sort) ? v.sort : tab === "invested" ? "amount-high" : DEFAULT_SORT;
+      // Each tab opens on its own default sort (Rejected: date rejected, oldest first).
+      const sort = tab !== v.tab || !sorts.includes(v.sort) ? defaultSortFor(tab) : v.sort;
       return { ...v, tab, f, sort };
     });
   };

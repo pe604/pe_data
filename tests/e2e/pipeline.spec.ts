@@ -198,7 +198,7 @@ test("Invested tab: rounds with fund give total invested with a Hedgehogs / Samb
   for (const h of ["Priority", "Stage at exit", "Via", "Current value", "MOIC"]) {
     await expect(head.getByRole("columnheader", { name: new RegExp(`^${h}`) })).toHaveCount(0);
   }
-  await expect(page.locator(".pf")).not.toContainText("MOIC");
+  await expect(page.locator(".pf-line")).not.toContainText("MOIC");
 
   await page.getByRole("button", { name: "Add company" }).first().click();
   const dlg = page.getByRole("dialog");
@@ -209,7 +209,7 @@ test("Invested tab: rounds with fund give total invested with a Hedgehogs / Samb
 
   await row(page, a).locator("td.c-amt").first().click();
   const drawer = page.locator(".drawer.open");
-  await expect(drawer.getByRole("tab", { name: /Investment/ })).toHaveAttribute("aria-selected", "true");
+  await expect(drawer.getByRole("tab", { name: /Overview/ })).toHaveAttribute("aria-selected", "true");
   await expect(drawer.getByRole("heading", { name: "Valuation" })).toHaveCount(0);
 
   // Round 1: fund is required; stake suggested from amount and pre-money.
@@ -241,7 +241,7 @@ test("Invested tab: rounds with fund give total invested with a Hedgehogs / Samb
   const r = row(page, a);
   await expect(r.locator("td.c-amt")).toContainText("₹ 15 Cr");
   await expect(r.locator("td.c-amt")).toContainText("Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr");
-  await expect(page.locator(".pf")).toContainText("Hedgehogs");
+  await expect(page.locator(".pf-line")).toContainText("Hedgehogs");
   await expect(page.locator("tfoot .total-row")).toContainText("₹ 15 Cr");
 
   // Removing a round updates the totals.
@@ -256,6 +256,7 @@ test("bulk add to Rejected with one reason and date, skipping duplicates", async
   const b = uniq("Rejtwo");
   await page.goto("/");
   await openTab(page, "Rejected");
+  await expect(page.getByRole("combobox", { name: "Sort" })).toHaveValue("rejected-old");
   await page.getByRole("button", { name: "Add company" }).first().click();
   const dlg = page.getByRole("dialog");
   const box = dlg.locator("details", { hasText: "Add several rejected companies at once" });
@@ -333,7 +334,7 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
   // Contacts on Mokobara: the first is primary and shows as POC.
   await page.getByRole("button", { name: "Mokobara", exact: true }).click();
   const drawer = page.locator(".drawer.open");
-  await drawer.getByRole("tab", { name: /Investment/ }).click();
+  await drawer.getByRole("tab", { name: /Overview/ }).click();
   await drawer.getByRole("button", { name: "Add contact" }).click();
   let cf = drawer.getByRole("form", { name: "Add contact" });
   await cf.getByLabel("Name").fill("Priya Shah");
@@ -404,7 +405,7 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
 
   // Company file: both files listed under the quarter, viewable and downloadable.
   await page.getByRole("button", { name: "Mokobara", exact: true }).click();
-  await expect(drawer.getByRole("tab", { name: /Investment/ })).toHaveAttribute("aria-selected", "true");
+  await expect(drawer.getByRole("tab", { name: /MIS & results/ })).toHaveAttribute("aria-selected", "true");
   const q = drawer.locator(".qfiles-q").first();
   await expect(q).toContainText(quarterLabel(lastEndedQuarter(todayISO())));
   await expect(q).toContainText("mokobara-mis.pdf");
@@ -461,6 +462,7 @@ test("MIS figures: upload from the company file, enter figures (AI off in tests)
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
   await row(page, a).locator("td.c-amt").first().click();
   const drawer = page.locator(".drawer.open");
+  await drawer.getByRole("tab", { name: /MIS & results/ }).click();
   await expect(drawer.getByRole("heading", { name: "Quarterly MIS and results" })).toBeVisible();
 
   const wb = new ExcelJS.Workbook();
@@ -512,17 +514,20 @@ test("company updates replace the comment column on Invested; sector allocation 
   await row(page, a).locator("td.c-cm").click();
   const drawer = page.locator(".drawer.open");
   await expect(drawer.getByRole("tab", { name: /Updates/ })).toHaveAttribute("aria-selected", "true");
+  await drawer.getByRole("button", { name: "Add update" }).click();
   const form = drawer.getByRole("form", { name: "Add update" });
   await form.getByLabel("New update").fill("Raised ₹40 Cr Series B led by X");
   await form.getByLabel("Update date").fill("2026-09-15");
   await form.getByRole("button", { name: "Add update" }).click();
   await expect(drawer.locator(".updates")).toContainText("Raised ₹40 Cr Series B led by X");
+  await expect(form).toHaveCount(0);
+  await drawer.getByRole("button", { name: "Add update" }).click();
   await form.getByLabel("New update").fill("New plant in Hosur commissioned");
   await form.getByRole("button", { name: "Add update" }).click();
   await expect(drawer.locator(".updates li").first()).toContainText("New plant in Hosur commissioned");
 
   // A round so the company shows in the allocation pie.
-  await drawer.getByRole("tab", { name: /Investment/ }).click();
+  await drawer.getByRole("tab", { name: /Overview/ }).click();
   const rf = drawer.getByRole("form", { name: "Add round" });
   await rf.getByLabel("Fund").selectOption("Sambhav");
   await rf.getByLabel("Amount invested (₹ Cr)").fill("7");

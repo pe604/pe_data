@@ -13,6 +13,7 @@ export function UpdatesTab({ companyId }: { companyId: string }) {
   const [list, setList] = useState<UpdateItem[] | null>(null);
   const [editing, setEditing] = useState<UpdateItem | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -39,16 +40,32 @@ export function UpdatesTab({ companyId }: { companyId: string }) {
 
   return (
     <div className="inv">
-      <UpdateForm
-        key={editing?.id ?? "new"}
-        initial={editing}
-        onCancel={editing ? () => setEditing(null) : undefined}
-        onSave={async (v) => {
-          const ok = done(await saveUpdate(companyId, editing?.id ?? null, v), editing ? "Update edited." : "Update added.");
-          if (ok) setEditing(null);
-          return ok;
-        }}
-      />
+      <div className="inv-head">
+        <h3>Company updates</h3>
+        {!adding && !editing && (
+          <button className="btn sm primary" type="button" onClick={() => setAdding(true)}>
+            Add update
+          </button>
+        )}
+      </div>
+      {(adding || editing) && (
+        <UpdateForm
+          key={editing?.id ?? "new"}
+          initial={editing}
+          onCancel={() => {
+            setEditing(null);
+            setAdding(false);
+          }}
+          onSave={async (v) => {
+            const ok = done(await saveUpdate(companyId, editing?.id ?? null, v), editing ? "Update edited." : "Update added.");
+            if (ok) {
+              setEditing(null);
+              setAdding(false);
+            }
+            return ok;
+          }}
+        />
+      )}
       {!list ? (
         <p className="muted">Loading…</p>
       ) : !list.length ? (
@@ -95,7 +112,7 @@ function UpdateForm({
   onSave,
 }: {
   initial: UpdateItem | null;
-  onCancel?: () => void;
+  onCancel: () => void;
   onSave: (v: { date: string; text: string }) => Promise<boolean>;
 }) {
   const [date, setDate] = useState(initial?.date ?? todayISO());
@@ -119,6 +136,7 @@ function UpdateForm({
       <label className="field">
         <span>{initial ? "Edit update" : "New update"}</span>
         <textarea
+          autoFocus
           className="ta"
           style={{ minHeight: 70 }}
           placeholder="e.g. Raised ₹40 Cr Series B led by X; new plant in Hosur commissioned"
@@ -131,11 +149,9 @@ function UpdateForm({
           Date
           <input className="inp" type="date" aria-label="Update date" max={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        {onCancel && (
-          <button className="btn-ghost sm" type="button" onClick={onCancel}>
-            Cancel
-          </button>
-        )}
+        <button className="btn-ghost sm" type="button" onClick={onCancel}>
+          Cancel
+        </button>
         <button className="btn sm primary" type="submit" disabled={!valid || saving}>
           {saving ? "Saving…" : initial ? "Save update" : "Add update"}
         </button>

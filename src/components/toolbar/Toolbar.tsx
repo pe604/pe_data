@@ -86,7 +86,7 @@ export function Toolbar({ rows, view, setView }: Props) {
     <div className="toolbar">
       <div className="search">
         <IconSearch />
-        <input type="search" placeholder="Search companies and comments" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input type="search" placeholder={view.tab === "invested" ? "Search companies and updates" : "Search companies and comments"} aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       {BUTTONS.filter(([k]) => k === "date" || filtersForTab(view.tab).includes(k)).map(([k, label]) => {
         const n = count(k);
@@ -139,7 +139,7 @@ export function Toolbar({ rows, view, setView }: Props) {
 
       {open && (
         <Popover anchor={open.el} onClose={() => setOpen(null)} width={open.k === "date" ? 300 : 260} label={TITLES[open.k]}>
-          <h4>{TITLES[open.k]}</h4>
+          <h4>{open.k === "date" && view.tab === "invested" ? "First invested" : TITLES[open.k]}</h4>
           {open.k === "date" ? (
             <>
               <div className="grid2">

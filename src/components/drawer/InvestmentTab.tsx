@@ -7,10 +7,9 @@ import { fmtCr, fmtCrNumber, parseCr } from "@/lib/domain/money";
 import { FUNDS, holdingOf, INSTRUMENTS, splitParts, suggestedStake, type Fund } from "@/lib/domain/portfolio";
 import type { CompanyDetail, ContactItem, RoundItem } from "@/lib/domain/types";
 import { useStore } from "../store";
-import { MisSection } from "./MisSection";
 
-// Investment tab for an Invested company (SPEC §15): amount invested (by fund), contacts, quarterly MIS and
-// result notes, rounds. Amounts in ₹ Cr.
+// Overview tab for an Invested company (SPEC §15): amount invested (by fund), latest update, contacts, rounds.
+// Amounts in ₹ Cr. MIS and result notes have their own tab (MisSection).
 
 const ROUND_NAMES = ["Seed", "Pre-Series A", "Series A", "Series B", "Series C", "Series D", "Pre-IPO", "Bridge", "Secondary"];
 
@@ -26,7 +25,8 @@ function parsePct(s: string): number | null | undefined {
 const fmtPct = (n: number | null) => (n === null ? "–" : `${n.toLocaleString("en-IN", { maximumFractionDigits: 4 })}%`);
 export const fundLabel = (k: Fund | "unset") => (k === "unset" ? "Fund not set" : k);
 
-export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reload: () => Promise<void> }) {
+/** Company file → Overview for an Invested company: invested by fund, latest update, contacts, rounds. */
+export function InvestmentTab({ detail, reload, goUpdates }: { detail: CompanyDetail; reload: () => Promise<void>; goUpdates: () => void }) {
   const { putRow, toast } = useStore();
   const c = detail.row;
   const h = c.holding ?? holdingOf([]);
@@ -63,9 +63,26 @@ export function InvestmentTab({ detail, reload }: { detail: CompanyDetail; reloa
         </div>
       </div>
 
-      <Contacts companyId={c.id} initial={detail.contacts} />
+      <section>
+        <div className="inv-head">
+          <h3>Latest update</h3>
+          <button className="btn sm" type="button" onClick={goUpdates}>
+            {c.latestUpdate ? `All updates (${c.updateCount})` : "Add update"}
+          </button>
+        </div>
+        {c.latestUpdate ? (
+          <div className="latest-update">
+            <div className="u-text">{c.latestUpdate.text}</div>
+            <div className="sub">
+              {fmtDate(c.latestUpdate.date)}, {c.latestUpdate.author}
+            </div>
+          </div>
+        ) : (
+          <p className="muted">No updates yet.</p>
+        )}
+      </section>
 
-      <MisSection companyId={c.id} items={detail.mis} files={detail.files} reload={reload} />
+      <Contacts companyId={c.id} initial={detail.contacts} />
 
       <section>
         <div className="inv-head">

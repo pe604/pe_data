@@ -14,9 +14,11 @@ import { STAGE_LABELS } from "@/lib/domain/constants";
 import { daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
 import type { CompanyDetail } from "@/lib/domain/types";
 import { DatePopover, OneDrivePopover, SectorPopover } from "../cells/popovers";
-import { useStore, type DrawerTab } from "../store";
+import { normaliseTab, useStore, type DrawerTab } from "../store";
 import { IconX } from "../ui/icons";
-import { ReasonModal } from "../ui/overlay";
+import { Popover, ReasonModal } from "../ui/overlay";
+import { fmtCr } from "@/lib/domain/money";
+import { MisSection } from "./MisSection";
 import { CommentsTab, HistoryTab } from "./CommentsHistory";
 import { InvestmentTab } from "./InvestmentTab";
 import { UpdatesTab } from "./UpdatesTab";
@@ -138,7 +140,7 @@ function DrawerBody({
   const { mutate, putRow, removeRow, toast } = store;
   const [editName, setEditName] = useState(false);
   const [modal, setModal] = useState<"reject" | "delete" | null>(null);
-  const [pop, setPop] = useState<{ kind: "sector" | "od" | "date"; el: HTMLElement } | null>(null);
+  const [pop, setPop] = useState<{ kind: "sector" | "od" | "date" | "more"; el: HTMLElement } | null>(null);
   const openId = detail?.row.id;
   const c = store.companies.find((x) => x.id === openId) ?? detail?.row;
 
@@ -185,20 +187,24 @@ function DrawerBody({
     if (n && n !== c.name) void mutate(c.id, { name: n }, () => updateCompany(c.id, { name: n }));
   };
 
-  const tabs: [DrawerTab, string, number | null][] = [
-    ["summary", "Summary", null],
-    ["materials", "Materials", detail?.files.length ?? c.fileCount],
-    ["comments", "Comments", detail?.comments.length ?? c.commentCount],
-    ["history", "History", null],
-  ];
-  // Invested companies get an Investment tab (rounds and valuations), first.
-  if (st === "INVESTED") {
-    tabs.unshift(["investment", "Investment", detail?.rounds.length ?? c.holding?.rounds ?? null]);
-    tabs.splice(1, 0, ["updates", "Updates", c.updateCount || null], ["meetings", "Meetings", null]);
-  }
-  const portfolioOnly = tab === "investment" || tab === "updates" || tab === "meetings";
-  const current: DrawerTab = portfolioOnly && st !== "INVESTED" ? "summary" : tab;
-
+  const invested = st === "INVESTED";
+  const tabs: [DrawerTab, string, number | null][] = invested
+    ? [
+        ["overview", "Overview", null],
+        ["mis", "MIS & results", null],
+        ["updates", "Updates", c.updateCount || null],
+        ["meetings", "Meetings", null],
+        ["files", "Files", detail?.files.length ?? c.fileCount],
+        ["history", "History", detail?.comments.length ?? (c.commentCount || null)],
+      ]
+    : [
+        ["summary", "Summary", null],
+        ["materials", "Materials", detail?.files.length ?? c.fileCount],
+        ["comments", "Comments", detail?.comments.length ?? c.commentCount],
+        ["history", "History", null],
+      ];
+  const current = normaliseTab(tab, invested);
+  const h = c.holding;
   return (
     <>
       <div className="dh">
@@ -216,9 +222,14 @@ function DrawerBody({
                   Reject
                 </button>
               </>
-            ) : (
+            ) : invested ? null : (
               <button className="btn" type="button" onClick={restore}>
                 Restore to pipeline
+              </button>
+            )}
+            {invested && (
+              <button className="btn-ghost" type="button" aria-haspopup="menu" onClick={(e) => setPop({ kind: "more", el: e.currentTarget })}>
+                More
               </button>
             )}
             <button className="btn-ghost danger-text" type="button" onClick={() => setModal("delete")}>
@@ -268,15 +279,17 @@ function DrawerBody({
               Add OneDrive link
             </button>
           )}
-          <button
-            className="meta-btn"
-            type="button"
-            title="Change the date received"
-            onClick={(e) => setPop({ kind: "date", el: e.currentTarget })}
-          >
-            {c.dateReceived ? `Received ${fmtDate(c.dateReceived)}` : "Set date received"}
-          </button>
-          {c.dateReceived && (
+          {!invested && (
+            <button
+              className="meta-btn"
+              type="button"
+              title="Change the date received"
+              onClick={(e) => setPop({ kind: "date", el: e.currentTarget })}
+            >
+              {c.dateReceived ? `Received ${fmtDate(c.dateReceived)}` : "Set date received"}
+            </button>
+          )}
+          {c.dateReceived && !invested && (
             <span>
               {days} days{st !== "PIPELINE" ? " in pipeline" : ""}
             </span>
@@ -291,7 +304,9 @@ function DrawerBody({
         {st === "INVESTED" && (
           <div className="reject-note" style={{ background: "var(--gold-soft)" }}>
             <strong style={{ color: "var(--gold)" }}>
-              {c.exitAt ? `Invested on ${fmtDate(c.exitAt)}.` : "Portfolio company, added directly to Invested."}
+              {h?.invested && h.firstDate
+                ? `First invested ${fmtDate(h.firstDate)} · ${fmtCr(h.invested)} in ${h.rounds} round${h.rounds === 1 ? "" : "s"}`
+                : "Portfolio company. Add the first round on Overview."}
             </strong>
           </div>
         )}
@@ -307,8 +322,24 @@ function DrawerBody({
       <div className="dbody">
         {!detail ? (
           <p className="muted">Loading…</p>
-        ) : current === "investment" ? (
-          <InvestmentTab detail={detail} reload={reload} />
+        ) : current === "overview" ? (
+          <InvestmentTab detail={detail} reload={reload} goUpdates={() => setTab("updates")} />
+        ) : current === "mis" ? (
+          <MisSection companyId={c.id} items={detail.mis} files={detail.files} reload={reload} />
+        ) : current === "files" ? (
+          <>
+            <MaterialsTab detail={detail} reload={reload} />
+            <details className="deck-summary">
+              <summary>Deck summary (from when the deal was in the pipeline)</summary>
+              <SummaryTab detail={detail} reload={reload} goMaterials={() => setTab("files")} setBusyEditing={setBusyEditing} />
+            </details>
+          </>
+        ) : current === "history" && invested ? (
+          <>
+            <CommentsTab detail={detail} reload={reload} setBusyEditing={setBusyEditing} />
+            <h3 className="sec-title">History</h3>
+            <HistoryTab detail={detail} />
+          </>
         ) : current === "updates" ? (
           <UpdatesTab companyId={c.id} />
         ) : current === "meetings" ? (
@@ -327,6 +358,33 @@ function DrawerBody({
       {pop?.kind === "sector" && <SectorPopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
       {pop?.kind === "od" && <OneDrivePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
       {pop?.kind === "date" && <DatePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
+      {pop?.kind === "more" && (
+        <Popover anchor={pop.el} onClose={() => setPop(null)} width={220} label="More actions">
+          <div className="menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                const el = pop.el;
+                e.stopPropagation();
+                setPop({ kind: "date", el });
+              }}
+            >
+              {c.dateReceived ? `Change date received (${fmtDate(c.dateReceived)})` : "Set date received"}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setPop(null);
+                void restore();
+              }}
+            >
+              Restore to pipeline
+            </button>
+          </div>
+        </Popover>
+      )}
 
       {modal === "reject" && (
         <ReasonModal
