@@ -62,6 +62,7 @@ export const SEED_SECTORS = [
   "Education",
   "Electronics & Semiconductors",
   "Energy Transition",
+  "EV & Charging",
   "Financial Services & Fintech",
   "Healthcare & Pharma",
   "Industrial Products",
