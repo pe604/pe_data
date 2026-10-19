@@ -69,6 +69,7 @@ export const SEED_SECTORS = [
   "Infrastructure & EPC",
   "IT Services & BPM",
   "Logistics & Supply Chain",
+  "Manufacturing",
   "Media & Entertainment",
   "MedTech & Diagnostics",
   "Metals & Mining",
