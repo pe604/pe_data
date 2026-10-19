@@ -1,7 +1,8 @@
 // Portfolio maths (SPEC §15): amount invested per company (total and by fund) and the Invested-tab summary.
 // Amounts in ₹ Cr. Pure: unit-tested in tests/unit/portfolio.test.ts.
 
-export const FUNDS = ["Hedgehogs", "Sambhav"] as const;
+/** "Other" = money not from either fund (e.g. a direct investment). */
+export const FUNDS = ["Hedgehogs", "Sambhav", "Other"] as const;
 export type Fund = (typeof FUNDS)[number];
 export const INSTRUMENTS = ["Equity", "CCPS", "CCD", "Convertible note", "Other"] as const;
 
@@ -24,7 +25,7 @@ export interface Holding {
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const emptySplit = (): FundSplit => ({ Hedgehogs: 0, Sambhav: 0, unset: 0 });
+const emptySplit = (): FundSplit => ({ Hedgehogs: 0, Sambhav: 0, Other: 0, unset: 0 });
 
 export function holdingOf(rounds: RoundLite[]): Holding {
   const byFund = emptySplit();

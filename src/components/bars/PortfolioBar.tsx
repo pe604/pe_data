@@ -26,14 +26,14 @@ export function PortfolioBar({ rows, view }: { rows: CompanyRow[]; view: ViewSta
         <span>
           {s.companies} compan{s.companies === 1 ? "y" : "ies"}
         </span>
-        {FUNDS.map((f) => (
+        {FUNDS.filter((f) => f !== "Other" || s.byFund.Other > 0).map((f) => (
           <span key={f} className="pf-fund">
             <span className="pf-sep" aria-hidden="true" />
             {f} <strong>{fmtCr(s.byFund[f])}</strong> <small>{pct(s.byFund[f])}%</small>
           </span>
         ))}
         {s.byFund.unset > 0 && (
-          <span className="warn-text" title="Edit those rounds to choose Hedgehogs or Sambhav">
+          <span className="warn-text" title="Edit those rounds to choose Hedgehogs, Sambhav or Other">
             <span className="pf-sep" aria-hidden="true" />
             {fmtCr(s.byFund.unset)} without a fund
           </span>

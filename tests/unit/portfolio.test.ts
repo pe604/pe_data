@@ -11,7 +11,7 @@ describe("holdings", () => {
   it("totals rounds and splits by fund", () => {
     expect(holdingOf(rounds)).toEqual({
       invested: 17.5,
-      byFund: { Hedgehogs: 12.5, Sambhav: 5, unset: 0 },
+      byFund: { Hedgehogs: 12.5, Sambhav: 5, Other: 0, unset: 0 },
       rounds: 3,
       firstDate: "2024-06-10",
     });
@@ -19,7 +19,7 @@ describe("holdings", () => {
 
   it("keeps rounds without a fund separate", () => {
     const h = holdingOf([{ date: "2024-01-01", amount: 3, fund: null }]);
-    expect(h.byFund).toEqual({ Hedgehogs: 0, Sambhav: 0, unset: 3 });
+    expect(h.byFund).toEqual({ Hedgehogs: 0, Sambhav: 0, Other: 0, unset: 3 });
     expect(splitParts(h.byFund)).toEqual([["unset", 3]]);
     expect(splitParts(holdingOf(rounds).byFund)).toEqual([["Hedgehogs", 12.5], ["Sambhav", 5]]);
   });
@@ -41,7 +41,7 @@ describe("portfolio summary", () => {
       { sector: "Space Tech", holding: holdingOf([{ date: "2026-02-01", amount: 5, fund: "Sambhav" }]) },
       { sector: null, holding: holdingOf([]) },
     ]);
-    expect(s).toMatchObject({ companies: 3, invested: 22.5, byFund: { Hedgehogs: 12.5, Sambhav: 10, unset: 0 } });
+    expect(s).toMatchObject({ companies: 3, invested: 22.5, byFund: { Hedgehogs: 12.5, Sambhav: 10, Other: 0, unset: 0 } });
     expect(s.bySector[0]).toEqual({ name: "Consumer & Retail", invested: 17.5, companies: 1 });
     expect(s.byYear).toEqual([
       { fy: "FY25", invested: 17.5, companies: 1 },
@@ -99,5 +99,16 @@ describe("allocation by year", () => {
     expect(yearSlices(rows, "all").map((s) => [s.key, s.value, s.companies])).toEqual([["FY25", 14, 2], ["FY26", 6, 1]]);
     expect(yearSlices(rows, "Sambhav").map((s) => [s.key, s.value])).toEqual([["FY25", 4], ["FY26", 6]]);
     expect(companiesInYear(rows, "FY25", "all").map((s) => s.label)).toEqual(["Alpha", "Beta"]);
+  });
+});
+
+describe("Other fund", () => {
+  it("counts money from neither fund under Other, after the two funds", () => {
+    const h = holdingOf([
+      { date: "2025-01-01", amount: 3, fund: "Other" },
+      { date: "2025-02-01", amount: 2, fund: "Sambhav" },
+    ]);
+    expect(h.invested).toBe(5);
+    expect(splitParts(h.byFund)).toEqual([["Sambhav", 2], ["Other", 3]]);
   });
 });

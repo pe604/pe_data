@@ -256,7 +256,7 @@ function RoundForm({
           )}
         </label>
       </div>
-      {!f.fund && <p className="hint">Choose the fund: Hedgehogs or Sambhav.</p>}
+      {!f.fund && <p className="hint">Choose the fund: Hedgehogs, Sambhav or Other.</p>}
       {(amount === undefined || preMoney === undefined) && <p className="hint err">Enter amounts in ₹ Cr, like 12.5 or 1,250.</p>}
       {stake === undefined && <p className="hint err">Enter the stake as a percentage between 0 and 100.</p>}
       <div className="foot">

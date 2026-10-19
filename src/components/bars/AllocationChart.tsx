@@ -115,7 +115,7 @@ export function AllocationChart({ rows, onClose }: { rows: CompanyRow[]; onClose
           <div className="seg-switch sm" role="tablist" aria-label="Fund">
             {(["all", ...FUNDS] as FundFilter[]).map((f) => (
               <button key={f} type="button" role="tab" aria-selected={fund === f} onClick={() => setFund(f)}>
-                {f === "all" ? "Both funds" : f}
+                {f === "all" ? "All funds" : f}
               </button>
             ))}
           </div>

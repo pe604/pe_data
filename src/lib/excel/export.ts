@@ -76,6 +76,7 @@ function columns(status: Status, today: string): Col[] {
     { h: "Invested (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.invested ?? "" },
     { h: "Hedgehogs (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.byFund.Hedgehogs || "" },
     { h: "Sambhav (₹ Cr)", w: 14, t: "num", v: (c) => c.holding?.byFund.Sambhav || "" },
+    { h: "Other (₹ Cr)", w: 12, t: "num", v: (c) => c.holding?.byFund.Other || "" },
     { h: "Rounds", w: 8, t: "num", v: (c) => c.holding?.rounds || "" },
     ...people.filter((p) => p.h !== "Priority"),
     { h: "Latest update", w: 48, wrap: true, v: (c) => c.latestUpdate?.text ?? "" },

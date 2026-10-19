@@ -384,7 +384,7 @@ model InvestmentRound {
   round       String?
   /// Equity, CCPS, CCD, Convertible note, Other
   instrument  String?
-  /// Hedgehogs or Sambhav (null only for rounds entered before funds existed)
+  /// Hedgehogs, Sambhav or Other (null only for rounds entered before funds existed)
   fund        String?
   amount      Decimal  @db.Decimal(14, 2)
   /// Company pre-money valuation for this round, INR crore.

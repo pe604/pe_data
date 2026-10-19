@@ -20,7 +20,7 @@ const crore = z.number().finite().max(10_000_000);
 const pct = z.number().finite().min(0).max(100);
 
 const roundSchema = z.object({
-  fund: z.enum(FUNDS, { message: "Choose the fund: Hedgehogs or Sambhav" }),
+  fund: z.enum(FUNDS, { message: "Choose the fund: Hedgehogs, Sambhav or Other" }),
   date: pastDate,
   round: z.string().trim().max(60).nullable(),
   instrument: z.enum(INSTRUMENTS).nullable(),
