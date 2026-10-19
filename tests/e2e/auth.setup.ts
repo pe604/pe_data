@@ -29,13 +29,13 @@ async function resetTestDb() {
     .map((r) => `"${r.tablename}"`)
     .join(", ");
   await db.query(`truncate ${tables} cascade`);
-  const sectors = ["Aerospace & Defence", "Agri & Food", "Consumer & Retail", "Power & T&D", "Technology & SaaS", "Other"];
+  const sectors = ["Defence, Aerospace & Drones", "Agri & Food", "Consumer", "Energy Transition", "Technology & SaaS", "Other"];
   for (const s of sectors) await db.query(`insert into "Sector"(id, name, "sortOrder") values (gen_random_uuid()::text, $1, $2)`, [s, s === "Other" ? 1000 : 0]);
   const team = [["Keyur", 0], ["Arjun", 1], ["Arvind Sir", 2]] as const;
   for (const [n, rank] of team) await db.query(`insert into "TeamMember"(id, name, "nameKey", "peRank", "inPe") values (gen_random_uuid()::text, $1, lower($1), $2, true)`, [n, rank]);
   await db.query(`insert into "TeamMember"(id, name, "nameKey", "inResearch") values (gen_random_uuid()::text, 'Riya', 'riya', true)`);
   const user = (await db.query(`insert into "User"(id, name, email, role) values ('e2e-seed', 'Seed', 'seed@e2e.invalid', 'EDITOR') returning id`)).rows[0].id;
-  const power = (await db.query(`select id from "Sector" where name = 'Power & T&D'`)).rows[0].id;
+  const power = (await db.query(`select id from "Sector" where name = 'Energy Transition'`)).rows[0].id;
   // Fixtures referenced by the tests: a pipeline company to search for, an investment to duplicate.
   await db.query(
     `insert into "Company"(id, name, "sectorId", stage, priority, status, "dateReceived", "createdById", "updatedAt")

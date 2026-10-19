@@ -218,7 +218,9 @@ When a pipeline company in `Not Assigned` gets its first PE or Research assignee
 
 ## 8. Sector master list (seed)
 
-Aerospace & Defence, Agri & Food, Auto & Auto Components, Chemicals & Materials, Consumer & Retail, Education, Electronics & Semiconductors, Financial Services & Fintech, Healthcare & Pharma, Industrials & Manufacturing, Infrastructure & EPC, Media & Entertainment, Mobility & Logistics, Power & T&D, Real Estate & Hospitality, Renewables & Climate, Technology & SaaS, Other (always last).
+Agri & Food, AI & Deep Tech, Automotive Component, Building Materials, Business Services & Staffing, Chemicals & Materials, Consumer, Consumer Internet & E-commerce, Defence, Aerospace & Drones, Education, Electronics & Semiconductors, Energy Transition, Financial Services & Fintech, Healthcare & Pharma, Industrial Products, Infrastructure & EPC, IT Services & BPM, Logistics & Supply Chain, Media & Entertainment, MedTech & Diagnostics, Metals & Mining, Packaging, Real Estate & Hospitality, Recycling, Space Tech, Technology & SaaS, Telecom & Data Centres, Water Infrastructure, Other (always last).
+
+No two sectors may overlap; the firm's portfolio names win. Oct 2026 merges: Renewables & Climate, Power & T&D and EV & Battery Tech → Energy Transition; Consumer & Retail and Textiles & Apparel → Consumer; Aerospace & Defence → Defence, Aerospace & Drones; Auto & Auto Components → Automotive Component; Electronics & EMS → Electronics & Semiconductors; Mobility & Logistics → Logistics & Supply Chain; Industrials & Manufacturing → Industrial Products; Water & Waste Management → Water Infrastructure.
 
 ## 9. AI summary
 
