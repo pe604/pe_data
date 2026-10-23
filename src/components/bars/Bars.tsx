@@ -60,7 +60,7 @@ export function PeBar({ rows, view, setView }: Props) {
             Manage
           </button>
           <button type="button" onClick={() => setReminders(true)}>
-            Reminders
+            WhatsApp
           </button>
         </div>
       </div>

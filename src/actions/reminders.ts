@@ -63,7 +63,7 @@ export async function sendTestReminder(memberId: string) {
     try {
       await sendText(
         m.whatsappNumber,
-        `Hi ${m.name.split(" ")[0]}, this is a test from the Niveshaay deal pipeline. Reminders about your idle pipeline deals will come here.`,
+        `Hi ${m.name.split(" ")[0]}, this is a test from the Niveshaay deal pipeline. Messages from the dashboard will come here.`,
       );
     } catch (e) {
       console.error("[reminders] test failed", mid, (e as { status?: number }).status ?? (e as Error).message?.slice(0, 40));

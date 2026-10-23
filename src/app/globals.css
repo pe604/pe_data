@@ -595,3 +595,6 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .rm-idle{line-height:1.6}
 .pe-lab .pe-acts{display:flex;gap:10px}
 @media (max-width:760px){.rm-name{flex-basis:100%}}
+.rm-sec{margin:18px 0 4px}
+.rm-sec:first-of-type{margin-top:4px}
+.rm-tag{display:inline-block;margin-left:6px;font-size:11px;font-weight:500;background:var(--green-soft);color:var(--green);border-radius:4px;padding:1px 5px;vertical-align:1px}

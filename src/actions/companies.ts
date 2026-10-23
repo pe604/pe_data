@@ -24,6 +24,8 @@ import {
 import { fmtDay, fmtPriority, fmtStage, fmtStatus } from "@/lib/server/format";
 import { storage } from "@/lib/storage";
 import { attachJobToCompany } from "@/lib/ai/jobs";
+import { newlyAdded } from "@/lib/domain/reminders";
+import { notifyResearchAssigned } from "@/lib/whatsapp/assign";
 
 const id = z.string().min(1).max(40);
 const isoDate = z.string().refine(isISODate, "Invalid date");
@@ -125,10 +127,12 @@ export async function setPeople(companyId: string, role: PersonRole, names: stri
     const cid = id.parse(companyId);
     const r = z.enum(["PE", "RESEARCH", "VIA"]).parse(role);
     const list = peopleList.parse(names);
-    return db.$transaction(async (tx) => {
+    let added: string[] = [];
+    const row = await db.$transaction(async (tx) => {
       const c = await tx.company.findUniqueOrThrow({ where: { id: cid } });
       const before = await peopleOf(tx, cid);
       const after = await replacePeople(tx, cid, r, list);
+      if (r === "RESEARCH") added = newlyAdded(before.RESEARCH, after);
       const field = r === "PE" ? "pe" : r === "RESEARCH" ? "research" : "via";
       const changes: Change[] = [{ field, from: listText(before[r]), to: listText(after) }];
       // SPEC §7.5: first PE or Research assignee moves Not Assigned → Call Pending. Never back.
@@ -139,6 +143,8 @@ export async function setPeople(companyId: string, role: PersonRole, names: stri
       await audit(tx, cid, me.id, changes);
       return getRow(cid, tx);
     });
+    notifyResearchAssigned(cid, added, me.id); // SPEC §15.8, after the save
+    return row;
   });
 }
 
@@ -214,6 +220,7 @@ export async function createCompany(input: z.input<typeof createSchema>) {
       const job = await db.summaryJob.findUnique({ where: { id: p.jobId }, select: { createdById: true, companyId: true } });
       if (job && !job.companyId && job.createdById === me.id) await attachJobToCompany(p.jobId, cid, me.id);
     }
+    notifyResearchAssigned(cid, p.research, me.id); // SPEC §15.8
     return getRow(cid);
   });
 }

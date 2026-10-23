@@ -552,11 +552,11 @@ test("company updates replace the comment column on Invested; sector allocation 
   await expect(page.locator(".drawer.open .dh-name")).toHaveText(a);
 });
 
-test("Reminders panel: save a WhatsApp number per PE, reject a bad one", async ({ page }) => {
+test("WhatsApp panel: save a number per person, reject a bad one, Research team listed", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".pe-lab").getByRole("button", { name: "Reminders" }).click();
+  await page.locator(".pe-lab").getByRole("button", { name: "WhatsApp" }).click();
   const dlg = page.getByRole("dialog");
-  await expect(dlg.getByRole("heading", { name: "WhatsApp reminders" })).toBeVisible();
+  await expect(dlg.getByRole("heading", { name: "WhatsApp", exact: true })).toBeVisible();
   await expect(dlg).toContainText("WhatsApp isn’t connected");
   const person = dlg.locator(".rm-row").filter({ hasText: "Arvind Sir" });
   const num = person.getByLabel("WhatsApp number for Arvind Sir");
@@ -569,4 +569,7 @@ test("Reminders panel: save a WhatsApp number per PE, reject a bad one", async (
   await expect(num).toHaveValue("+91 98765 43210");
   // Send test stays off while WhatsApp isn't connected.
   await expect(person.getByRole("button", { name: "Send test" })).toBeDisabled();
+  // Research people are listed too, for assignment messages.
+  await expect(dlg.getByRole("heading", { name: "Research team" })).toBeVisible();
+  await expect(dlg.locator(".rm-row").filter({ hasText: "Riya" })).toContainText("won’t get assignment messages");
 });

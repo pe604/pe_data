@@ -18,12 +18,18 @@ export interface IdleItem extends IdleDeal {
 export interface MemberIdle {
   memberId: string;
   name: string;
+  /** In the PE list (gets idle reminders) and/or the Research list (gets assignment messages). */
+  pe: boolean;
+  research: boolean;
   whatsappNumber: string | null;
   remindersOn: boolean;
   idle: IdleItem[];
 }
 
-/** Pipeline deals idle 7+ days, per assigned PE (everyone in the PE list, even with no idle deals). */
+/**
+ * Everyone in the PE or Research lists with their WhatsApp settings, and for PEs their pipeline deals idle 7+ days.
+ * Research-only people have no idle list (reminders go to PEs only).
+ */
 export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
   const [companies, members] = await Promise.all([
     db.company.findMany({
@@ -39,8 +45,24 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
       },
     }),
     db.teamMember.findMany({
-      where: { OR: [{ inPe: true }, { peRank: { not: null } }, { assignments: { some: { role: "PE" } } }] },
-      select: { id: true, name: true, whatsappNumber: true, remindersOn: true, peRank: true },
+      where: {
+        OR: [
+          { inPe: true },
+          { peRank: { not: null } },
+          { inResearch: true },
+          { assignments: { some: { role: { in: ["PE", "RESEARCH"] } } } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        whatsappNumber: true,
+        remindersOn: true,
+        peRank: true,
+        inPe: true,
+        inResearch: true,
+        assignments: { where: { role: { in: ["PE", "RESEARCH"] } }, select: { role: true }, distinct: ["role"] },
+      },
     }),
   ]);
   const sent = await db.reminderLog.groupBy({
@@ -66,6 +88,8 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
     .map((m) => ({
       memberId: m.id,
       name: m.name,
+      pe: m.inPe || m.peRank !== null || m.assignments.some((a) => a.role === "PE"),
+      research: m.inResearch || m.assignments.some((a) => a.role === "RESEARCH"),
       whatsappNumber: m.whatsappNumber,
       remindersOn: m.remindersOn,
       idle: (byMember.get(m.id) ?? []).sort((a, b) => b.idleDays - a.idleDays),

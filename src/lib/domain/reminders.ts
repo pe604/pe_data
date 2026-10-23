@@ -1,6 +1,7 @@
 // Idle deal reminders (SPEC §15.7). Pure: unit-tested in tests/unit/reminders.test.ts.
 import { STAGE_LABELS, type Stage } from "./constants";
 import { daysBetween } from "./dates";
+import { nameKey } from "./names";
 
 /** Days without activity before the first reminder. */
 export const IDLE_DAYS = 7;
@@ -37,6 +38,26 @@ export function fmtWhatsapp(n: string | null): string {
   if (!n) return "";
   if (n.startsWith("91") && n.length === 12) return `+91 ${n.slice(2, 7)} ${n.slice(7)}`;
   return "+" + n;
+}
+
+/** Names in `after` that weren't in `before` (case- and spacing-insensitive). */
+export function newlyAdded(before: string[], after: string[]): string[] {
+  const had = new Set(before.map(nameKey));
+  return after.filter((n) => !had.has(nameKey(n)));
+}
+
+/** "A", "A and B", "A, B and C". */
+const andList = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+
+/** The WhatsApp message to a Research person newly assigned to a company (SPEC §15.8). */
+export function assignmentText(p: { name: string; company: string; sector: string | null; pe: string[]; deck: boolean }): string {
+  const first = p.name.split(" ")[0];
+  const what = `*${p.company}*${p.sector ? ` (${p.sector})` : ""}`;
+  const team = p.pe.length
+    ? `${andList(p.pe)} from the PE team ${p.pe.length === 1 ? "is" : "are"} working on it with you.`
+    : "No one from the PE team is assigned yet.";
+  const deck = p.deck ? "The deck is attached below." : "There's no deck on the dashboard yet.";
+  return `Hi ${first}, you've been assigned ${what} on the deal pipeline. ${team} ${deck}`;
 }
 
 export interface IdleDeal {

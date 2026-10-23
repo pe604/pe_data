@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtWhatsapp, normaliseWhatsapp, reminderDue, reminderText } from "@/lib/domain/reminders";
+import { assignmentText, fmtWhatsapp, newlyAdded, normaliseWhatsapp, reminderDue, reminderText } from "@/lib/domain/reminders";
 
 describe("reminderDue (SPEC §15.7)", () => {
   it("waits 7 days from the last activity", () => {
@@ -55,5 +55,27 @@ describe("reminderText", () => {
 
   it("uses the singular for one deal", () => {
     expect(reminderText("Riya", [{ company: "A", stage: "NOT_ASSIGNED", idleDays: 7 }])).toContain("one of your pipeline deals has");
+  });
+});
+
+describe("Research assignment messages (SPEC §15.8)", () => {
+  it("names the company, sector and PE team, and mentions the deck", () => {
+    expect(assignmentText({ name: "Riya Shah", company: "Zooto", sector: "Consumer", pe: ["Keyur", "Arjun"], deck: true })).toBe(
+      "Hi Riya, you've been assigned *Zooto* (Consumer) on the deal pipeline. Keyur and Arjun from the PE team are working on it with you. The deck is attached below.",
+    );
+  });
+
+  it("handles one PE, no PE, three PEs and no deck", () => {
+    expect(assignmentText({ name: "Riya", company: "A", sector: null, pe: ["Keyur"], deck: false })).toBe(
+      "Hi Riya, you've been assigned *A* on the deal pipeline. Keyur from the PE team is working on it with you. There's no deck on the dashboard yet.",
+    );
+    expect(assignmentText({ name: "Riya", company: "A", sector: null, pe: [], deck: true })).toContain("No one from the PE team is assigned yet.");
+    expect(assignmentText({ name: "Riya", company: "A", sector: null, pe: ["A", "B", "C"], deck: true })).toContain("A, B and C from the PE team are");
+  });
+
+  it("only newly added names get a message", () => {
+    expect(newlyAdded(["Riya"], ["riya ", "Meet"])).toEqual(["Meet"]);
+    expect(newlyAdded(["Riya", "Meet"], ["Meet"])).toEqual([]);
+    expect(newlyAdded([], ["Riya"])).toEqual(["Riya"]);
   });
 });

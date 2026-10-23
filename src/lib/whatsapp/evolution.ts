@@ -77,6 +77,16 @@ export async function sendGroupText(text: string): Promise<void> {
   await sendText(env.EVOLUTION_Receiver, text);
 }
 
+/** Sends a file as a WhatsApp document. The bytes go to Evolution only, never to a public URL. */
+export async function sendDocument(to: string, file: { data: Buffer; fileName: string; mime: string }): Promise<void> {
+  await call(
+    "POST",
+    `/message/sendMedia/${inst()}`,
+    { number: to, mediatype: "document", mimetype: file.mime, media: file.data.toString("base64"), fileName: file.fileName },
+    180_000,
+  );
+}
+
 /** Sends a text to a group JID or a person's number (digits with country code). */
 export async function sendText(to: string, text: string): Promise<void> {
   await call("POST", `/message/sendText/${inst()}`, { number: to, text });
