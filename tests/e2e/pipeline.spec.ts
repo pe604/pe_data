@@ -573,3 +573,49 @@ test("WhatsApp panel: save a number per person, reject a bad one, Research team 
   await expect(dlg.getByRole("heading", { name: "Research team" })).toBeVisible();
   await expect(dlg.locator(".rm-row").filter({ hasText: "Riya" })).toContainText("won’t get assignment messages");
 });
+
+test("WhatsApp panel: rename a person everywhere, delete them and their assignments", async ({ page }) => {
+  const name = uniq("Ppl");
+  const person = "Rs" + uniq("x").replace(/\W/g, "").toLowerCase();
+  const display = person.charAt(0).toUpperCase() + person.slice(1);
+  const renamed = display + " Two";
+  await page.goto("/");
+  await addByName(page, name);
+  const pop = page.locator(".pop");
+  // Popovers close on scroll, so let the cell settle in view before clicking.
+  const cell = row(page, name).locator("td.c-re");
+  await cell.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await cell.click();
+  await pop.getByRole("textbox", { name: "Assigned Research" }).fill(person);
+  await pop.getByRole("option", { name: /as a new team member/ }).click();
+  await pop.getByRole("button", { name: "Done" }).click();
+  await expect(row(page, name).locator("td.c-re")).toContainText(display);
+
+  const open = async () => {
+    await page.locator(".pe-lab").getByRole("button", { name: "WhatsApp" }).click();
+    return page.getByRole("dialog");
+  };
+  let dlg = await open();
+  await dlg.locator(".rm-row").filter({ hasText: display }).getByRole("button", { name: "Rename" }).click();
+  await dlg.getByLabel(`New name for ${display}`).fill(renamed);
+  await dlg.getByRole("button", { name: "Save name" }).click();
+  await expect(page.locator(".toast")).toContainText(`Renamed ${display}.`);
+  await expect(dlg.locator(".rm-row").filter({ hasText: renamed })).toBeVisible();
+  await dlg.getByRole("button", { name: "Close" }).last().click();
+  await expect(row(page, name).locator("td.c-re")).toContainText(renamed);
+
+  dlg = await open();
+  const r = dlg.locator(".rm-row").filter({ hasText: renamed });
+  await r.getByRole("button", { name: "Delete" }).click();
+  await expect(r.locator(".rm-confirm")).toContainText("will be removed from 1 company");
+  await r.locator(".rm-confirm").getByRole("button", { name: "Delete" }).click();
+  await expect(page.locator(".toast")).toContainText(`Deleted ${renamed}.`);
+  await expect(dlg.locator(".rm-row").filter({ hasText: renamed })).toHaveCount(0);
+  await dlg.getByRole("button", { name: "Close" }).last().click();
+  await expect(row(page, name).locator("td.c-re")).not.toContainText(renamed);
+  await openCompany(page, name);
+  await page.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText(`renamed ${display} to ${renamed}`);
+  await expect(page.locator(".hist")).toContainText("Assigned Research");
+});

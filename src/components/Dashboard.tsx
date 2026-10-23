@@ -118,19 +118,26 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
     if (tab) setDrawerTab(tab);
   }, []);
 
+  /** Reloads everything; `detail` also makes an open company file refetch. */
+  const load = useCallback(async (detail: boolean) => {
+    const r = await getDashboard().catch(() => null);
+    if (!r?.ok || pending.current > 0) return;
+    setCompanies(r.data.companies);
+    setTeam(r.data.team);
+    setSectors(r.data.sectors);
+    setPeMeta(r.data.peMeta);
+    if (detail) setDetailVersion((v) => v + 1);
+  }, []);
+  const refresh = useCallback(() => load(true), [load]);
+
   // Pick up other people's changes every minute (skipped while a save is in flight).
   useEffect(() => {
-    const t = setInterval(async () => {
+    const t = setInterval(() => {
       if (document.hidden || pending.current > 0) return;
-      const r = await getDashboard().catch(() => null);
-      if (!r?.ok || pending.current > 0) return;
-      setCompanies(r.data.companies);
-      setTeam(r.data.team);
-      setSectors(r.data.sectors);
-      setPeMeta(r.data.peMeta);
+      void load(false);
     }, 60_000);
     return () => clearInterval(t);
-  }, []);
+  }, [load]);
 
   const store: Store = useMemo(
     () => ({
@@ -150,13 +157,14 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       mutate,
       addTeamNames,
       setTeam,
+      refresh,
       setSectors,
       setPeMeta,
       toast,
       openDrawer,
       openAdd: () => setAddOpen(true),
     }),
-    [initial, companies, sectors, team, peMeta, detailVersion, putRow, syncRow, removeRow, mutate, addTeamNames, toast, openDrawer],
+    [initial, companies, sectors, team, peMeta, detailVersion, putRow, syncRow, removeRow, mutate, addTeamNames, refresh, toast, openDrawer],
   );
 
   const setTab = (tab: Tab) => {

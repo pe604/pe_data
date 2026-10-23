@@ -21,6 +21,8 @@ export interface MemberIdle {
   /** In the PE list (gets idle reminders) and/or the Research list (gets assignment messages). */
   pe: boolean;
   research: boolean;
+  /** Companies they're assigned to in any role (PE, Research, Via). */
+  companies: number;
   whatsappNumber: string | null;
   remindersOn: boolean;
   idle: IdleItem[];
@@ -65,6 +67,9 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
       },
     }),
   ]);
+  const links = await db.companyPerson.findMany({ select: { teamMemberId: true, companyId: true } });
+  const companiesOf = new Map<string, Set<string>>();
+  for (const l of links) companiesOf.set(l.teamMemberId, (companiesOf.get(l.teamMemberId) ?? new Set()).add(l.companyId));
   const sent = await db.reminderLog.groupBy({
     by: ["companyId", "teamMemberId"],
     where: { companyId: { in: companies.map((c) => c.id) } },
@@ -90,6 +95,7 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
       name: m.name,
       pe: m.inPe || m.peRank !== null || m.assignments.some((a) => a.role === "PE"),
       research: m.inResearch || m.assignments.some((a) => a.role === "RESEARCH"),
+      companies: companiesOf.get(m.id)?.size ?? 0,
       whatsappNumber: m.whatsappNumber,
       remindersOn: m.remindersOn,
       idle: (byMember.get(m.id) ?? []).sort((a, b) => b.idleDays - a.idleDays),

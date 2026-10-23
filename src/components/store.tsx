@@ -60,6 +60,8 @@ export interface Store {
   /** Optimistically add names to a field's list (and new PE names to the PE team bar). */
   addTeamNames: (names: string[], role: PersonRole, previous?: string[]) => void;
   setTeam: (team: TeamMemberOption[]) => void;
+  /** Reload every row, the team and sectors from the server (after a change that touches many companies). */
+  refresh: () => Promise<void>;
   setSectors: (s: SectorOption[]) => void;
   setPeMeta: (m: DashboardData["peMeta"]) => void;
   toast: (msg: string, action?: { label: string; run: () => void }) => void;

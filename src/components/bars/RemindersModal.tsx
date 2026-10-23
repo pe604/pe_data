@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getReminderPanel, saveReminderSettings, sendTestReminder, type ReminderPanel } from "@/actions/reminders";
+import { deleteMember, getReminderPanel, renameMember, saveReminderSettings, sendTestReminder, type ReminderPanel } from "@/actions/reminders";
 import { fmtDate } from "@/lib/domain/dates";
 import { fmtWhatsapp, IDLE_DAYS, REPEAT_DAYS } from "@/lib/domain/reminders";
 import type { MemberIdle } from "@/lib/whatsapp/reminders";
@@ -77,8 +77,34 @@ function MemberRow({ m, configured, onSaved }: { m: MemberIdle; configured: bool
   const { toast } = useStore();
   const [num, setNum] = useState(fmtWhatsapp(m.whatsappNumber));
   const [on, setOn] = useState(m.remindersOn);
-  const [busy, setBusy] = useState<"" | "save" | "test">("");
+  const { refresh } = useStore();
+  const [busy, setBusy] = useState<"" | "save" | "test" | "rename" | "delete">("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const dirty = num.trim() !== fmtWhatsapp(m.whatsappNumber) || on !== m.remindersOn;
+  const first = m.name.split(" ")[0];
+
+  const rename = async () => {
+    if (renaming === null || !renaming.trim() || renaming.trim() === m.name) return setRenaming(null);
+    setBusy("rename");
+    const r = await renameMember(m.memberId, renaming);
+    setBusy("");
+    if (!r.ok) return toast(r.error);
+    setRenaming(null);
+    onSaved(r.data);
+    void refresh();
+    toast(`Renamed ${m.name}.`);
+  };
+
+  const remove = async () => {
+    setBusy("delete");
+    const r = await deleteMember(m.memberId);
+    setBusy("");
+    if (!r.ok) return toast(r.error);
+    onSaved(r.data);
+    void refresh();
+    toast(`Deleted ${m.name}.`);
+  };
   const due = m.idle.filter((i) => i.due).length;
 
   const save = async () => {
@@ -102,10 +128,38 @@ function MemberRow({ m, configured, onSaved }: { m: MemberIdle; configured: bool
   return (
     <li className="rm-row">
       <div className="rm-top">
-        <strong className="rm-name">
-          {m.name}
-          {m.pe && m.research && <span className="rm-tag">also Research</span>}
-        </strong>
+        {renaming !== null ? (
+          <span className="rm-name rm-rename">
+            <label>
+              <span className="sr-only">New name for {m.name}</span>
+              <input
+                className="inp"
+                value={renaming}
+                autoFocus
+                maxLength={60}
+                onChange={(e) => setRenaming(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void rename();
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    setRenaming(null);
+                  }
+                }}
+              />
+            </label>
+            <button className="btn sm primary" type="button" onClick={rename} disabled={!!busy}>
+              {busy === "rename" ? "Saving…" : "Save name"}
+            </button>
+            <button className="btn-ghost sm" type="button" onClick={() => setRenaming(null)}>
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <strong className="rm-name">
+            {m.name}
+            {m.pe && m.research && <span className="rm-tag">also Research</span>}
+          </strong>
+        )}
         <label className="rm-num">
           <span className="sr-only">WhatsApp number for {m.name}</span>
           <input
@@ -137,7 +191,31 @@ function MemberRow({ m, configured, onSaved }: { m: MemberIdle; configured: bool
             {busy === "test" ? "Sending…" : "Send test"}
           </button>
         )}
+        <span className="rm-acts">
+          <button className="btn-ghost sm" type="button" onClick={() => setRenaming(m.name)} disabled={!!busy || renaming !== null}>
+            Rename
+          </button>
+          <button className="btn-ghost sm danger-text" type="button" onClick={() => setConfirmDelete(true)} disabled={!!busy}>
+            Delete
+          </button>
+        </span>
       </div>
+      {confirmDelete && (
+        <div className="banner err rm-confirm" role="alert">
+          <span>
+            Delete {m.name}?{" "}
+            {m.companies
+              ? `${first} will be removed from ${m.companies} compan${m.companies === 1 ? "y" : "ies"} they're assigned to (recorded in each History).`
+              : `${first} isn't assigned to any company.`}
+          </span>
+          <button className="btn sm danger" type="button" onClick={remove} disabled={!!busy}>
+            {busy === "delete" ? "Deleting…" : "Delete"}
+          </button>
+          <button className="btn sm" type="button" onClick={() => setConfirmDelete(false)} disabled={!!busy}>
+            Cancel
+          </button>
+        </div>
+      )}
       {!m.pe ? null : m.idle.length === 0 ? (
         <p className="hint">No idle deals.</p>
       ) : (

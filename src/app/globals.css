@@ -598,3 +598,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .rm-sec{margin:18px 0 4px}
 .rm-sec:first-of-type{margin-top:4px}
 .rm-tag{display:inline-block;margin-left:6px;font-size:11px;font-weight:500;background:var(--green-soft);color:var(--green);border-radius:4px;padding:1px 5px;vertical-align:1px}
+.rm-acts{margin-left:auto;display:flex;gap:2px}
+.rm-rename{display:flex;gap:6px;align-items:center;flex:1 1 260px}
+.rm-rename label{flex:1;min-width:0}
+.rm-rename .inp{width:100%}
+.rm-confirm{margin:8px 0 0}

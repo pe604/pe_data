@@ -460,6 +460,7 @@ The Invested tab has three views: **Portfolio**, **Quarterly tracker**, **Meetin
 - Names already on the company aren't messaged again; removing someone sends nothing. Any status.
 - Sent after the assignment is saved; it never delays or fails the save. The outcome per person goes in the company's **History** ("WhatsApp sent to Riya: assignment message and Deck.pdf", "No WhatsApp sent to Riya: no number saved", "… failed").
 - Needs the person's number in the **WhatsApp** panel (PE team bar → WhatsApp), which lists the PE team (idle reminders, §15.7) and the Research team. "Messages on" off = no messages of either kind.
+- Each person in the panel has **Rename** (changes the name everywhere: table, PE team bar, suggestions; companies link to the person, not the name; "Renamed A to B" in each of their companies' History; refused if the new name is already someone else's) and **Delete** (confirm shows how many companies they're on; removes them from every company's PE / Research / Via, recorded in each History, then from the list).
 
 ## 16. Non-goals (for now)
 
