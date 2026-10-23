@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deleteMember, getReminderPanel, renameMember, saveReminderSettings, sendTestReminder, type ReminderPanel } from "@/actions/reminders";
+import {
+  addMember,
+  deleteMember,
+  getReminderPanel,
+  renameMember,
+  saveReminderSettings,
+  sendTestReminder,
+  setMemberTeam,
+  type ReminderPanel,
+} from "@/actions/reminders";
 import { fmtDate } from "@/lib/domain/dates";
-import { fmtWhatsapp, IDLE_DAYS, REPEAT_DAYS } from "@/lib/domain/reminders";
+import { fmtWhatsapp, IDLE_DAYS, REPEAT_DAYS, TEAM_LABELS, TEAMS } from "@/lib/domain/reminders";
 import type { MemberIdle } from "@/lib/whatsapp/reminders";
 import { useStore } from "../store";
 import { Modal, ModalHead } from "../ui/overlay";
@@ -19,6 +28,9 @@ export function RemindersModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void getReminderPanel().then((r) => (r.ok ? setPanel(r.data) : toast(r.error)));
   }, [toast]);
+  // Each person shows once: a team (e.g. Scuttlebutt) first, then PE, then Research.
+  const pe = panel?.members.filter((m) => m.pe && !m.team) ?? [];
+  const research = panel?.members.filter((m) => m.research && !m.pe && !m.team) ?? [];
 
   return (
     <Modal onClose={onClose} size="wide" labelledBy="rm-title">
@@ -34,33 +46,34 @@ export function RemindersModal({ onClose }: { onClose: () => void }) {
               When a pipeline deal has no activity for {IDLE_DAYS} days, its PE gets a WhatsApp at 10 am, then every {REPEAT_DAYS} days until
               something changes. A stage change, comment, file, edit or new assignment counts as activity.
             </p>
-            {panel.members.some((m) => m.pe) ? (
-              <ul className="rm-list">
-                {panel.members
-                  .filter((m) => m.pe)
-                  .map((m) => (
-                    <MemberRow key={m.memberId} m={m} configured={panel.configured} onSaved={setPanel} />
-                  ))}
-              </ul>
-            ) : (
-              <p className="muted">No PE names yet. Add the PE team with Manage.</p>
-            )}
+            <Section members={pe} panel={panel} setPanel={setPanel} empty="No PE names yet. Add the PE team with Manage." />
             <h3 className="sec-title rm-sec">Research team</h3>
             <p className="hint">
               When someone is assigned a company in Assigned Research, they get a WhatsApp naming the company and its PE team, with the deck
               attached.
             </p>
-            {panel.members.some((m) => m.research && !m.pe) ? (
-              <ul className="rm-list">
-                {panel.members
-                  .filter((m) => m.research && !m.pe)
-                  .map((m) => (
-                    <MemberRow key={m.memberId} m={m} configured={panel.configured} onSaved={setPanel} />
-                  ))}
-              </ul>
-            ) : (
-              <p className="muted">No Research names yet. They appear here once someone is assigned in Assigned Research.</p>
-            )}
+            <Section
+              members={research}
+              panel={panel}
+              setPanel={setPanel}
+              empty="No Research names yet. They appear here once someone is assigned in Assigned Research, or add them below."
+            />
+            {TEAMS.map((t) => (
+              <div key={t}>
+                <h3 className="sec-title rm-sec">{TEAM_LABELS[t]} team</h3>
+                <p className="hint">
+                  Assigned through Assigned Research. A member gets the usual message and deck; the head is also told which member was
+                  assigned, with the deck.
+                </p>
+                <Section
+                  members={panel.members.filter((m) => m.team === t).sort((a, b) => Number(b.teamHead) - Number(a.teamHead))}
+                  panel={panel}
+                  setPanel={setPanel}
+                  empty={`No one in ${TEAM_LABELS[t]} yet. Move someone here with their Team choice, or add them below.`}
+                />
+              </div>
+            ))}
+            <AddPerson onSaved={setPanel} />
           </>
         )}
       </div>
@@ -70,6 +83,63 @@ export function RemindersModal({ onClose }: { onClose: () => void }) {
         </button>
       </div>
     </Modal>
+  );
+}
+
+function Section({ members, panel, setPanel, empty }: { members: MemberIdle[]; panel: ReminderPanel; setPanel: (p: ReminderPanel) => void; empty: string }) {
+  if (!members.length) return <p className="muted">{empty}</p>;
+  return (
+    <ul className="rm-list">
+      {members.map((m) => (
+        <MemberRow key={m.memberId} m={m} configured={panel.configured} onSaved={setPanel} />
+      ))}
+    </ul>
+  );
+}
+
+const TEAM_OPTIONS: [string, string][] = [["", "Research"], ...TEAMS.flatMap((t): [string, string][] => [[t, TEAM_LABELS[t]], [`${t}_HEAD`, `${TEAM_LABELS[t]} head`]])];
+const teamValue = (m: MemberIdle) => (m.team ? (m.teamHead ? `${m.team}_HEAD` : m.team) : "");
+
+/** Add a Research person (optionally straight into a team) before their first assignment. */
+function AddPerson({ onSaved }: { onSaved: (p: ReminderPanel) => void }) {
+  const { toast, refresh } = useStore();
+  const [name, setName] = useState("");
+  const [team, setTeam] = useState("");
+  const [busy, setBusy] = useState(false);
+  const add = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    const r = await addMember(name, team);
+    setBusy(false);
+    if (!r.ok) return toast(r.error);
+    onSaved(r.data);
+    void refresh();
+    toast(`Added ${name.trim()}.`);
+    setName("");
+  };
+  return (
+    <div className="rm-add">
+      <h3 className="sec-title rm-sec">Add a person</h3>
+      <div className="rm-top">
+        <label className="rm-num">
+          <span className="sr-only">Name of the person to add</span>
+          <input className="inp" placeholder="Name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void add()} />
+        </label>
+        <label>
+          <span className="sr-only">Team for the new person</span>
+          <select className="sel" value={team} onChange={(e) => setTeam(e.target.value)}>
+            {TEAM_OPTIONS.map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="btn sm primary" type="button" onClick={add} disabled={busy || !name.trim()}>
+          {busy ? "Adding…" : "Add"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -94,6 +164,16 @@ function MemberRow({ m, configured, onSaved }: { m: MemberIdle; configured: bool
     onSaved(r.data);
     void refresh();
     toast(`Renamed ${m.name}.`);
+  };
+
+  const changeTeam = async (choice: string) => {
+    setBusy("save");
+    const r = await setMemberTeam(m.memberId, choice);
+    setBusy("");
+    if (!r.ok) return toast(r.error);
+    onSaved(r.data);
+    const label = TEAM_OPTIONS.find(([v]) => v === choice)?.[1] ?? "Research";
+    toast(`${m.name} is now in ${label === "Research" ? "Research" : label.endsWith("head") ? `charge of ${label.replace(/ head$/, "")}` : label}.`);
   };
 
   const remove = async () => {
@@ -157,7 +237,8 @@ function MemberRow({ m, configured, onSaved }: { m: MemberIdle; configured: bool
         ) : (
           <strong className="rm-name">
             {m.name}
-            {m.pe && m.research && <span className="rm-tag">also Research</span>}
+            {m.teamHead && <span className="rm-tag">Head</span>}
+            {m.pe && m.research && !m.team && <span className="rm-tag">also Research</span>}
           </strong>
         )}
         <label className="rm-num">
@@ -176,6 +257,18 @@ function MemberRow({ m, configured, onSaved }: { m: MemberIdle; configured: bool
           <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
           Messages on
         </label>
+        {(!m.pe || m.team) && (
+          <label>
+            <span className="sr-only">Team for {m.name}</span>
+            <select className="sel sm" value={teamValue(m)} onChange={(e) => void changeTeam(e.target.value)} disabled={!!busy}>
+              {TEAM_OPTIONS.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {dirty ? (
           <button className="btn sm primary" type="button" onClick={save} disabled={!!busy}>
             {busy === "save" ? "Saving…" : "Save"}

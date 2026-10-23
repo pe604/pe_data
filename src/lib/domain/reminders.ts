@@ -60,6 +60,21 @@ export function assignmentText(p: { name: string; company: string; sector: strin
   return `Hi ${first}, you've been assigned ${what} on the deal pipeline. ${team} ${deck}`;
 }
 
+/** Sub-teams within Research (SPEC §15.9). */
+export const TEAMS = ["SCUTTLEBUTT"] as const;
+export type Team = (typeof TEAMS)[number];
+export const TEAM_LABELS: Record<Team, string> = { SCUTTLEBUTT: "Scuttlebutt" };
+
+/** The WhatsApp message to a team head when members of their team are assigned a company (SPEC §15.9). */
+export function headAlertText(p: { head: string; team: Team; members: string[]; company: string; sector: string | null; pe: string[]; deck: boolean }): string {
+  const first = p.head.split(" ")[0];
+  const who = `${andList(p.members)} from the ${TEAM_LABELS[p.team]} team ${p.members.length === 1 ? "has" : "have"} been assigned`;
+  const what = `*${p.company}*${p.sector ? ` (${p.sector})` : ""}`;
+  const pe = p.pe.length ? ` PE: ${p.pe.join(", ")}.` : " No PE assigned yet.";
+  const deck = p.deck ? " The deck is attached below." : "";
+  return `Hi ${first}, ${who} ${what} on the deal pipeline.${pe}${deck}`;
+}
+
 export interface IdleDeal {
   company: string;
   stage: Stage;

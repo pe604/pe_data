@@ -30,8 +30,10 @@ test("change stage and priority inline, and History records it", async ({ page }
   await page.goto("/");
   await addByName(page, name);
   const r = row(page, name);
-  await r.locator(".stage-sel").selectOption("SCUTTLEBUTT");
-  await r.locator(".pri-sel").selectOption("2");
+  // The cells update optimistically, so wait for each save to finish before reloading.
+  const saved = () => page.waitForResponse((res) => res.request().method() === "POST" && res.url().endsWith("/"));
+  await Promise.all([saved(), r.locator(".stage-sel").selectOption("SCUTTLEBUTT")]);
+  await Promise.all([saved(), r.locator(".pri-sel").selectOption("2")]);
   await expect(r.locator(".pri-sel")).toHaveClass(/p2/);
   await page.reload();
   await expect(row(page, name).locator(".stage-sel")).toHaveValue("SCUTTLEBUTT");
@@ -618,4 +620,38 @@ test("WhatsApp panel: rename a person everywhere, delete them and their assignme
   await page.getByRole("tab", { name: "History" }).click();
   await expect(page.locator(".hist")).toContainText(`renamed ${display} to ${renamed}`);
   await expect(page.locator(".hist")).toContainText("Assigned Research");
+});
+
+test("WhatsApp panel: Scuttlebutt team with one head; add a person into a team", async ({ page }) => {
+  const head = "Sbh" + uniq("x").replace(/\W/g, "").toLowerCase();
+  const member = "Sbm" + uniq("x").replace(/\W/g, "").toLowerCase();
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  await page.goto("/");
+  await page.locator(".pe-lab").getByRole("button", { name: "WhatsApp" }).click();
+  const dlg = page.getByRole("dialog");
+  const team = dlg.locator("div").filter({ has: page.getByRole("heading", { name: "Scuttlebutt team" }) }).last();
+
+  await dlg.getByLabel("Name of the person to add").fill(head);
+  await dlg.getByLabel("Team for the new person").selectOption("SCUTTLEBUTT_HEAD");
+  await dlg.locator(".rm-add").getByRole("button", { name: "Add" }).click();
+  await expect(page.locator(".toast")).toContainText(`Added ${head}.`);
+  await expect(team.locator(".rm-row").filter({ hasText: cap(head) })).toContainText("Head");
+
+  await dlg.getByLabel("Name of the person to add").fill(member);
+  await dlg.getByLabel("Team for the new person").selectOption("SCUTTLEBUTT");
+  await dlg.locator(".rm-add").getByRole("button", { name: "Add" }).click();
+  const m = team.locator(".rm-row").filter({ hasText: cap(member) });
+  await expect(m).toBeVisible();
+  await expect(m.locator(".rm-tag")).toHaveCount(0);
+
+  // Making the member head replaces the old head.
+  await dlg.getByLabel(`Team for ${cap(member)}`).selectOption("SCUTTLEBUTT_HEAD");
+  await expect(page.locator(".toast")).toContainText(`${cap(member)} is now in charge of Scuttlebutt.`);
+  await expect(team.locator(".rm-row").filter({ hasText: cap(member) })).toContainText("Head");
+  await expect(team.locator(".rm-row").filter({ hasText: cap(head) }).locator(".rm-tag")).toHaveCount(0);
+
+  // Back to plain Research: leaves the Scuttlebutt section.
+  await dlg.getByLabel(`Team for ${cap(head)}`).selectOption("");
+  await expect(team.locator(".rm-row").filter({ hasText: cap(head) })).toHaveCount(0);
+  await expect(dlg.locator(".rm-row").filter({ hasText: cap(head) })).toBeVisible();
 });

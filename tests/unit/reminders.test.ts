@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignmentText, fmtWhatsapp, newlyAdded, normaliseWhatsapp, reminderDue, reminderText } from "@/lib/domain/reminders";
+import { assignmentText, fmtWhatsapp, headAlertText, newlyAdded, normaliseWhatsapp, reminderDue, reminderText } from "@/lib/domain/reminders";
 
 describe("reminderDue (SPEC §15.7)", () => {
   it("waits 7 days from the last activity", () => {
@@ -77,5 +77,18 @@ describe("Research assignment messages (SPEC §15.8)", () => {
     expect(newlyAdded(["Riya"], ["riya ", "Meet"])).toEqual(["Meet"]);
     expect(newlyAdded(["Riya", "Meet"], ["Meet"])).toEqual([]);
     expect(newlyAdded([], ["Riya"])).toEqual(["Riya"]);
+  });
+});
+describe("team head alerts (SPEC §15.9)", () => {
+  it("tells the head which member was assigned, with PE and deck", () => {
+    expect(headAlertText({ head: "Rohit Shah", team: "SCUTTLEBUTT", members: ["Diya"], company: "Zooto", sector: "Consumer", pe: ["Keyur", "Arjun"], deck: true })).toBe(
+      "Hi Rohit, Diya from the Scuttlebutt team has been assigned *Zooto* (Consumer) on the deal pipeline. PE: Keyur, Arjun. The deck is attached below.",
+    );
+  });
+
+  it("handles several members, no PE and no deck", () => {
+    expect(headAlertText({ head: "Rohit", team: "SCUTTLEBUTT", members: ["Diya", "Hardik"], company: "A", sector: null, pe: [], deck: false })).toBe(
+      "Hi Rohit, Diya and Hardik from the Scuttlebutt team have been assigned *A* on the deal pipeline. No PE assigned yet.",
+    );
   });
 });

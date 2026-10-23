@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { nameKey, titleCase } from "@/lib/domain/names";
-import { normaliseWhatsapp } from "@/lib/domain/reminders";
+import { normaliseWhatsapp, TEAM_LABELS, TEAMS, type Team } from "@/lib/domain/reminders";
 import { whatsappConfigured } from "@/lib/env";
 import { run, UserError } from "@/lib/server/action";
 import { audit, listText, peopleOf, type Change } from "@/lib/server/company";
@@ -48,6 +48,49 @@ export async function saveReminderSettings(memberId: string, number: string, rem
       if (m.whatsappNumber !== n) changes.push(n ? "WhatsApp number saved" : "WhatsApp number removed");
       if (m.remindersOn !== on) changes.push(on ? "reminders turned on" : "reminders turned off");
       if (changes.length) await audit(tx, null, me.id, [{ note: `${m.name}: ${changes.join(", ")}` }]);
+    });
+    return { configured: whatsappConfigured, members: await idleByMember() };
+  });
+}
+
+const teamChoice = z.enum(["", ...TEAMS, ...TEAMS.map((t) => `${t}_HEAD` as const)]);
+
+/** Puts a person in a sub-team of Research (or none), optionally as its head; one head per team (SPEC §15.9). */
+export async function setMemberTeam(memberId: string, choice: string) {
+  return run<ReminderPanel>(async () => {
+    const me = await requireRole();
+    const mid = id.parse(memberId);
+    const c = teamChoice.parse(choice);
+    const head = c.endsWith("_HEAD");
+    const team = (c ? c.replace(/_HEAD$/, "") : null) as Team | null;
+    await db.$transaction(async (tx) => {
+      const m = await tx.teamMember.findUnique({ where: { id: mid } });
+      if (!m) throw new UserError("That person no longer exists. Reload the page.");
+      if (head && team) {
+        const other = await tx.teamMember.findFirst({ where: { team, teamHead: true, id: { not: mid } } });
+        if (other) await tx.teamMember.update({ where: { id: other.id }, data: { teamHead: false } });
+      }
+      await tx.teamMember.update({ where: { id: mid }, data: { team, teamHead: head, inResearch: team ? true : m.inResearch } });
+      const what = team ? `${head ? "head of" : "in"} the ${TEAM_LABELS[team]} team` : "out of any team";
+      await audit(tx, null, me.id, [{ note: `${m.name}: now ${what}` }]);
+    });
+    return { configured: whatsappConfigured, members: await idleByMember() };
+  });
+}
+
+/** Adds a person to the Research list, optionally straight into a team (so they show up before their first assignment). */
+export async function addMember(name: string, choice: string) {
+  return run<ReminderPanel>(async () => {
+    const me = await requireRole();
+    const n = titleCase(z.string().trim().min(1).max(60).parse(name));
+    const c = teamChoice.parse(choice);
+    const team = (c ? c.replace(/_HEAD$/, "") : null) as Team | null;
+    await db.$transaction(async (tx) => {
+      const existing = await tx.teamMember.findUnique({ where: { nameKey: nameKey(n) } });
+      if (existing) throw new UserError(`${existing.name} is already in the list.`);
+      if (c.endsWith("_HEAD") && team) await tx.teamMember.updateMany({ where: { team, teamHead: true }, data: { teamHead: false } });
+      await tx.teamMember.create({ data: { name: n, nameKey: nameKey(n), inResearch: true, team, teamHead: c.endsWith("_HEAD") } });
+      await audit(tx, null, me.id, [{ note: `Added ${n}${team ? ` to the ${TEAM_LABELS[team]} team` : " to Research"}` }]);
     });
     return { configured: whatsappConfigured, members: await idleByMember() };
   });

@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { todayISO } from "@/lib/domain/dates";
-import { IDLE_DAYS, reminderDue, reminderText, SEND_HOUR_IST, type IdleDeal } from "@/lib/domain/reminders";
+import { IDLE_DAYS, reminderDue, reminderText, SEND_HOUR_IST, TEAMS, type IdleDeal, type Team } from "@/lib/domain/reminders";
 import type { Stage } from "@/lib/domain/constants";
 import { whatsappConfigured } from "@/lib/env";
 import { sendText } from "./evolution";
@@ -23,6 +23,9 @@ export interface MemberIdle {
   research: boolean;
   /** Companies they're assigned to in any role (PE, Research, Via). */
   companies: number;
+  /** Sub-team within Research (SPEC §15.9), and whether they head it. */
+  team: Team | null;
+  teamHead: boolean;
   whatsappNumber: string | null;
   remindersOn: boolean;
   idle: IdleItem[];
@@ -52,6 +55,7 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
           { inPe: true },
           { peRank: { not: null } },
           { inResearch: true },
+          { team: { not: null } },
           { assignments: { some: { role: { in: ["PE", "RESEARCH"] } } } },
         ],
       },
@@ -63,6 +67,8 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
         peRank: true,
         inPe: true,
         inResearch: true,
+        team: true,
+        teamHead: true,
         assignments: { where: { role: { in: ["PE", "RESEARCH"] } }, select: { role: true }, distinct: ["role"] },
       },
     }),
@@ -96,6 +102,8 @@ export async function idleByMember(today = todayISO()): Promise<MemberIdle[]> {
       pe: m.inPe || m.peRank !== null || m.assignments.some((a) => a.role === "PE"),
       research: m.inResearch || m.assignments.some((a) => a.role === "RESEARCH"),
       companies: companiesOf.get(m.id)?.size ?? 0,
+      team: (TEAMS as readonly string[]).includes(m.team ?? "") ? (m.team as Team) : null,
+      teamHead: m.teamHead,
       whatsappNumber: m.whatsappNumber,
       remindersOn: m.remindersOn,
       idle: (byMember.get(m.id) ?? []).sort((a, b) => b.idleDays - a.idleDays),

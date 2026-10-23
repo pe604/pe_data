@@ -462,6 +462,11 @@ The Invested tab has three views: **Portfolio**, **Quarterly tracker**, **Meetin
 - Needs the person's number in the **WhatsApp** panel (PE team bar → WhatsApp), which lists the PE team (idle reminders, §15.7) and the Research team. "Messages on" off = no messages of either kind.
 - Each person in the panel has **Rename** (changes the name everywhere: table, PE team bar, suggestions; companies link to the person, not the name; "Renamed A to B" in each of their companies' History; refused if the new name is already someone else's) and **Delete** (confirm shows how many companies they're on; removes them from every company's PE / Research / Via, recorded in each History, then from the list).
 
+### 15.9 Scuttlebutt team (2026-10-24)
+- A sub-team within Research: **Rohit (head), Mohit, Diya, Hardik**. No separate column; they're assigned through **Assigned Research**. Stored on the person (`TeamMember.team = "SCUTTLEBUTT"`, `teamHead`); one head per team.
+- When a Scuttlebutt member (not the head) is **newly** assigned a company, they get the usual §15.8 message and deck, and the **head** gets: "Hi Rohit, Diya from the Scuttlebutt team has been assigned *Zooto* (Consumer) on the deal pipeline. PE: Keyur, Arjun. The deck is attached below." plus the deck. Several members at once are named together. If the head is also on that company's Research, the alert goes without the deck (they already have it). No alert when the head is the one assigned. Outcome in the company's History.
+- **WhatsApp panel:** sections PE team, Research team, Scuttlebutt team (head first, tagged Head). Each person shows once (a team first, then PE, then Research). Research and Scuttlebutt rows have a **Team** choice (Research / Scuttlebutt / Scuttlebutt head; choosing a new head replaces the old one). **Add a person** (name + team) adds someone to the Research list before their first assignment.
+
 ## 16. Non-goals (for now)
 
 - Email ingestion

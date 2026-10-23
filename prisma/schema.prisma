@@ -111,6 +111,10 @@ model TeamMember {
   whatsappNumber String? @unique
   /// Idle deal reminders on WhatsApp (SPEC §15.7).
   remindersOn    Boolean @default(true)
+  /// Sub-team within Research (SPEC §15.9): "SCUTTLEBUTT" or null. Assigned through Assigned Research; no own column.
+  team           String?
+  /// Head of `team`: told on WhatsApp (with the deck) when a member of the team is assigned a company. One per team.
+  teamHead       Boolean @default(false)
 
   assignments CompanyPerson[]
   reminders   ReminderLog[]
