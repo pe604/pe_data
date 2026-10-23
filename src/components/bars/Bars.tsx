@@ -6,6 +6,7 @@ import type { CompanyRow } from "@/lib/domain/types";
 import { applyFilters, type ViewState } from "@/lib/domain/view";
 import { useStore } from "../store";
 import { ManageTeamModal } from "./ManageTeamModal";
+import { RemindersModal } from "./RemindersModal";
 
 type Props = { rows: CompanyRow[]; view: ViewState; setView: React.Dispatch<React.SetStateAction<ViewState>> };
 
@@ -43,6 +44,7 @@ export function StagesBar({ rows, view, setView }: Props) {
 export function PeBar({ rows, view, setView }: Props) {
   const { team } = useStore();
   const [manage, setManage] = useState(false);
+  const [reminders, setReminders] = useState(false);
   const names = useMemo(
     () => team.filter((t) => t.peRank !== null).sort((a, b) => a.peRank! - b.peRank!).map((t) => t.name),
     [team],
@@ -53,9 +55,14 @@ export function PeBar({ rows, view, setView }: Props) {
     <div className={"strip pe" + (dim ? " dim" : "")} role="group" aria-label="PE team">
       <div className="pe-lab">
         <span>PE team</span>
-        <button type="button" onClick={() => setManage(true)}>
-          Manage
-        </button>
+        <div className="pe-acts">
+          <button type="button" onClick={() => setManage(true)}>
+            Manage
+          </button>
+          <button type="button" onClick={() => setReminders(true)}>
+            Reminders
+          </button>
+        </div>
       </div>
       {names.length === 0 ? (
         <div className="strip-empty">No PE team members yet. Use Manage to add names and set their order.</div>
@@ -78,6 +85,7 @@ export function PeBar({ rows, view, setView }: Props) {
         })
       )}
       {manage && <ManageTeamModal initial={names} onClose={() => setManage(false)} />}
+      {reminders && <RemindersModal onClose={() => setReminders(false)} />}
     </div>
   );
 }

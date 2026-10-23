@@ -109,8 +109,11 @@ model TeamMember {
   inVia      Boolean @default(false)
   /// Digits only, with country code (e.g. 9198xxxxxxxx). Used to recognise WhatsApp senders (SPEC §14).
   whatsappNumber String? @unique
+  /// Idle deal reminders on WhatsApp (SPEC §15.7).
+  remindersOn    Boolean @default(true)
 
   assignments CompanyPerson[]
+  reminders   ReminderLog[]
 
   @@index([peRank])
 }
@@ -166,6 +169,7 @@ model Company {
   checks      QuarterCheck[]
   meetings    Meeting[]
   misFigures  MisFigure[]
+  reminders   ReminderLog[]
 
   @@index([status])
   @@index([status, priority, dateReceived])
@@ -498,4 +502,23 @@ model CompanyUpdate {
   updatedAt   DateTime @updatedAt
 
   @@index([companyId, date])
+}
+/// One idle-deal reminder sent to one PE about one company (SPEC §15.7). Drives the 7-then-every-3-days rule.
+model ReminderLog {
+  id           String     @id @default(cuid())
+  companyId    String
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  teamMemberId String
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  idleDays     Int
+  sentAt       DateTime   @default(now())
+
+  @@index([companyId, teamMemberId, sentAt])
+}
+
+/// Per-day lock so reminders go out once a day even across restarts. `day` = Asia/Kolkata date.
+model ReminderRun {
+  day   String   @id
+  at    DateTime @default(now())
+  sent  Int      @default(0)
 }

@@ -448,10 +448,17 @@ The Invested tab has three views: **Portfolio**, **Quarterly tracker**, **Meetin
 ### 15.6 Rejected tab sort
 - Sort options include **Date rejected, oldest first** (the default on the Rejected tab) and newest first. Each tab opens on its own default sort (Pipeline: priority; Rejected: date rejected oldest first; Invested: amount invested).
 
+### 15.7 Idle deal reminders on WhatsApp (2026-10-23)
+- **Who and what:** Pipeline companies only. Each assigned **PE** (not Research or Via) whose WhatsApp number is saved and whose reminders are on.
+- **Last activity** of a company: the newest of any History entry (stage, priority, assignment, field edit, file upload or removal, summary generate or edit), any comment, or when it was added. Dates are Asia/Kolkata.
+- **Rule:** the first reminder goes when a deal has had **7 days** with no activity; then **every 3 days** while there is still none (day 7, 10, 13, …). Any activity resets it. A newly assigned PE counts as activity.
+- **Sending:** once a day after **10:00 IST** (a per-day lock means one send even across restarts). One message per person listing all their due deals with days idle and stage, most idle first. Each (company, person) reminder is logged in `ReminderLog`; a failed send isn't logged as sent, so it retries the next day. Message contents and numbers are never logged.
+- **Reminders panel** (PE team bar → **Reminders**): every PE-list name with their WhatsApp number (digits with country code; a 10-digit Indian number gets 91), a reminders on/off switch, **Send test**, and their deals idle 7+ days. Shows a notice when WhatsApp isn't connected. The same numbers recognise senders in WhatsApp intake (§14).
+
 ## 16. Non-goals (for now)
 
 - Email ingestion
-- Notifications
+- Notifications other than the idle deal reminders (§15.7)
 - A banker column
 - Deck page references in summaries
 - Parked status

@@ -551,3 +551,22 @@ test("company updates replace the comment column on Invested; sector allocation 
   await expect(modal).toHaveCount(0);
   await expect(page.locator(".drawer.open .dh-name")).toHaveText(a);
 });
+
+test("Reminders panel: save a WhatsApp number per PE, reject a bad one", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".pe-lab").getByRole("button", { name: "Reminders" }).click();
+  const dlg = page.getByRole("dialog");
+  await expect(dlg.getByRole("heading", { name: "WhatsApp reminders" })).toBeVisible();
+  await expect(dlg).toContainText("WhatsApp isn’t connected");
+  const person = dlg.locator(".rm-row").filter({ hasText: "Arvind Sir" });
+  const num = person.getByLabel("WhatsApp number for Arvind Sir");
+  await num.fill("12345");
+  await num.press("Enter");
+  await expect(page.locator(".toast")).toContainText("Enter the WhatsApp number with country code");
+  await num.fill("98765 43210");
+  await person.getByRole("button", { name: "Save" }).click();
+  await expect(page.locator(".toast")).toContainText("Saved for Arvind Sir.");
+  await expect(num).toHaveValue("+91 98765 43210");
+  // Send test stays off while WhatsApp isn't connected.
+  await expect(person.getByRole("button", { name: "Send test" })).toBeDisabled();
+});

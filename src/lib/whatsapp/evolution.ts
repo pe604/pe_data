@@ -74,5 +74,10 @@ export async function downloadMedia(messageId: string): Promise<Buffer> {
 }
 
 export async function sendGroupText(text: string): Promise<void> {
-  await call("POST", `/message/sendText/${inst()}`, { number: env.EVOLUTION_Receiver, text });
+  await sendText(env.EVOLUTION_Receiver, text);
+}
+
+/** Sends a text to a group JID or a person's number (digits with country code). */
+export async function sendText(to: string, text: string): Promise<void> {
+  await call("POST", `/message/sendText/${inst()}`, { number: to, text });
 }
