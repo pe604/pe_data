@@ -7,6 +7,8 @@ import { aiProvider } from "./provider";
 // Never log the items or the model's output.
 
 const MODEL = "google/gemini-2.5-flash";
+/** Used once for a batch the cheaper model fails on (it occasionally loops and its JSON comes back cut off). */
+export const FALLBACK_MODEL = "google/gemini-2.5-pro";
 
 export interface CompanyProfile {
   name: string;
@@ -67,7 +69,12 @@ const system = [
 ].join("\n");
 
 /** Judges a company's new items in one call. Items the model leaves out are returned as not judged. */
-export async function judgeItems(company: CompanyProfile, items: Candidate[], recent: string[], signal?: AbortSignal): Promise<Map<string, Verdict>> {
+export async function judgeItems(
+  company: CompanyProfile,
+  items: Candidate[],
+  recent: string[],
+  opts: { model?: string; signal?: AbortSignal } = {},
+): Promise<Map<string, Verdict>> {
   const prompt = [
     `Company: ${company.name}`,
     company.names.length ? `Also known as: ${company.names.join(", ")}` : "",
@@ -90,7 +97,8 @@ export async function judgeItems(company: CompanyProfile, items: Candidate[], re
   ]
     .filter((l) => l !== null)
     .join("\n");
-  const raw = await aiProvider().generateJson({ system, prompt, jsonSchema: schema, model: MODEL, signal });
+  // Generous answer room: Gemini Flash spends part of it thinking, and a cut-off answer is unreadable JSON.
+  const raw = await aiProvider().generateJson({ system, prompt, jsonSchema: schema, model: opts.model ?? MODEL, signal: opts.signal, maxTokens: 16_000 });
   const parsed = z.object({ items: z.array(verdict) }).parse(JSON.parse(raw));
   return new Map(parsed.items.filter((v) => items.some((i) => i.key === v.key)).map((v) => [v.key, { ...v, summary: v.summary.trim().slice(0, 300) }]));
 }

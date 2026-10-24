@@ -4,7 +4,7 @@ import { todayISO } from "@/lib/domain/dates";
 import { randomBytes } from "node:crypto";
 import { dueSlot, googleNewsUrl, newsText, normaliseLinkedinUrl, parseGoogleNewsRss, shortCode, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, env, newsLink, newsWhatsappTo, whatsappConfigured } from "@/lib/env";
-import { judgeItems, type Candidate, type Verdict } from "@/lib/ai/news";
+import { FALLBACK_MODEL, judgeItems, type Candidate, type Verdict } from "@/lib/ai/news";
 import { audit } from "@/lib/server/company";
 import { sendText } from "@/lib/whatsapp/evolution";
 
@@ -156,8 +156,17 @@ export async function checkNews(opts: { companyIds?: string[]; newsDays: number;
     const verdicts = new Map<string, Verdict>();
     const profile = { name: c.name, names, sector: c.sector?.name ?? null, subSector: c.subSector, website: c.newsWatch?.website ?? null };
     for (let i = 0; i < fresh.length; i += JUDGE_BATCH) {
+      const batch = fresh.slice(i, i + JUDGE_BATCH);
+      const judge = (model?: string) => judgeItems(profile, batch, recent.map((r) => r.text), { model });
       try {
-        for (const [k, v] of await judgeItems(profile, fresh.slice(i, i + JUDGE_BATCH), recent.map((r) => r.text))) verdicts.set(k, v);
+        let got;
+        try {
+          got = await judge();
+        } catch (e) {
+          console.error("[news] judge retry", c.id, errCode(e));
+          got = await judge(FALLBACK_MODEL);
+        }
+        for (const [k, v] of got) verdicts.set(k, v);
       } catch (e) {
         result.failed++;
         console.error("[news] judge failed", c.id, errCode(e)); // unjudged items aren't stored, so the next check retries them

@@ -15,6 +15,8 @@ export interface GenerateRequest {
   signal?: AbortSignal;
   /** Overrides OPENROUTER_MODEL for this request (e.g. a cheaper model for a yes/no check). */
   model?: string;
+  /** Room for the answer; without it some providers cut long JSON answers off. */
+  maxTokens?: number;
 }
 
 /** Swappable model backend (SPEC §2). Returns the raw JSON text. */
@@ -38,7 +40,7 @@ type ContentPart =
 
 /** OpenRouter chat completions (SPEC §2, §9, §13). Never logs deck content. */
 class OpenRouterProvider implements AiProvider {
-  async generateJson({ system, prompt, deck, jsonSchema, signal, model }: GenerateRequest): Promise<string> {
+  async generateJson({ system, prompt, deck, jsonSchema, signal, model, maxTokens }: GenerateRequest): Promise<string> {
     const content: ContentPart[] = [];
     if (deck?.kind === "pdf") {
       content.push({
@@ -61,6 +63,7 @@ class OpenRouterProvider implements AiProvider {
         body: JSON.stringify({
           model: model ?? aiModel,
           temperature: 0.2,
+          ...(maxTokens ? { max_tokens: maxTokens } : {}),
           messages: [
             { role: "system", content: system },
             { role: "user", content },
