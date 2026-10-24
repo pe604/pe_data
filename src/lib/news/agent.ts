@@ -1,18 +1,9 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { todayISO } from "@/lib/domain/dates";
-import {
-  DIGEST_HOUR,
-  digestText,
-  dueSlot,
-  googleNewsUrl,
-  instantText,
-  normaliseLinkedinUrl,
-  parseGoogleNewsRss,
-  type NewsLine,
-  type RawItem,
-} from "@/lib/domain/news";
-import { aiConfigured, apifyConfigured, env, newsWhatsappTo, whatsappConfigured } from "@/lib/env";
+import { randomBytes } from "node:crypto";
+import { dueSlot, googleNewsUrl, newsText, normaliseLinkedinUrl, parseGoogleNewsRss, shortCode, type RawItem } from "@/lib/domain/news";
+import { aiConfigured, apifyConfigured, env, newsLink, newsWhatsappTo, whatsappConfigured } from "@/lib/env";
 import { judgeItems, type Candidate, type Verdict } from "@/lib/ai/news";
 import { audit } from "@/lib/server/company";
 import { sendText } from "@/lib/whatsapp/evolution";
@@ -97,15 +88,11 @@ async function fetchLinkedinPosts(pages: string[], sinceMs: number): Promise<Map
 
 // ─── Check ───────────────────────────────────────────────────────────────────
 
-export interface FoundItem extends NewsLine {
-  id: string;
-  importance: string;
-}
-
 interface CheckResult {
   companies: number;
   seen: number;
-  material: FoundItem[];
+  /** Ids of the new material items */
+  material: string[];
   failed: number;
 }
 
@@ -214,11 +201,11 @@ export async function checkNews(opts: { companyIds?: string[]; newsDays: number;
             createdById: botId,
           },
         });
-        const n = await tx.newsItem.create({ data: { ...base, updateId: u.id } });
+        const n = await tx.newsItem.create({ data: { ...base, updateId: u.id, code: shortCode(randomBytes(7)) } });
         await audit(tx, c.id, botId, [{ note: `Added company update from ${item.source === "LINKEDIN" ? "LinkedIn" : "the news"}: ${v.summary.slice(0, 80)}` }]);
         return n;
       });
-      if (saved) result.material.push({ id: saved.id, company: c.name, summary: v.summary, category: v.category, url: item.url, importance: v.importance });
+      if (saved) result.material.push(saved.id);
     }
   }
   return result;
@@ -226,39 +213,44 @@ export async function checkNews(opts: { companyIds?: string[]; newsDays: number;
 
 // ─── WhatsApp ────────────────────────────────────────────────────────────────
 
-/** Sends high-importance items right away, one message each. */
-export async function sendInstant(items: FoundItem[]): Promise<number> {
+/**
+ * Sends every material item not yet sent (found in the last 3 days, optionally only some companies), one message
+ * each, big news first. A failed send stays unsent and is retried after the next check.
+ */
+export async function sendPending(companyIds?: string[]): Promise<number> {
   if (!whatsappConfigured) return 0;
+  const items = await db.newsItem.findMany({
+    where: {
+      verdict: "MATERIAL",
+      alertedAt: null,
+      createdAt: { gte: new Date(Date.now() - 3 * DAY_MS) },
+      ...(companyIds ? { companyId: { in: companyIds } } : {}),
+    },
+    include: { company: { select: { name: true } } },
+    orderBy: [{ importance: "asc" }, { publishedAt: "asc" }], // "high" sorts before "low" and "medium"
+  });
   let sent = 0;
-  for (const i of items.filter((x) => x.importance === "high")) {
+  for (const i of items) {
     try {
-      await sendText(newsWhatsappTo, instantText(i));
+      await sendText(
+        newsWhatsappTo,
+        newsText({
+          company: i.company.name,
+          summary: i.summary ?? i.title,
+          category: i.category,
+          importance: i.importance,
+          link: newsLink(i.code, i.url),
+          date: i.publishedAt ? todayISO(i.publishedAt) : null,
+        }),
+      );
       await db.newsItem.update({ where: { id: i.id }, data: { alertedAt: new Date() } });
       sent++;
+      await new Promise((r) => setTimeout(r, 2000)); // spaced out so WhatsApp doesn't flag the number
     } catch (e) {
-      console.error("[news] instant failed", i.id, errCode(e)); // left for the clubbed message
+      console.error("[news] send failed", i.id, errCode(e));
     }
   }
   return sent;
-}
-
-/** One clubbed message with every material item not yet sent (last 3 days); nothing when there's none. */
-export async function sendDigest(day = todayISO()): Promise<number> {
-  if (!whatsappConfigured) return 0;
-  const items = await db.newsItem.findMany({
-    where: { verdict: "MATERIAL", alertedAt: null, digestedAt: null, createdAt: { gte: new Date(Date.now() - 3 * DAY_MS) } },
-    include: { company: { select: { name: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!items.length) return 0;
-  try {
-    await sendText(newsWhatsappTo, digestText(day, items.map((i) => ({ company: i.company.name, summary: i.summary ?? i.title, category: i.category, url: i.url }))));
-  } catch (e) {
-    console.error("[news] digest failed", errCode(e));
-    return 0;
-  }
-  await db.newsItem.updateMany({ where: { id: { in: items.map((i) => i.id) } }, data: { digestedAt: new Date() } });
-  return items.length;
 }
 
 // ─── Schedule ────────────────────────────────────────────────────────────────
@@ -272,7 +264,7 @@ async function claim(key: string): Promise<boolean> {
   return r.count > 0;
 }
 
-/** One scheduled run: the latest due check slot today (once), then the clubbed message after the last slot. */
+/** One scheduled run: the latest due check slot today (once), then each new material item on its own. */
 export async function newsTick(now = new Date()): Promise<void> {
   const slot = dueSlot(istHour(now));
   if (slot === null) return;
@@ -284,9 +276,8 @@ export async function newsTick(now = new Date()): Promise<void> {
   if (apifyConfigured && !r.failed) {
     await db.appSetting.upsert({ where: { key: LINKEDIN_SINCE }, create: { key: LINKEDIN_SINCE, value: String(now.getTime()) }, update: { value: String(now.getTime()) } });
   }
-  const instant = await sendInstant(r.material);
-  const clubbed = slot === DIGEST_HOUR ? await sendDigest(day) : 0;
-  console.log(`[news] ${day} ${slot}:00: ${r.companies} companies, ${r.seen} judged, ${r.material.length} material, ${instant} instant, ${clubbed} clubbed, ${r.failed} failed`);
+  const sent = await sendPending();
+  console.log(`[news] ${day} ${slot}:00: ${r.companies} companies, ${r.seen} judged, ${r.material.length} material, ${sent} sent, ${r.failed} failed`);
 }
 
 const g = globalThis as unknown as { __news?: { timer: NodeJS.Timeout; running: boolean } };

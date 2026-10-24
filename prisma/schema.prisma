@@ -564,7 +564,9 @@ model NewsItem {
   summary     String?
   /// The company update created for a material item
   updateId    String?
-  /// Sent on WhatsApp: instantly (high importance) or in the clubbed message
+  /// Short link code for WhatsApp: APP_URL/n/<code> redirects to `url` (material items only)
+  code        String?   @unique
+  /// Sent on WhatsApp (one message per material item). digestedAt: unused since messages stopped being clubbed.
   alertedAt   DateTime?
   digestedAt  DateTime?
   createdAt   DateTime  @default(now())

@@ -38,6 +38,8 @@ const schema = z.object({
   // Portfolio news agent (SPEC §15.10): LinkedIn posts via Apify; WhatsApp group for news (default: the intake group)
   APIFY_TOKEN: z.string().optional().default(""),
   NEWS_WHATSAPP_GROUP: z.string().optional().default(""),
+  // The dashboard's public address (e.g. https://pe.example.com), for short news links in WhatsApp (APP_URL/n/<code>)
+  APP_URL: z.string().url().optional(),
   NODE_ENV: z.string().optional().default("development"),
 });
 
@@ -60,6 +62,9 @@ export const whatsappConfigured = Boolean(
 export const apifyConfigured = Boolean(env.APIFY_TOKEN);
 /** Where portfolio news goes on WhatsApp: its own group if set, else the deck-intake group. */
 export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP || env.EVOLUTION_Receiver;
+
+/** Short link for a news item (SPEC §15.10), or the original link when APP_URL isn't set. */
+export const newsLink = (code: string | null, url: string) => (env.APP_URL && code ? `${env.APP_URL.replace(/\/+$/, "")}/n/${code}` : url);
 
 /** AI summaries are on when an OpenRouter key is set. */
 export const aiConfigured = Boolean(env.OPENROUTER_API_KEY);

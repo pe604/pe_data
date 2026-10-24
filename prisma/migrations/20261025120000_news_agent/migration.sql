@@ -29,11 +29,13 @@ CREATE TABLE "NewsItem" (
     "importance" TEXT,
     "summary" TEXT,
     "updateId" TEXT,
+    "code" TEXT,
     "alertedAt" TIMESTAMP(3),
     "digestedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "NewsItem_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX "NewsItem_companyId_url_key" ON "NewsItem"("companyId", "url");
+CREATE UNIQUE INDEX "NewsItem_code_key" ON "NewsItem"("code");
 CREATE INDEX "NewsItem_verdict_alertedAt_digestedAt_idx" ON "NewsItem"("verdict", "alertedAt", "digestedAt");
 ALTER TABLE "NewsItem" ADD CONSTRAINT "NewsItem_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;

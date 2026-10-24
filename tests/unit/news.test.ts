@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  digestText,
-  dueSlot,
-  googleNewsUrl,
-  instantText,
-  normaliseLinkedinUrl,
-  normaliseWebsite,
-  parseGoogleNewsRss,
-} from "@/lib/domain/news";
+import { dueSlot, googleNewsUrl, isShortCode, newsText, normaliseLinkedinUrl, normaliseWebsite, parseGoogleNewsRss, shortCode } from "@/lib/domain/news";
 
 const RSS = `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>x</title>
 <item><title>Kimbal wins &#8377;120 crore smart meter order from MSEDCL - The Economic Times</title>
@@ -56,16 +48,22 @@ describe("news agent helpers (SPEC §15.10)", () => {
     expect(dueSlot(23)).toBe(20);
   });
 
-  it("writes the instant alert and the clubbed message", () => {
-    const k = { company: "Kimbal", summary: "Won a ₹120 Cr smart meter order from MSEDCL.", category: "BIG_ORDER", url: "https://x.test/a" };
-    expect(instantText(k)).toBe("*Portfolio news: Kimbal* (Big order)\nWon a ₹120 Cr smart meter order from MSEDCL.\nhttps://x.test/a");
-    const d = digestText("2026-10-23", [
-      { company: "Mokobara", summary: "Opened a store in Pune.", category: "EXPANSION", url: "https://x.test/b" },
-      k,
-      { company: "Kimbal", summary: "Launched a new meter.", category: "PRODUCT_LAUNCH", url: "https://x.test/c" },
-    ]);
-    expect(d.startsWith("*Portfolio news, 23 Oct 2026*")).toBe(true);
-    expect(d.indexOf("*Kimbal*")).toBeLessThan(d.indexOf("*Mokobara*"));
-    expect(d).toContain("• Launched a new meter. (Product launch)\n  https://x.test/c");
+  it("writes one message per item, with Big news for high importance and the short link", () => {
+    const base = { company: "Kimbal", summary: "Won a ₹120 Cr smart meter order from MSEDCL.", category: "BIG_ORDER", link: "https://pe.test/n/Ab3xK9q", date: "2026-10-23" };
+    expect(newsText({ ...base, importance: "high" })).toBe(
+      "*Big news: Kimbal* (Big order)\nWon a ₹120 Cr smart meter order from MSEDCL.\n23 Oct 2026\nhttps://pe.test/n/Ab3xK9q",
+    );
+    expect(newsText({ ...base, importance: "medium", date: null })).toBe(
+      "*Portfolio news: Kimbal* (Big order)\nWon a ₹120 Cr smart meter order from MSEDCL.\nhttps://pe.test/n/Ab3xK9q",
+    );
+  });
+
+  it("makes 7-character short link codes", () => {
+    // Each byte picks a character mod 62: 0→"0", 61→"Z", 62→"0", 255→"7", 10→"a", 36→"A", 7→"7".
+    const c = shortCode(new Uint8Array([0, 61, 62, 255, 10, 36, 7]));
+    expect(c).toBe("0Z07aA7");
+    expect(isShortCode(c)).toBe(true);
+    expect(isShortCode("abc")).toBe(false);
+    expect(isShortCode("abc/def")).toBe(false);
   });
 });

@@ -655,3 +655,11 @@ test("WhatsApp panel: Scuttlebutt team with one head; add a person into a team",
   await expect(team.locator(".rm-row").filter({ hasText: cap(head) })).toHaveCount(0);
   await expect(dlg.locator(".rm-row").filter({ hasText: cap(head) })).toBeVisible();
 });
+
+test("news short links redirect to the article; unknown or malformed codes are 404", async ({ request }) => {
+  const res = await request.get("/n/E2eTst1", { maxRedirects: 0 });
+  expect(res.status()).toBe(302);
+  expect(res.headers()["location"]).toBe("http://127.0.0.1:3100/robots.txt");
+  expect((await request.get("/n/Zzzzzz9", { maxRedirects: 0 })).status()).toBe(404);
+  expect((await request.get("/n/bad", { maxRedirects: 0 })).status()).toBe(404);
+});

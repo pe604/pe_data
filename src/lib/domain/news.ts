@@ -29,9 +29,8 @@ export const categoryLabel = (c: string | null | undefined) => (c && c in NEWS_C
 export const IMPORTANCE = ["high", "medium", "low"] as const;
 export type Importance = (typeof IMPORTANCE)[number];
 
-/** Checks run from these Asia/Kolkata hours; the clubbed WhatsApp message goes after the last one. */
+/** Checks run from these Asia/Kolkata hours; each material item is sent on its own right after. */
 export const NEWS_CHECK_HOURS = [8, 12, 16, 20] as const;
-export const DIGEST_HOUR = 20;
 
 /** The latest check slot due at `hour` (IST), or null before the first one. */
 export function dueSlot(hour: number): number | null {
@@ -122,20 +121,24 @@ export interface NewsLine {
   company: string;
   summary: string;
   category: string | null;
-  url: string;
+  importance: string | null;
+  /** The link to share: a short dashboard link, or the original */
+  link: string;
+  /** Publication date (YYYY-MM-DD, India), if known */
+  date: string | null;
 }
 
-/** Instant WhatsApp alert for one high-importance item. */
-export function instantText(i: NewsLine): string {
-  return `*Portfolio news: ${i.company}* (${categoryLabel(i.category)})\n${i.summary}\n${i.url}`;
+/** One WhatsApp message per material item (no clubbing); "Big news" for high importance. */
+export function newsText(i: NewsLine): string {
+  const head = `*${i.importance === "high" ? "Big news" : "Portfolio news"}: ${i.company}* (${categoryLabel(i.category)})`;
+  return `${head}\n${i.summary}${i.date ? `\n${fmtDate(i.date)}` : ""}\n${i.link}`;
 }
 
-/** The clubbed WhatsApp message: items grouped by company (A–Z), each with category and link. */
-export function digestText(dayISO: string, items: NewsLine[]): string {
-  const by = new Map<string, NewsLine[]>();
-  for (const i of items) by.set(i.company, [...(by.get(i.company) ?? []), i]);
-  const blocks = [...by.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([company, list]) => [`*${company}*`, ...list.map((i) => `• ${i.summary} (${categoryLabel(i.category)})\n  ${i.url}`)].join("\n"));
-  return [`*Portfolio news, ${fmtDate(dayISO)}*`, ...blocks].join("\n\n");
+const B62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+/** A short link code from random bytes (7 characters, ~3.5 trillion combinations). */
+export function shortCode(random: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < 7; i++) s += B62[random[i % random.length] % 62];
+  return s;
 }
+export const isShortCode = (s: string) => /^[0-9a-zA-Z]{7}$/.test(s);

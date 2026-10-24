@@ -30,7 +30,7 @@ export function NewsWatchCard({ companyId, onFound }: { companyId: string; onFou
     if (r.data.added) await onFound(); // refreshes the company file and its table row (latest update)
     toast(
       r.data.added
-        ? `Found ${r.data.added} material update${r.data.added === 1 ? "" : "s"}${r.data.alerted ? `; ${r.data.alerted} sent on WhatsApp as big news` : ""}. See Updates.`
+        ? `Found ${r.data.added} material update${r.data.added === 1 ? "" : "s"}${r.data.alerted ? `; ${r.data.alerted} sent on WhatsApp` : ""}. See Updates.`
         : r.data.judged
           ? `Checked ${r.data.judged} new item${r.data.judged === 1 ? "" : "s"}; nothing material.`
           : "No new news or posts.",

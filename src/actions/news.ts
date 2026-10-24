@@ -8,7 +8,7 @@ import { normaliseLinkedinUrl, normaliseWebsite } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, whatsappConfigured } from "@/lib/env";
 import { run, UserError } from "@/lib/server/action";
 import { audit } from "@/lib/server/company";
-import { checkNews, sendInstant } from "@/lib/news/agent";
+import { checkNews, sendPending } from "@/lib/news/agent";
 
 const id = z.string().min(1).max(40);
 
@@ -100,7 +100,7 @@ export async function saveNewsWatch(companyId: string, input: z.input<typeof wat
   });
 }
 
-/** Runs the news agent for one company now: last 7 days of news and LinkedIn posts, instant alerts for big news. */
+/** Runs the news agent for one company now: last 7 days of news and LinkedIn posts; each material item sent on WhatsApp. */
 export async function checkNewsNow(companyId: string) {
   return run<{ watch: NewsWatchView; judged: number; added: number; alerted: number }>(async () => {
     await requireRole();
@@ -109,7 +109,7 @@ export async function checkNewsNow(companyId: string) {
     if (!aiConfigured) throw new UserError("The news agent needs the AI key (OPENROUTER_API_KEY) to judge what's material.");
     const r = await checkNews({ companyIds: [cid], newsDays: 7, linkedinSinceMs: Date.now() - 7 * 86_400_000 });
     if (r.failed && !r.seen) throw new UserError("Couldn't check the news right now. Try again in a few minutes.");
-    const alerted = await sendInstant(r.material);
+    const alerted = await sendPending([cid]);
     return { watch: await view(cid, c.name), judged: r.seen, added: r.material.length, alerted };
   });
 }

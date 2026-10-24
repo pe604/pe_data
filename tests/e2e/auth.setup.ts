@@ -44,6 +44,10 @@ async function resetTestDb() {
     [power, user],
   );
   await db.query(`update "Company" set "directInvested" = true where id = 'e2e-mokobara'`);
+  // A news item with a short link code (SPEC §15.10), pointing at a local page so the redirect can be followed offline.
+  await db.query(
+    `insert into "NewsItem"(id, "companyId", source, url, title, verdict, code) values ('e2e-news', 'e2e-mokobara', 'NEWS', 'http://127.0.0.1:3100/robots.txt', 'Test', 'MATERIAL', 'E2eTst1')`,
+  );
   await db.end();
 }
 
