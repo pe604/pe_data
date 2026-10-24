@@ -13,7 +13,7 @@ import {
   type RawItem,
 } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, env, newsWhatsappTo, whatsappConfigured } from "@/lib/env";
-import { judgeItems, type Candidate } from "@/lib/ai/news";
+import { judgeItems, type Candidate, type Verdict } from "@/lib/ai/news";
 import { audit } from "@/lib/server/company";
 import { sendText } from "@/lib/whatsapp/evolution";
 
@@ -22,6 +22,7 @@ import { sendText } from "@/lib/whatsapp/evolution";
 const NEWS_EMAIL = "news-agent@portal.invalid";
 const LINKEDIN_SINCE = "news:linkedin-since";
 const MAX_ITEMS = 25;
+const JUDGE_BATCH = 10;
 const DAY_MS = 86_400_000;
 const errCode = (e: unknown) => (e as { status?: number; code?: string }).status ?? (e as { code?: string }).code ?? (e as Error).message?.slice(0, 40);
 
@@ -164,18 +165,18 @@ export async function checkNews(opts: { companyIds?: string[]; newsDays: number;
       orderBy: { date: "desc" },
       take: 30,
     });
-    let verdicts;
-    try {
-      verdicts = await judgeItems(
-        { name: c.name, names, sector: c.sector?.name ?? null, subSector: c.subSector, website: c.newsWatch?.website ?? null },
-        fresh,
-        recent.map((r) => r.text),
-      );
-    } catch (e) {
-      result.failed++;
-      console.error("[news] judge failed", c.id, errCode(e));
-      continue;
+    // Judge in small batches: a long list can make the model's answer run out of room and come back cut off.
+    const verdicts = new Map<string, Verdict>();
+    const profile = { name: c.name, names, sector: c.sector?.name ?? null, subSector: c.subSector, website: c.newsWatch?.website ?? null };
+    for (let i = 0; i < fresh.length; i += JUDGE_BATCH) {
+      try {
+        for (const [k, v] of await judgeItems(profile, fresh.slice(i, i + JUDGE_BATCH), recent.map((r) => r.text))) verdicts.set(k, v);
+      } catch (e) {
+        result.failed++;
+        console.error("[news] judge failed", c.id, errCode(e)); // unjudged items aren't stored, so the next check retries them
+      }
     }
+    if (!verdicts.size) continue;
 
     for (const item of fresh) {
       const v = verdicts.get(item.key);
