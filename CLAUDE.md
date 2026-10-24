@@ -75,7 +75,8 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │       ├── storage/                # StorageDriver (S3 + encryption), crypto.ts, tmp.ts (OS temp dir for LibreOffice only)
 │       ├── ai/                     # AiProvider (OpenRouter), prompt, JSON schema, deck prep (PDF/PPTX), DB-backed job worker
 │       ├── summary/                # JSON → markdown builder, markdown → safe HTML renderer
-│       ├── whatsapp/               # Evolution API client + intake poller (SPEC §14); pure matching in domain/whatsapp.ts
+│       ├── whatsapp/               # Evolution API client + intake poller (SPEC §14); idle reminders, assignment and team-head messages (§15.7–15.9)
+│       ├── news/                   # portfolio news agent (§15.10): Google News + LinkedIn via Apify, AI filter (ai/news.ts), WhatsApp alerts; pure helpers in domain/news.ts
 │       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types
 │       ├── server/                 # row loading/serialising, audit(), action wrapper, upload sniffing, HTTP errors
 │       └── excel/                  # export workbook builder

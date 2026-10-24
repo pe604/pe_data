@@ -8,5 +8,7 @@ export async function register() {
     startWhatsAppPoller();
     const { startReminderScheduler } = await import("@/lib/whatsapp/reminders");
     startReminderScheduler();
+    const { startNewsScheduler } = await import("@/lib/news/agent");
+    startNewsScheduler();
   }
 }

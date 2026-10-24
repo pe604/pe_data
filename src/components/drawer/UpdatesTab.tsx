@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { deleteUpdate, listUpdates, saveUpdate } from "@/actions/updates";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
+import { categoryLabel } from "@/lib/domain/news";
 import type { UpdateItem } from "@/lib/domain/types";
 import { useStore } from "../store";
 
@@ -78,8 +79,25 @@ export function UpdatesTab({ companyId }: { companyId: string }) {
               <div className="u-main">
                 <div className="u-text">{u.text}</div>
                 <div className="sub">
-                  Added by {u.author}
-                  {u.source === "WHATSAPP" ? " from WhatsApp" : ""}
+                  {u.source === "NEWS" || u.source === "LINKEDIN" ? (
+                    <>
+                      From {u.source === "LINKEDIN" ? "LinkedIn" : "the news"} · {categoryLabel(u.category)}
+                      {u.importance === "high" && <span className="u-hi">Big news</span>}
+                      {u.url && (
+                        <>
+                          {" · "}
+                          <a href={u.url} target="_blank" rel="noopener noreferrer">
+                            {u.source === "LINKEDIN" ? "Open post" : "Open article"}
+                          </a>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Added by {u.author}
+                      {u.source === "WHATSAPP" ? " from WhatsApp" : ""}
+                    </>
+                  )}
                 </div>
               </div>
               <div className="acts">

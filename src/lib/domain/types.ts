@@ -37,8 +37,12 @@ export interface UpdateItem {
   date: string;
   text: string;
   author: string;
-  source: "MANUAL" | "WHATSAPP";
+  source: "MANUAL" | "WHATSAPP" | "NEWS" | "LINKEDIN";
   createdAt: string;
+  /** News agent (SPEC §15.10): the article or post, category key and importance. */
+  url: string | null;
+  category: string | null;
+  importance: string | null;
 }
 
 export interface SectorOption {

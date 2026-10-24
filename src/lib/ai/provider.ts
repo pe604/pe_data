@@ -9,7 +9,8 @@ export type DeckInput =
 export interface GenerateRequest {
   system: string;
   prompt: string;
-  deck: DeckInput;
+  /** The deck to read; omitted for text-only requests (e.g. the news filter, SPEC §15.10). */
+  deck?: DeckInput;
   jsonSchema: unknown;
   signal?: AbortSignal;
   /** Overrides OPENROUTER_MODEL for this request (e.g. a cheaper model for a yes/no check). */
@@ -39,7 +40,7 @@ type ContentPart =
 class OpenRouterProvider implements AiProvider {
   async generateJson({ system, prompt, deck, jsonSchema, signal, model }: GenerateRequest): Promise<string> {
     const content: ContentPart[] = [];
-    if (deck.kind === "pdf") {
+    if (deck?.kind === "pdf") {
       content.push({
         type: "file",
         file: { filename: deck.fileName.replace(/\.pptx$/i, ".pdf"), file_data: "data:application/pdf;base64," + deck.data.toString("base64") },
@@ -67,7 +68,7 @@ class OpenRouterProvider implements AiProvider {
           response_format: { type: "json_schema", json_schema: { name: "deck_summary", strict: true, schema: jsonSchema } },
           // NDA decks: only providers that don't store or train on prompts, and that support the schema.
           provider: { data_collection: "deny", require_parameters: true },
-          plugins: [{ id: "file-parser", pdf: { engine: "native" } }],
+          ...(deck?.kind === "pdf" ? { plugins: [{ id: "file-parser", pdf: { engine: "native" } }] } : {}),
         }),
       });
     } catch (e) {

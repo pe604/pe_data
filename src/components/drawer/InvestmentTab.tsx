@@ -5,6 +5,7 @@ import { deleteContact, deleteRound, saveContact, saveRound } from "@/actions/po
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import { fmtCr, fmtCrNumber, parseCr } from "@/lib/domain/money";
 import { FUNDS, holdingOf, INSTRUMENTS, splitParts, suggestedStake, type Fund } from "@/lib/domain/portfolio";
+import { NewsWatchCard } from "./NewsWatchCard";
 import type { CompanyDetail, ContactItem, RoundItem } from "@/lib/domain/types";
 import { useStore } from "../store";
 
@@ -149,6 +150,8 @@ export function InvestmentTab({ detail, reload, goUpdates }: { detail: CompanyDe
         )}
         {!detail.rounds.length && editing === null && <p className="muted">No rounds yet. Add the first investment.</p>}
       </section>
+
+      <NewsWatchCard companyId={c.id} onFound={reload} />
     </div>
   );
 }

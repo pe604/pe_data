@@ -37,8 +37,12 @@ async function listFor(companyId: string): Promise<UpdateItem[]> {
     date: dateToISO(u.date) ?? "",
     text: u.text,
     author: u.createdBy.name,
-    source: u.source === "WHATSAPP" ? "WHATSAPP" : "MANUAL",
+    source: u.source === "WHATSAPP" || u.source === "NEWS" || u.source === "LINKEDIN" ? u.source : "MANUAL",
     createdAt: u.createdAt.toISOString(),
+    // Shown as a link: only http(s), checked again here before it reaches the page.
+    url: u.url && /^https?:\/\//i.test(u.url) ? u.url : null,
+    category: u.category,
+    importance: u.importance,
   }));
 }
 

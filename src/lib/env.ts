@@ -35,6 +35,9 @@ const schema = z.object({
   EVOLUTION_INSTANCE: z.string().optional().default(""),
   EVOLUTION_Receiver: z.string().optional().default(""),
   WHATSAPP_POLL_SECONDS: z.coerce.number().int().min(15).default(60),
+  // Portfolio news agent (SPEC §15.10): LinkedIn posts via Apify; WhatsApp group for news (default: the intake group)
+  APIFY_TOKEN: z.string().optional().default(""),
+  NEWS_WHATSAPP_GROUP: z.string().optional().default(""),
   NODE_ENV: z.string().optional().default("development"),
 });
 
@@ -52,6 +55,11 @@ export const maxUploadBytes = env.MAX_UPLOAD_MB * 1024 * 1024;
 export const whatsappConfigured = Boolean(
   env.EVOLUTION_API_URL && env.EVOLUTION_API_KEY && env.EVOLUTION_INSTANCE && env.EVOLUTION_Receiver,
 );
+
+/** LinkedIn posts for the news agent need an Apify token. */
+export const apifyConfigured = Boolean(env.APIFY_TOKEN);
+/** Where portfolio news goes on WhatsApp: its own group if set, else the deck-intake group. */
+export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP || env.EVOLUTION_Receiver;
 
 /** AI summaries are on when an OpenRouter key is set. */
 export const aiConfigured = Boolean(env.OPENROUTER_API_KEY);

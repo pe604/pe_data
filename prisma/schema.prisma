@@ -174,6 +174,8 @@ model Company {
   meetings    Meeting[]
   misFigures  MisFigure[]
   reminders   ReminderLog[]
+  newsWatch   NewsWatch?
+  newsItems   NewsItem[]
 
   @@index([status])
   @@index([status, priority, dateReceived])
@@ -498,8 +500,12 @@ model CompanyUpdate {
   /// When it happened
   date        DateTime @db.Date
   text        String
-  /// MANUAL now; WHATSAPP once updates come in from WhatsApp
+  /// MANUAL, WHATSAPP, or NEWS / LINKEDIN from the news agent (SPEC §15.10)
   source      String   @default("MANUAL")
+  /// News agent: the article or post, its category and importance (high / medium / low)
+  url         String?
+  category    String?
+  importance  String?
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
@@ -525,4 +531,44 @@ model ReminderRun {
   day   String   @id
   at    DateTime @default(now())
   sent  Int      @default(0)
+}
+
+/// What the news agent searches for, per Invested company (SPEC §15.10).
+model NewsWatch {
+  companyId     String    @id
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// Legal and brand names to search for; distinctive enough not to match unrelated news.
+  names         String[]
+  website       String?
+  /// LinkedIn company page, e.g. https://www.linkedin.com/company/kimbal
+  linkedinUrl   String?
+  enabled       Boolean   @default(true)
+  lastCheckedAt DateTime?
+  updatedAt     DateTime  @updatedAt
+}
+
+/// Every article or post the news agent has seen, once per company, with the AI's verdict (SPEC §15.10).
+model NewsItem {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// NEWS or LINKEDIN
+  source      String
+  url         String
+  title       String
+  publishedAt DateTime?
+  /// MATERIAL, NOT_MATERIAL, NOT_ABOUT, REPEAT, or PENDING (not yet judged, e.g. the AI call failed)
+  verdict     String    @default("PENDING")
+  category    String?
+  importance  String?
+  summary     String?
+  /// The company update created for a material item
+  updateId    String?
+  /// Sent on WhatsApp: instantly (high importance) or in the clubbed message
+  alertedAt   DateTime?
+  digestedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([companyId, url])
+  @@index([verdict, alertedAt, digestedAt])
 }
