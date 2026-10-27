@@ -60,8 +60,11 @@ export const whatsappConfigured = Boolean(
 
 /** LinkedIn posts for the news agent need an Apify token. */
 export const apifyConfigured = Boolean(env.APIFY_TOKEN);
-/** Where portfolio news goes on WhatsApp: its own group if set, else the deck-intake group. */
-export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP || env.EVOLUTION_Receiver;
+/**
+ * The WhatsApp group for portfolio news. Only NEWS_WHATSAPP_GROUP: never the deck-intake group, which isn't for news.
+ * Unset = no news messages (news is still saved to company updates).
+ */
+export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP;
 
 /** Short link for a news item (SPEC §15.10), or the original link when APP_URL isn't set. */
 export const newsLink = (code: string | null, url: string) => (env.APP_URL && code ? `${env.APP_URL.replace(/\/+$/, "")}/n/${code}` : url);
