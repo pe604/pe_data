@@ -610,3 +610,5 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .nw p{margin:0 0 4px;font-size:13.5px}
 .nw .hint{margin:2px 0 0}
 .inv-head .acts{display:flex;gap:6px}
+.q-upload{display:inline-flex;align-items:center;justify-content:center;width:30px;height:24px;border:1px dashed var(--rule);border-radius:6px;color:var(--muted)}
+.q-c.editable:hover .q-upload,.q-c.editable:focus-visible .q-upload{color:var(--green);border-color:var(--green)}

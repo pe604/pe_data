@@ -360,29 +360,47 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
   const tr = page.locator("table.qgrid tbody tr", { hasText: "Mokobara" });
   await expect(tr.locator("td").nth(2)).toHaveText("Priya Shah");
 
-  // MIS: upload from the cell; it ticks with the date.
+  // Show filter: MIS not received / received.
+  const show = page.getByLabel("Show", { exact: true });
+  await show.selectOption("mis-received");
+  await expect(tr).toHaveCount(0);
+  await show.selectOption("mis-missing");
+  await expect(tr).toHaveCount(1);
+  await show.selectOption("all");
+
+  // MIS: an upload icon until received; several files at once, wrong types skipped; then a tick with the date.
   const mis = page.getByRole("button", { name: "MIS received for Mokobara" });
-  await expect(mis).toContainText("Upload");
+  await expect(mis.locator(".q-upload")).toBeVisible();
   await mis.click();
   const pop = page.locator(".pop");
-  await pop.locator('input[aria-label="Upload MIS file"]').setInputFiles({
-    name: "mokobara-mis.pdf",
-    mimeType: "application/pdf",
-    buffer: Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF"),
-  });
-  await expect(page.getByRole("status").first()).toContainText("MIS for");
+  const pdf = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
+  await pop.locator('input[aria-label="Upload MIS files"]').setInputFiles([
+    { name: "mokobara-mis.pdf", mimeType: "application/pdf", buffer: pdf },
+    { name: "mokobara-mis-annexure.pdf", mimeType: "application/pdf", buffer: pdf },
+    { name: "readme.txt", mimeType: "text/plain", buffer: Buffer.from("hello") },
+  ]);
+  await expect(page.locator(".toast")).toContainText("Uploaded 2 MIS files");
+  await expect(page.locator(".toast")).toContainText("skipped 1");
   await expect(mis).toContainText("✓");
+  await expect(mis).toContainText("2 files");
   await expect(pop).toContainText("mokobara-mis.pdf");
-  await expect(pop.getByRole("button", { name: "View" })).toBeVisible();
-  await expect(pop.getByRole("button", { name: "Download" })).toBeVisible();
+  await expect(pop).toContainText("mokobara-mis-annexure.pdf");
+  await expect(pop.getByRole("button", { name: "View" }).first()).toBeVisible();
+  await expect(pop.getByRole("button", { name: "Download" }).first()).toBeVisible();
+  await expect(pop.getByRole("button", { name: "Upload a folder" })).toBeVisible();
   await pop.getByRole("button", { name: "Close" }).click();
   await expect(page.locator(".q-progress")).toContainText("MIS received: 1/");
+  await show.selectOption("mis-received");
+  await expect(tr).toHaveCount(1);
+  await show.selectOption("mis-missing");
+  await expect(tr).toHaveCount(0);
+  await show.selectOption("all");
 
-  // Result note: "Not made" until a file is uploaded.
+  // Result note: an upload icon until a file is uploaded.
   const note = page.getByRole("button", { name: "Result note for Mokobara" });
-  await expect(note).toContainText("Not made");
+  await expect(note.locator(".q-upload")).toBeVisible();
   await note.click();
-  await page.locator(".pop").locator('input[aria-label="Upload result note file"]').setInputFiles({
+  await page.locator(".pop").locator('input[aria-label="Upload result note files"]').setInputFiles({
     name: "mokobara-result-note.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.4\n%%EOF"),
@@ -399,11 +417,8 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
   await page.locator(".pop").getByRole("button", { name: "Save" }).click();
   await expect(remarks).toHaveText("Raghav will visit this month");
 
-  // MIS due date is editable.
-  await page.getByRole("button", { name: /MIS due .*\(default\) · Edit/ }).click();
-  await page.locator(".pop").getByLabel("Date").fill("2030-01-31");
-  await page.locator(".pop").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: /MIS due 31 Jan 2030 · Edit/ })).toBeVisible();
+  // No MIS due date in the tracker any more.
+  await expect(page.getByRole("button", { name: /MIS due/ })).toHaveCount(0);
 
   // Company file: both files listed under the quarter, viewable and downloadable.
   await page.getByRole("button", { name: "Mokobara", exact: true }).click();

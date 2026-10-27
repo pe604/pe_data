@@ -93,8 +93,27 @@ export function meetingSummary(list: MeetingLite[], from: string, to: string): s
   return [done ? `${done} done` : "", planned ? `${planned} planned` : ""].filter(Boolean).join(" · ");
 }
 
-/** MIS cell state for the tracker. */
+/** MIS cell state against a due date. The tracker no longer shows due dates (SPEC §15.2); kept for the data. */
 export function misState(misAt: string | null, due: string, today: string): "received" | "overdue" | "pending" {
   if (misAt) return "received";
   return today > due ? "overdue" : "pending";
+}
+
+/** File types the tracker uploads for each column (all also on the server's allow-list). */
+export const QUARTER_FILE_EXTS = {
+  MIS: ["pdf", "xlsx", "xlsm", "xls", "csv"],
+  RESULT_NOTE: ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt"],
+} as const;
+
+/**
+ * Splits picked files (several, or a whole folder) into ones to upload and ones skipped: wrong type, hidden or
+ * system files (".DS_Store", Office "~$" lock files), or empty.
+ */
+export function splitUploads<F extends { name: string; size: number }>(files: F[], kind: keyof typeof QUARTER_FILE_EXTS): { upload: F[]; skipped: F[] } {
+  const ok = (f: F) => {
+    if (!f.size || f.name.startsWith(".") || f.name.startsWith("~$")) return false;
+    const ext = /\.([a-z0-9]+)$/i.exec(f.name)?.[1]?.toLowerCase() ?? "";
+    return (QUARTER_FILE_EXTS[kind] as readonly string[]).includes(ext);
+  };
+  return { upload: files.filter(ok), skipped: files.filter((f) => !ok(f)) };
 }

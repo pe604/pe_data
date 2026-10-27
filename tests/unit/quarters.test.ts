@@ -74,3 +74,17 @@ describe("tracker and meetings", () => {
     expect(meetingSummary(m, "2026-07-01", "2026-09-30")).toBeNull();
   });
 });
+
+import { splitUploads } from "@/lib/domain/quarters";
+
+describe("splitUploads (quarterly tracker multi-file / folder upload)", () => {
+  const f = (name: string, size = 10) => ({ name, size });
+  it("keeps MIS-type files and skips the rest", () => {
+    const r = splitUploads([f("Sep MIS.xlsx"), f("Q2.PDF"), f("notes.docx"), f(".DS_Store"), f("~$Sep MIS.xlsx"), f("empty.pdf", 0), f("data.csv")], "MIS");
+    expect(r.upload.map((x) => x.name)).toEqual(["Sep MIS.xlsx", "Q2.PDF", "data.csv"]);
+    expect(r.skipped.map((x) => x.name)).toEqual(["notes.docx", ".DS_Store", "~$Sep MIS.xlsx", "empty.pdf"]);
+  });
+  it("result notes take Word and PowerPoint too", () => {
+    expect(splitUploads([f("note.docx"), f("deck.pptx"), f("img.png")], "RESULT_NOTE").upload.map((x) => x.name)).toEqual(["note.docx", "deck.pptx"]);
+  });
+});

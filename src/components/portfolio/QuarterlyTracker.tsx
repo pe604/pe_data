@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getQuarterView, setMisDue, setQuarterRemarks } from "@/actions/tracker";
+import { getQuarterView, setQuarterRemarks } from "@/actions/tracker";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
-import { lastEndedQuarter, misState, quarterLabel, quarterOptions } from "@/lib/domain/quarters";
+import { lastEndedQuarter, QUARTER_FILE_EXTS, quarterLabel, quarterOptions, splitUploads } from "@/lib/domain/quarters";
 import type { ActionResult, QuarterFile, QuarterRow, QuarterView } from "@/lib/domain/types";
 import { useStore } from "../store";
 import { canView, downloadFile, FileViewer, type ViewableFile } from "../ui/FileViewer";
+import { IconUpload } from "../ui/icons";
 import { Popover } from "../ui/overlay";
 import { uploadFile } from "../ui/upload";
 
@@ -16,7 +17,16 @@ type Kind = "MIS" | "RESULT_NOTE";
 const LABEL: Record<Kind, string> = { MIS: "MIS received", RESULT_NOTE: "Result note" };
 const short = (iso: string) => fmtDate(iso).replace(/ \d{4}$/, "");
 
-type Pop = { kind: "files"; row: QuarterRow; file: Kind; el: HTMLElement } | { kind: "remarks"; row: QuarterRow; el: HTMLElement } | { kind: "due"; el: HTMLElement };
+type Pop = { kind: "files"; row: QuarterRow; file: Kind; el: HTMLElement } | { kind: "remarks"; row: QuarterRow; el: HTMLElement };
+type Show = "all" | "mis-missing" | "mis-received" | "result-missing";
+const SHOW: [Show, string][] = [
+  ["all", "All companies"],
+  ["mis-missing", "MIS not received"],
+  ["mis-received", "MIS received"],
+  ["result-missing", "Result note not made"],
+];
+const shows = (r: QuarterRow, s: Show) =>
+  s === "mis-missing" ? !r.misAt : s === "mis-received" ? !!r.misAt : s === "result-missing" ? !r.resultNoteAt : true;
 
 export function QuarterlyTracker() {
   const { toast, openDrawer } = useStore();
@@ -25,7 +35,7 @@ export function QuarterlyTracker() {
   const [data, setData] = useState<QuarterView | null>(null);
   const [pop, setPop] = useState<Pop | null>(null);
   const [viewing, setViewing] = useState<ViewableFile | null>(null);
-  const [pendingOnly, setPendingOnly] = useState(false);
+  const [show, setShow] = useState<Show>("all");
   const [order, setOrder] = useState<"action" | "az">("action");
 
   const load = useCallback(
@@ -50,16 +60,14 @@ export function QuarterlyTracker() {
   };
 
   const all = data?.quarter === quarter ? data.rows : [];
-  // Needs action first: MIS overdue, then MIS pending, then result note pending, then done (A–Z within each).
-  const rank = (r: QuarterRow) =>
-    !data ? 0 : !r.misAt ? (misState(null, data.misDue, today) === "overdue" ? 0 : 1) : !r.resultNoteAt ? 2 : 3;
+  // Needs action first: MIS not received, then result note not made, then done (A–Z within each).
+  const rank = (r: QuarterRow) => (!r.misAt ? 0 : !r.resultNoteAt ? 1 : 2);
   const rows = all
-    .filter((r) => !pendingOnly || !r.misAt || !r.resultNoteAt)
+    .filter((r) => shows(r, show))
     .sort((a, b) => (order === "action" ? rank(a) - rank(b) : 0) || a.name.localeCompare(b.name));
   const n = all.length;
-  const overdue = data ? all.filter((r) => misState(r.misAt, data.misDue, today) === "overdue").length : 0;
-  // Keep an open popover pointed at fresh row data after an upload.
-  const popRow = pop && pop.kind !== "due" ? (rows.find((r) => r.companyId === pop.row.companyId) ?? pop.row) : null;
+  // Keep an open popover pointed at fresh row data after an upload (it may have left the filtered list).
+  const popRow = pop ? (all.find((r) => r.companyId === pop.row.companyId) ?? pop.row) : null;
 
   return (
     <div className="pview">
@@ -74,15 +82,15 @@ export function QuarterlyTracker() {
             ))}
           </select>
         </label>
-        {data && data.quarter === quarter && (
-          <button className="meta-btn" type="button" onClick={(e) => setPop({ kind: "due", el: e.currentTarget })}>
-            MIS due {fmtDate(data.misDue)}
-            {data.misDueIsDefault ? " (default)" : ""} · Edit
-          </button>
-        )}
-        <label className="ck q-pending">
-          <input type="checkbox" checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)} />
-          Pending only
+        <label className="sortwrap">
+          Show
+          <select className="sel" value={show} onChange={(e) => setShow(e.target.value as Show)} aria-label="Show">
+            {SHOW.map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="sortwrap">
           Order
@@ -100,7 +108,6 @@ export function QuarterlyTracker() {
             <span>
               Result notes made: <strong>{all.filter((r) => r.resultNoteAt).length}</strong>/{n}
             </span>
-            {overdue > 0 && <span className="bad">MIS overdue: {overdue}</span>}
           </div>
         )}
       </div>
@@ -113,7 +120,9 @@ export function QuarterlyTracker() {
           <p>Companies in Invested appear here every quarter.</p>
         </div>
       ) : (
-        <p className="muted" style={{ margin: "8px 28px" }}>Nothing pending for this quarter.</p>
+        <p className="muted" style={{ margin: "8px 28px" }}>
+          No companies match &ldquo;{SHOW.find(([v]) => v === show)?.[1]}&rdquo; for this quarter.
+        </p>
       )) : (
         <div className="table-wrap">
           <table className="grid qgrid">
@@ -146,8 +155,8 @@ export function QuarterlyTracker() {
                       </button>
                     )}
                   </td>
-                  <FileCell row={r} kind="MIS" due={data.misDue} today={today} onOpen={(el) => setPop({ kind: "files", row: r, file: "MIS", el })} />
-                  <FileCell row={r} kind="RESULT_NOTE" due={null} today={today} onOpen={(el) => setPop({ kind: "files", row: r, file: "RESULT_NOTE", el })} />
+                  <FileCell row={r} kind="MIS" onOpen={(el) => setPop({ kind: "files", row: r, file: "MIS", el })} />
+                  <FileCell row={r} kind="RESULT_NOTE" onOpen={(el) => setPop({ kind: "files", row: r, file: "RESULT_NOTE", el })} />
                   <td
                     className="q-rem editable"
                     role="button"
@@ -178,16 +187,6 @@ export function QuarterlyTracker() {
           onUploaded={() => load(quarter)}
         />
       )}
-      {pop?.kind === "due" && data && (
-        <DuePop
-          quarter={quarter}
-          value={data.misDue}
-          isDefault={data.misDueIsDefault}
-          anchor={pop.el}
-          onClose={() => setPop(null)}
-          onSave={(d) => apply(setMisDue(quarter, d))}
-        />
-      )}
       {pop?.kind === "remarks" && popRow && (
         <RemarksPop row={popRow} anchor={pop.el} onClose={() => setPop(null)} onSave={(t) => apply(setQuarterRemarks(popRow.companyId, quarter, t))} />
       )}
@@ -196,13 +195,13 @@ export function QuarterlyTracker() {
   );
 }
 
-function FileCell({ row, kind, due, today, onOpen }: { row: QuarterRow; kind: Kind; due: string | null; today: string; onOpen: (el: HTMLElement) => void }) {
+/** Received: a tick with the date (click to view, download or add files). Not yet: an upload icon. */
+function FileCell({ row, kind, onOpen }: { row: QuarterRow; kind: Kind; onOpen: (el: HTMLElement) => void }) {
   const at = kind === "MIS" ? row.misAt : row.resultNoteAt;
   const count = (kind === "MIS" ? row.misFiles : row.resultFiles).length;
-  const state = kind === "MIS" && due ? misState(at, due, today) : at ? "received" : "pending";
   return (
     <td
-      className={"q-c editable q-" + state}
+      className={"q-c editable q-" + (at ? "received" : "pending")}
       role="button"
       tabIndex={0}
       aria-label={`${LABEL[kind]} for ${row.name}`}
@@ -220,14 +219,12 @@ function FileCell({ row, kind, due, today, onOpen }: { row: QuarterRow; kind: Ki
           {short(at)}
           {count > 1 ? ` · ${count} files` : ""}
         </span>
-      ) : state === "overdue" ? (
-        <span className="late">Overdue</span>
-      ) : kind === "MIS" && due ? (
-        <span className="ph">Due {short(due)}</span>
       ) : (
-        <span className="ph">Not made</span>
+        <span className="q-upload" title={kind === "MIS" ? "Upload MIS" : "Upload result note"}>
+          <IconUpload />
+          <span className="sr-only">Upload</span>
+        </span>
       )}
-      {!at && <span className="q-up">Upload</span>}
     </td>
   );
 }
@@ -251,9 +248,36 @@ function FilesPop({
 }) {
   const { toast } = useStore();
   const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const folder = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const files: QuarterFile[] = kind === "MIS" ? row.misFiles : row.resultFiles;
+  const what = kind === "MIS" ? "MIS" : "result note";
   const title = `${kind === "MIS" ? "MIS" : "Result note"} · ${quarterLabel(quarter)} · ${row.name}`;
+
+  // Several files or a whole folder: uploads the right types one by one, skips the rest, then refreshes once.
+  const upload = async (picked: File[]) => {
+    const { upload: todo, skipped } = splitUploads(picked, kind);
+    if (!todo.length) {
+      return toast(picked.length ? `None of those are ${kind === "MIS" ? "PDF, Excel or CSV" : "PDF, Word, Excel or PowerPoint"} files.` : "No files picked.");
+    }
+    let done = 0;
+    const failed: string[] = [];
+    for (const [i, f] of todo.entries()) {
+      setBusy(todo.length > 1 ? `Uploading ${i + 1} of ${todo.length}…` : "Uploading…");
+      const r = await uploadFile(f, { kind, companyId: row.companyId, quarter });
+      if (r.ok) done++;
+      else failed.push(`${f.name}: ${r.error}`);
+    }
+    if (done) await onUploaded();
+    setBusy(null);
+    const parts = [
+      done ? `Uploaded ${done} ${what} file${done === 1 ? "" : "s"} for ${quarterLabel(quarter)}` : "",
+      skipped.length ? `skipped ${skipped.length} (not ${kind === "MIS" ? "PDF/Excel/CSV" : "PDF/Word/Excel/PowerPoint"})` : "",
+      failed.length ? `${failed.length} failed (${failed[0]}${failed.length > 1 ? ", …" : ""})` : "",
+    ].filter(Boolean);
+    toast(parts.join("; ") + ".");
+  };
+  const accept = QUARTER_FILE_EXTS[kind].map((e) => "." + e).join(",");
 
   return (
     <Popover anchor={anchor} onClose={onClose} width={360} label={title}>
@@ -286,79 +310,43 @@ function FilesPop({
         ref={input}
         type="file"
         hidden
-        aria-label={`Upload ${kind === "MIS" ? "MIS" : "result note"} file`}
-        accept={kind === "MIS" ? ".pdf,.xlsx,.xlsm,.xls" : ".pdf,.docx,.doc,.xlsx,.pptx"}
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
+        multiple
+        aria-label={`Upload ${what} files`}
+        accept={accept}
+        onChange={(e) => {
+          const picked = Array.from(e.target.files ?? []);
           e.target.value = "";
-          if (!file) return;
-          setBusy(true);
-          const r = await uploadFile(file, { kind, companyId: row.companyId, quarter });
-          if (!r.ok) {
-            setBusy(false);
-            return toast(r.error);
-          }
-          await onUploaded();
-          setBusy(false);
-          toast(kind === "MIS" ? `MIS for ${quarterLabel(quarter)} uploaded.` : `Result note for ${quarterLabel(quarter)} uploaded.`);
+          if (picked.length) void upload(picked);
+        }}
+      />
+      <input
+        ref={folder}
+        type="file"
+        hidden
+        aria-label={`Upload a folder of ${what} files`}
+        // Non-standard but supported by Chrome, Edge, Firefox and Safari: pick a whole folder.
+        {...{ webkitdirectory: "" }}
+        onChange={(e) => {
+          const picked = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (picked.length) void upload(picked);
         }}
       />
       <div className="foot">
-        <button className="btn-ghost sm" type="button" onClick={onClose}>
-          Close
-        </button>
-        <button className="btn sm primary" type="button" disabled={busy} onClick={() => input.current?.click()}>
-          {busy ? "Uploading…" : files.length ? "Upload another file" : "Upload file"}
-        </button>
-      </div>
-    </Popover>
-  );
-}
-
-function DuePop({
-  quarter,
-  value,
-  isDefault,
-  anchor,
-  onClose,
-  onSave,
-}: {
-  quarter: string;
-  value: string;
-  isDefault: boolean;
-  anchor: HTMLElement;
-  onClose: () => void;
-  onSave: (d: string | null) => void;
-}) {
-  const [d, setD] = useState(value);
-  const title = `MIS due date for ${quarterLabel(quarter)}`;
-  return (
-    <Popover anchor={anchor} onClose={onClose} width={270} label={title}>
-      <h4>{title}</h4>
-      <input className="inp" type="date" aria-label="Date" value={d} onChange={(e) => setD(e.target.value)} autoFocus />
-      <div className="foot">
-        {!isDefault && (
-          <button
-            className="btn-ghost sm"
-            type="button"
-            onClick={() => {
-              onClose();
-              onSave(null);
-            }}
-          >
-            Reset to default
+        {busy ? (
+          <span className="hint" role="status">
+            {busy}
+          </span>
+        ) : (
+          <button className="btn-ghost sm" type="button" onClick={onClose}>
+            Close
           </button>
         )}
-        <button
-          className="btn sm primary"
-          type="button"
-          disabled={!d}
-          onClick={() => {
-            onClose();
-            onSave(d);
-          }}
-        >
-          Save
+        <button className="btn sm" type="button" disabled={!!busy} onClick={() => folder.current?.click()}>
+          Upload a folder
+        </button>
+        <button className="btn sm primary" type="button" disabled={!!busy} onClick={() => input.current?.click()}>
+          {files.length ? "Upload more files" : "Upload files"}
         </button>
       </div>
     </Popover>
