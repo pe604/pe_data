@@ -157,10 +157,10 @@ export async function checkNews(opts: { companyIds?: string[]; newsDays: number;
     const profile = { name: c.name, names, sector: c.sector?.name ?? null, subSector: c.subSector, website: c.newsWatch?.website ?? null };
     // "Already recorded" grows as batches find material news, so the same story from another outlet in a later
     // batch of this check is marked a repeat too (not only stories recorded in earlier checks).
-    const known = recent.map((r) => r.text);
+    const recorded = recent.map((r) => r.text);
     for (let i = 0; i < fresh.length; i += JUDGE_BATCH) {
       const batch = fresh.slice(i, i + JUDGE_BATCH);
-      const judge = (model?: string) => judgeItems(profile, batch, known, { model });
+      const judge = (model?: string) => judgeItems(profile, batch, recorded, { model });
       try {
         let got;
         try {
@@ -170,7 +170,7 @@ export async function checkNews(opts: { companyIds?: string[]; newsDays: number;
           got = await judge(FALLBACK_MODEL);
         }
         for (const [k, v] of got) verdicts.set(k, v);
-        for (const v of got.values()) if (v.about_company && v.material && !v.repeat) known.push(v.summary);
+        for (const v of got.values()) if (v.about_company && v.material && !v.repeat) recorded.push(v.summary);
       } catch (e) {
         result.failed++;
         console.error("[news] judge failed", c.id, errCode(e)); // unjudged items aren't stored, so the next check retries them
