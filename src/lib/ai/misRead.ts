@@ -179,7 +179,7 @@ async function readExcel(data: Buffer, fileName: string, companyName: string): P
   const prompt = [
     `Company: ${companyName}`,
     `File: ${fileName}`,
-    "The MIS is an Excel file. Its cells follow, sheet by sheet: 'R12: A=Revenue | C=297614023' means row 12, column A holds 'Revenue', column C holds 297614023.",
+    "The MIS is an Excel file. Its cells follow, sheet by sheet: 'R12: A=Revenue | C=123456789' means row 12, column A holds 'Revenue', column C holds 123456789.",
     "Map the tables in scope: for each, the sheet, a section name, which columns hold which period, and the rows in scope with their row number, label, unit and kind. Give cell addresses only; do not copy figures.",
     "---",
     gridText(sheets),

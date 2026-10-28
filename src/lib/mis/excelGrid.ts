@@ -73,7 +73,7 @@ export async function readWorkbook(data: Buffer): Promise<GridSheet[]> {
   return out;
 }
 
-/** The grids as text for the model: "[Sheet: P&L]" then "R12: A=Revenue | C=297614023 | D=100%". */
+/** The grids as text for the model: "[Sheet: P&L]" then "R12: A=Revenue | C=123456789 | D=100%". */
 export function gridText(sheets: GridSheet[], maxChars = 220_000): string {
   const out: string[] = [];
   let size = 0;

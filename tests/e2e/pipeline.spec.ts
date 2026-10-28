@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 import { addByName, openCompany, openTab, row, uniq } from "./helpers";
 import { addDays, todayISO } from "../../src/lib/domain/dates";
-import { lastEndedQuarter, quarterLabel } from "../../src/lib/domain/quarters";
+import { lastEndedQuarter, quarterLabel, shiftQuarter } from "../../src/lib/domain/quarters";
 import ExcelJS from "exceljs";
 
 test("add a company with a deck, review, and it appears in Pipeline", async ({ page }) => {
@@ -522,11 +522,11 @@ test("MIS figures: upload from the company file, build the figures history by ha
   // Paste a table from Excel: periods are recognised, growth columns left out, the review saves it (no AI).
   await drawer.getByRole("button", { name: "Paste from Excel" }).click();
   const paste = page.getByRole("dialog", { name: "Paste from Excel" });
-  await paste.getByLabel("Table").fill(["Rs Cr\tFY25\tFY26\tYoY %", "Net revenue\t900.5\t1,034.2\t15%", "EBITDA margin\t-4.8%\t-3.4%\t"].join("\n"));
+  await paste.getByLabel("Table").fill(["Rs Cr\tFY25\tFY26\tYoY %", "Net revenue\t820.5\t1,150.2\t15%", "EBITDA margin\t-4.8%\t-3.4%\t"].join("\n"));
   await paste.getByRole("button", { name: "Review figures" }).click();
   const review = page.getByRole("dialog", { name: /Review figures/ });
   await expect(review).toContainText("Columns left out: YoY %");
-  await expect(review).toContainText("1,034.20");
+  await expect(review).toContainText("1,150.20");
   await review.getByRole("button", { name: "Save 2 lines" }).click();
   await expect(page.locator(".toast")).toContainText("Saved 4 figures from the pasted table.");
 
@@ -539,6 +539,66 @@ test("MIS figures: upload from the company file, build the figures history by ha
   // The MIS uploaded from the company file ticks the tracker for that quarter.
   await page.getByRole("tab", { name: "Quarterly tracker" }).click();
   await expect(page.getByRole("button", { name: `MIS received for ${a}` })).toContainText("✓");
+});
+
+test("results: figures pasted in the company file build a live preview; the format is saved and locked", async ({ page }) => {
+  const a = uniq("Resco");
+  await page.goto("/");
+  await openTab(page, "Invested");
+  await page.getByRole("button", { name: "Add company" }).first().click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByText("Add several portfolio companies at once").click();
+  await dlg.locator("textarea").fill(a);
+  await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
+  await row(page, a).locator("td.c-amt").first().click();
+  const drawer = page.locator(".drawer.open");
+  await drawer.getByRole("tab", { name: /MIS & results/ }).click();
+
+  // Made-up figures (tests are public), pasted for the last two ended quarters.
+  const q = lastEndedQuarter(todayISO());
+  const prev = shiftQuarter(q, -1);
+  await drawer.getByRole("button", { name: "Paste from Excel" }).click();
+  const paste = page.getByRole("dialog", { name: "Paste from Excel" });
+  await paste
+    .getByLabel("Table")
+    .fill([`Rs Cr\t${quarterLabel(prev)}\t${quarterLabel(q)}`, "Revenue\t200\t250", "COGS\t120\t150", "EBITDA\t-12\t-10"].join("\n"));
+  await paste.getByRole("button", { name: "Review figures" }).click();
+  await page.getByRole("dialog", { name: /Review figures/ }).getByRole("button", { name: "Save 3 lines" }).click();
+  await expect(page.locator(".toast")).toContainText("Saved 6 figures");
+  await page.keyboard.press("Escape");
+
+  // Results view: recommended format, live preview for the latest quarter with figures.
+  await page.getByRole("tablist", { name: "Invested views" }).getByRole("tab", { name: "Results" }).click();
+  await page.getByLabel("Company", { exact: true }).selectOption({ label: a });
+  await expect(page.getByLabel("Result quarter")).toHaveValue(q);
+  const preview = page.getByLabel(`Result preview: ${a}`);
+  await expect(preview).toContainText("250.00");
+  await expect(preview).toContainText("25.00%");
+  await expect(preview).toContainText("EBITDA margin");
+  await expect(preview).toContainText("-4.00%");
+  await expect(preview).toContainText("NM = not meaningful");
+  await expect(page.locator(".rv-status")).toHaveText("Recommended format, not saved yet");
+
+  // Edits redraw the preview at once.
+  await page.locator(".rb").getByLabel("Title").fill(`${a} Private Limited`);
+  await expect(page.getByLabel(`Result preview: ${a} Private Limited`)).toBeVisible();
+  await page.getByLabel("Column 1 header").fill("This quarter");
+  await expect(page.getByLabel(`Result preview: ${a} Private Limited`)).toContainText("This quarter");
+  await expect(page.locator(".rv-status")).toHaveText("Unsaved changes");
+
+  await page.getByRole("button", { name: "Save format" }).click();
+  await expect(page.locator(".toast")).toContainText("Format saved.");
+  await page.getByRole("button", { name: "Lock format" }).click();
+  await expect(page.locator(".toast")).toContainText("Format locked");
+  await expect(page.locator(".rv-status")).toHaveText("Format locked");
+  await expect(page.locator(".rb").getByLabel("Title")).toBeDisabled();
+
+  // Reloaded, the saved format comes back.
+  await page.reload();
+  await openTab(page, "Invested");
+  await page.getByRole("tablist", { name: "Invested views" }).getByRole("tab", { name: "Results" }).click();
+  await page.getByLabel("Company", { exact: true }).selectOption({ label: a });
+  await expect(page.getByLabel(`Result preview: ${a} Private Limited`)).toContainText("This quarter");
 });
 
 test("company updates replace the comment column on Invested; sector allocation pie drills into companies", async ({ page }) => {

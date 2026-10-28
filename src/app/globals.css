@@ -643,3 +643,60 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .mf-cell{cursor:pointer}
 .mf-cell:hover{background:var(--rule-2)}
 .mf-manual{font-style:italic}
+
+/* Results (SPEC §15.12): builder beside a live preview */
+.rv-status{font-size:12.5px;color:var(--muted);padding:3px 8px;border-radius:999px;background:var(--rule-2)}
+.rv-status.locked{background:var(--green-soft);color:var(--green)}
+.rv-status.dirty{background:var(--gold-soft);color:var(--amber)}
+.rv-grid{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:20px;align-items:start;margin:0 28px}
+.rv-builder{max-height:calc(100vh - 220px);overflow:auto;padding-right:6px}
+.rv-preview{position:sticky;top:12px;min-width:0}
+.rv-scroll{overflow:auto;border:1px solid var(--rule);border-radius:8px;background:var(--surface-2);padding:12px}
+@media (max-width:760px){.rv-grid{margin:0 16px}}
+@media (max-width:900px){.rv-grid{grid-template-columns:1fr}.rv-builder{max-height:none}.rv-preview{position:static}}
+.rb{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.rb .field{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.rb .field .inp,.rb .field .sel,.rb .field .ta{width:100%}
+.rb-h{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--ink-2)}
+.rb-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.rb-item{display:flex;gap:6px;align-items:flex-start;padding:6px;border:1px solid var(--rule);border-radius:8px;background:var(--surface)}
+.rb-row-key{border-left:3px solid var(--green)}
+.rb-row-sub{padding-left:14px}
+.rb-main{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;min-width:0}
+.rb-main .inp.sm{flex:1;min-width:120px}
+.rb-label{font-weight:500}
+.rb-chg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+.rb-formula{flex-basis:100%}
+.rb-term{display:inline-flex;gap:3px;align-items:center}
+.rb-kind{font-size:12px}
+.rb-arrows{display:flex;gap:0;flex-shrink:0}
+.rb-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rb-table{display:flex;flex-direction:column;gap:8px;padding-top:6px;border-top:1px solid var(--rule)}
+.rb-table-head{display:flex;justify-content:space-between;align-items:center}
+.rb:disabled .rb-item{opacity:.75}
+
+/* The result itself: fixed Niveshaay brand colours (a document; same in light and dark mode) */
+.rs{--res-band:#DAE1F3;--res-navy:#1F4E78;--res-dark:#395324;--res-light:#C6E0B3;--res-white:#FFFFFF;--res-ink:#000000;--res-rule:#7F7F7F;--res-note:#404040;--res-warn:#C00000;
+  display:inline-block;min-width:640px;background:var(--res-white);color:var(--res-ink);font-family:var(--serif);border:1px solid var(--res-rule)}
+.rs-band{position:relative;display:flex;align-items:center;justify-content:center;min-height:84px;padding:10px 190px;background:var(--res-band);border-bottom:2px solid var(--res-ink)}
+.rs-title{font-size:26px;font-weight:700;text-align:center}
+.rs-logo{position:absolute;right:12px;top:50%;transform:translateY(-50%);height:68px;width:auto}
+.rs-table{border-collapse:collapse;width:100%;font-size:15px;font-variant-numeric:tabular-nums}
+.rs-table th,.rs-table td{border:1px solid var(--res-rule);padding:5px 8px;white-space:nowrap}
+.rs-head th{background:var(--res-navy);color:var(--res-white);font-weight:700;text-align:center}
+.rs-head th:first-child{text-align:left;min-width:220px}
+.rs-label{text-align:left;font-weight:400;background:var(--res-light)}
+.rs-v{text-align:right;background:var(--res-white);min-width:86px}
+.rs-row.key .rs-label{background:var(--res-dark);color:var(--res-white);font-weight:700}
+.rs-row.key:not(.pct) .rs-v{background:var(--res-light)}
+.rs-row.key.pct .rs-v{font-weight:700}
+.rs-row.sub .rs-label{font-style:italic;padding-left:22px}
+.rs-row.sub .rs-v{font-style:italic}
+.rs-row.heading .rs-label{font-weight:400}
+.rs-gap td{border:0;height:22px;background:var(--res-white)}
+.rs-table tbody:last-child .rs-gap{display:none}
+.rs-notes{padding:6px 8px 8px;font-size:12.5px;font-style:italic;color:var(--res-note);border-top:1px solid var(--res-rule)}
+.rs-notes p{margin:0}
+.rs-missing{color:var(--res-warn)}
+.rs-derived{text-decoration:underline dotted var(--res-rule);text-underline-offset:3px}
+.rs-problem{color:var(--res-warn)}

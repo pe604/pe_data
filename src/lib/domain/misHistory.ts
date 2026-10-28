@@ -174,7 +174,7 @@ function halfStep(v: ReadValue | undefined): number {
 
 /**
  * Flows only: for each quarter (or half / year) printed alongside all its months, whether the months add up to it.
- * Returns readable problems like "Q2 FY27: months add up to 291.40, file shows 289.10".
+ * Returns readable problems like "Q2 FY27: months add up to 300.00, file shows 250.00".
  */
 export function monthsVsTotals(kind: LineKind, values: ReadValue[], fmt: (n: number) => string): string[] {
   if (kind !== "FLOW") return [];
@@ -194,7 +194,7 @@ export function monthsVsTotals(kind: LineKind, values: ReadValue[], fmt: (n: num
   return out;
 }
 
-/** Printed figures that can't be found in the file's text (PDF), e.g. "Jul 2026 1,034". */
+/** Printed figures that can't be found in the file's text (PDF), e.g. "Jul 2026 1,000". */
 export function notInText(values: ReadValue[], fileText: string): string[] {
   if (fileText.replace(/\s+/g, "").length < 200) return [];
   const nums = new Set<string>();

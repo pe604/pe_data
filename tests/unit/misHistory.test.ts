@@ -59,15 +59,15 @@ describe("figures and units", () => {
   });
 
   it("converts money scales to ₹ Cr", () => {
-    expect(moneyToCr(297614023, "Rupees")).toBeCloseTo(29.7614023, 9);
-    expect(moneyToCr(1034, "Mn")).toBeCloseTo(103.4, 9);
+    expect(moneyToCr(123456789, "Rupees")).toBeCloseTo(12.3456789, 9);
+    expect(moneyToCr(1250, "Mn")).toBeCloseTo(125, 9);
     expect(moneyToCr(93.1, "Lakh")).toBeCloseTo(0.931, 9);
     expect(moneyToCr(2, "Bn")).toBe(200);
   });
 
   it("formats for display", () => {
-    expect(fmtLineValue(291.3, "INR_CR")).toBe("291.30");
-    expect(fmtLineValue(-9.94, "INR_CR")).toBe("(9.94)");
+    expect(fmtLineValue(123.45, "INR_CR")).toBe("123.45");
+    expect(fmtLineValue(-6.5, "INR_CR")).toBe("(6.50)");
     expect(fmtLineValue(98, "PCT")).toBe("98.0%");
     expect(fmtLineValue(1123200, "NUM")).toBe("11,23,200");
     expect(fmtLineValue(null, "NUM")).toBe("–");
@@ -93,10 +93,10 @@ describe("checks", () => {
   const fmt = (n: number) => n.toFixed(2);
   it("flags months that don't add up to a printed quarter (flows only)", () => {
     const v = (period: string, value: number) => ({ period, value, raw: String(value) });
-    const ok = [v("2026-07", 103.4), v("2026-08", 74), v("2026-09", 114), v("FY27-Q2", 291.4)];
+    const ok = [v("2026-07", 100), v("2026-08", 80), v("2026-09", 120), v("FY27-Q2", 300)];
     expect(monthsVsTotals("FLOW", ok, fmt)).toEqual([]);
-    const bad = [v("2026-07", 103.4), v("2026-08", 74), v("2026-09", 114), v("FY27-Q2", 250)];
-    expect(monthsVsTotals("FLOW", bad, fmt)).toEqual(["Q2 FY27: months add up to 291.40, file shows 250.00"]);
+    const bad = [v("2026-07", 100), v("2026-08", 80), v("2026-09", 120), v("FY27-Q2", 250)];
+    expect(monthsVsTotals("FLOW", bad, fmt)).toEqual(["Q2 FY27: months add up to 300.00, file shows 250.00"]);
     expect(monthsVsTotals("STOCK", bad, fmt)).toEqual([]);
     // A quarter without all its months isn't checked.
     expect(monthsVsTotals("FLOW", [v("2026-07", 1), v("FY27-Q2", 9)], fmt)).toEqual([]);
@@ -116,12 +116,12 @@ describe("checks", () => {
   });
 
   it("flags printed figures missing from the file's text", () => {
-    const text = "Total revenue 499 1,522 821 1,034 740 1,140 ".repeat(10);
+    const text = "Total revenue 410 1,250 800 1,000 600 1,100 ".repeat(10);
     const vals = [
-      { period: "2026-07", value: 103.4, raw: "1,034" },
-      { period: "2026-08", value: 74, raw: "(741)" },
+      { period: "2026-07", value: 100, raw: "1,000" },
+      { period: "2026-08", value: 60, raw: "(601)" },
     ];
-    expect(notInText(vals, text)).toEqual(["Aug 2026 (741)"]);
+    expect(notInText(vals, text)).toEqual(["Aug 2026 (601)"]);
   });
 });
 
@@ -156,9 +156,9 @@ describe("paste from Excel (SPEC §15.11)", () => {
   it("reads a pasted result table: periods, sections, units, skipped columns", () => {
     const text = [
       "Rs Cr\tQ2 FY26\tQ1 FY27\tQ2 FY27\tYoY %\tH1 FY27",
-      "Revenue\t250.5\t270.1\t291.3\t16%\t561.4",
-      "EBITDA\t(12.0)\t(10.3)\t(9.9)\t\t(20.2)",
-      "EBITDA margin\t-4.8%\t-3.8%\t-3.4%\t\t-3.6%",
+      "Revenue\t150.5\t170.1\t190.3\t16%\t360.4",
+      "EBITDA\t(8.0)\t(7.5)\t(6.1)\t\t(13.6)",
+      "EBITDA margin\t-5.1%\t-4.2%\t-3.2%\t\t-3.7%",
       "",
       "Key metrics",
       "Orders (lakh)\t1,250\t1,320\t-\t\t",
@@ -172,8 +172,8 @@ describe("paste from Excel (SPEC §15.11)", () => {
       ["P&L", "EBITDA margin", "PCT", "RATIO", 4],
       ["Key metrics", "Orders (lakh)", "INR_CR", "FLOW", 2],
     ]);
-    expect(t.rows[1].values[0]).toEqual({ period: "FY26-Q2", value: -12, raw: "(12.0)" });
-    expect(t.rows[2].values[2].value).toBe(-3.4);
+    expect(t.rows[1].values[0]).toEqual({ period: "FY26-Q2", value: -8, raw: "(8.0)" });
+    expect(t.rows[2].values[2].value).toBe(-3.2);
     // Money in lakh is stored in ₹ Cr.
     expect(parsePastedTable("x\tFY26\nRevenue\t2,500", "Lakh", "").rows[0].values[0].value).toBe(25);
     expect(parsePastedTable("no periods here\nRevenue\t1", "Cr", "P&L").rows).toEqual([]);

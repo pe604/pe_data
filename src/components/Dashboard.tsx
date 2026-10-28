@@ -19,6 +19,7 @@ import { AddCompanyModal } from "./add/AddCompanyModal";
 import { PeBar, StagesBar } from "./bars/Bars";
 import { PortfolioBar } from "./bars/PortfolioBar";
 import { MeetingsView } from "./portfolio/MeetingsView";
+import { ResultsView } from "./results/ResultsView";
 import { QuarterlyTracker } from "./portfolio/QuarterlyTracker";
 import { Drawer } from "./drawer/Drawer";
 import { Header } from "./shell/Header";
@@ -47,7 +48,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const [addOpen, setAddOpen] = useState(false);
   const [detailVersion, setDetailVersion] = useState(0);
   // Invested tab sub-view (SPEC §15).
-  const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings">("portfolio");
+  const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings" | "results">("portfolio");
 
   const rowsRef = useRef(companies);
   useEffect(() => {
@@ -222,6 +223,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
                 ["portfolio", "Portfolio"],
                 ["quarterly", "Quarterly tracker"],
                 ["meetings", "Meetings"],
+                ["results", "Results"],
               ] as const
             ).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={invView === k} onClick={() => setInvView(k)}>
@@ -234,6 +236,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
           <QuarterlyTracker />
         ) : view.tab === "invested" && counts.invested > 0 && invView === "meetings" ? (
           <MeetingsView companies={inTab} />
+        ) : view.tab === "invested" && counts.invested > 0 && invView === "results" ? (
+          <ResultsView companies={inTab} />
         ) : (
           <>
             {view.tab === "invested" && counts.invested > 0 && <PortfolioBar rows={inTab} view={view} />}
