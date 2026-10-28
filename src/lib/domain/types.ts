@@ -226,6 +226,8 @@ export interface QuarterRow {
   resultNoteAt: string | null;
   misFiles: QuarterFile[];
   resultFiles: QuarterFile[];
+  /** Other quarterly files (SHA, cap tables, …) */
+  otherFiles: QuarterFile[];
   remarks: string | null;
 }
 

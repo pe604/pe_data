@@ -13,6 +13,7 @@ import {
   monthsVsTotals,
   notInText,
   parseFigure,
+  periodMonths,
   readingsDiffer,
   type LineKind,
   type LineUnit,
@@ -22,11 +23,11 @@ import {
 import { cellNumber, gridText, readWorkbook } from "@/lib/mis/excelGrid";
 import { pdfText } from "./deck";
 import { execFile } from "node:child_process";
-import { aiModel, env } from "@/lib/env";
+import { env, misModel, misPdfModel } from "@/lib/env";
 import { withTempDir } from "@/lib/storage";
 import { aiProvider, AiError, type DeckInput, type ImageInput } from "./provider";
 
-// Full MIS reader (SPEC Â§15.11). Excel: the model maps the structure and figures come from the cells. PDF: the model
+// Full MIS reader (SPEC §15.11). Excel: the model maps the structure and figures come from the cells. PDF: the model
 // maps the structure, then copies figures as printed in batches, each checked against the file's text.
 // Never log file contents, prompts or model output.
 
@@ -47,23 +48,28 @@ export interface MisReadDraft {
   rows: DraftRow[];
 }
 
-// â”€â”€â”€ Shared rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared rules ────────────────────────────────────────────────────────────
 
 const RULES = [
   "You read a portfolio company's MIS (management information report) for an Indian private equity fund and map its figures into a history of line items by period.",
   "",
-  "SCOPE: the P&L (revenue lines and splits, costs, margins, EBITDA, depreciation, finance cost, other income, PBT, tax, PAT) and key business metrics (volumes, users/customers, AUM, orders, production and capacity, cash, debt, net debt, working capital and its days, headcount totals, capex). Also per-channel or per-segment P&Ls. SKIP: receivables/payables ageing by customer or vendor, loan-facility lists, customer-wise revenue lists, order-win lists, inventory ageing, detailed balance-sheet notes (a few balance-sheet totals like cash, debt, net worth are fine), cap tables and shareholding. If the file has nothing in scope (e.g. it's only a cap table), return no tables.",
+  "SCOPE: only what a one-page quarterly result needs. The company's main (consolidated, or the only) P&L at summary level: revenue (and its 2-4 main splits if shown), COGS / direct costs, gross profit or margin, the main expense heads (employee, marketing, other), contribution margins if the MIS uses them, EBITDA, depreciation, finance cost, other income, exceptional items, PBT, tax, PAT, and margin rows. Plus at most 10 headline business metrics (volumes, orders, customers/users, AUM, capacity or utilisation, capex, cash, debt). Usually 15-40 rows in all.",
+  "SKIP everything else, completely: per-channel, per-store, per-product, per-region or per-segment P&Ls and splits beyond the main ones, sub-ledgers and expense breakdowns below the main heads, balance-sheet detail, ageing, customer/vendor/order/loan lists, inventory detail, headcount detail, cohort tables, budget/plan, cap tables, shareholding and agreements (SHA). If the file has nothing in scope, return no tables.",
   "ONLY ACTUALS: never budget, plan, target, forecast, variance, growth (YoY, QoQ, % change), '% complete', or '% of revenue' columns. When a % column sits next to every amount column (share of revenue), skip it; margin ROWS (e.g. 'Gross Margin %', 'EBITDA %') are fine.",
   "",
-  "PERIODS (keys): month 'YYYY-MM' (e.g. 'Jan-26' â†’ '2026-01'); Indian financial-year quarter 'FYyy-Qn' (Q1 = Aprâ€“Jun; 'Q1FY27', 'Q1 FY2027', 'Aprâ€“Jun 2026' â†’ 'FY27-Q1'); half-year 'FYyy-H1'/'FYyy-H2'; full year 'FYyy' ('FY26', 'FY 2025-26', 'year ended 31.03.2026' â†’ 'FY26'); year-to-date 'YTD-YYYY-MM' ending that month ('FY27 YTD' or 'YTD' in a report up to Sep-26 â†’ 'YTD-2026-09'). A balance-sheet column 'as on 31.03.2026' or 'Mar-26' â†’ '2026-03'. For a single 'reporting month' column (e.g. 'SEPT' in a Sep-26 report) use that month.",
+  "PERIODS (keys): month 'YYYY-MM' (e.g. 'Jan-26' → '2026-01'); Indian financial-year quarter 'FYyy-Qn' (Q1 = Apr–Jun; 'Q1FY27', 'Q1 FY2027', 'Apr–Jun 2026' → 'FY27-Q1'); half-year 'FYyy-H1'/'FYyy-H2'; full year 'FYyy' ('FY26', 'FY 2025-26', 'year ended 31.03.2026' → 'FY26'); year-to-date 'YTD-YYYY-MM' ending that month ('FY27 YTD' or 'YTD' in a report up to Sep-26 → 'YTD-2026-09'). A balance-sheet column 'as on 31.03.2026' or 'Mar-26' → '2026-03'. For a single 'reporting month' column (e.g. 'SEPT' in a Sep-26 report) use that month.",
   "",
   "SECTIONS: name the table each row belongs to as it's headed, short: 'P&L', 'Balance sheet', 'Key metrics', 'Amazon.in', 'Retail EBO', 'smallcase Assets'. Rows with the same label in different tables are different lines, so their sections must differ.",
-  "ENTITY: if the MIS (its file name or title) is for a subsidiary, region or other entity rather than the main/consolidated company (e.g. '(UAE)', 'Subsidiary', 'Standalone' next to a consolidated one), prefix every section with it: 'UAE â€“ P&L'. Figures in another currency (e.g. AED): leave those tables out unless an INR version of the same table is not in the file.",
-  "LABELS: as printed, tidied (no trailing colons). When a sub-row's label only makes sense with its parent ('1P', '3P', 'Others'), prefix the parent: 'Non-Fee Assets â€“ 1P'.",
-  "UNIT: 'money' with its scale (Rupees, Thousand, Lakh, Mn, Cr, Bn) from the header or unit column ('Rs. cr' â†’ Cr, 'Rs. lakhs' â†’ Lakh, 'INR mn' â†’ Mn, plain 'INR' figures like 297,614,023 â†’ Rupees); 'percent' for percentages; 'number' for anything else with unitLabel as printed ('# (000s)', '# lakhs', 'INR/meter', 'x', 'days', 'units').",
+  "ENTITY: if the MIS (its file name or title) is for a subsidiary, region or other entity rather than the main/consolidated company (e.g. '(UAE)', 'Subsidiary', 'Standalone' next to a consolidated one), prefix every section with it: 'UAE – P&L'. Figures in another currency (e.g. AED): leave those tables out unless an INR version of the same table is not in the file.",
+  "LABELS: as printed, tidied (no trailing colons). When a sub-row's label only makes sense with its parent ('1P', '3P', 'Others'), prefix the parent: 'Non-Fee Assets – 1P'.",
+  "UNIT: 'money' with its scale (Rupees, Thousand, Lakh, Mn, Cr, Bn) from the header or unit column ('Rs. cr' → Cr, 'Rs. lakhs' → Lakh, 'INR mn' → Mn, plain 'INR' figures like 297,614,023 → Rupees); 'percent' for percentages; 'number' for anything else with unitLabel as printed ('# (000s)', '# lakhs', 'INR/meter', 'x', 'days', 'units').",
   "KIND: 'FLOW' for amounts over a period that add up (revenue, costs, profit, volumes produced or sold, orders, inflows, capex spent, cash generated); 'STOCK' for balances at a date (cash, debt, receivables, inventory, payables, net worth, assets/AUM, cumulative counts, users/investors/subscribers at a date, capacity, number of lines, employees); 'RATIO' for percentages, margins, per-unit figures, days, multiples, take rates, ROAS.",
+  "PERIODS IN SCOPE: only columns for periods ending in the last 15 months of the file (the latest quarter, the previous quarter, the same quarter last year, and their months, half-years and year to date). Skip older columns.",
   "Leave out rows that are empty for every period. Never invent rows or periods.",
 ].join("\n");
+
+/** Periods kept from a read: those ending within 15 months of the latest one (a result needs no more). */
+const KEEP_MONTHS = 15;
 
 const unitFields = {
   unit: { type: "string", enum: ["money", "percent", "number"] },
@@ -84,7 +90,23 @@ const lineUnit = (r: RowSpec): LineUnit => (r.unit === "money" ? "INR_CR" : r.un
 const toStored = (n: number, r: RowSpec) => (r.unit === "money" ? moneyToCr(n, (r.scale ?? "Cr") as MoneyScale) : n);
 const fmtFor = (r: RowSpec) => (n: number) => fmtLineValue(n, lineUnit(r));
 
-async function ask<T>(schema: z.ZodType<T>, jsonSchema: unknown, prompt: string, deck: DeckInput | ImageInput | null): Promise<T> {
+/** How to read: the model, and the lines a company's saved result format uses (read only those). */
+export interface ReadOptions {
+  /** For Excel and images (text + image model) */
+  model?: string;
+  /** For PDFs (needs a model that reads PDFs) */
+  pdfModel?: string;
+  /** Labels of the lines the company's result uses; empty = the summary scope in RULES */
+  want?: string[];
+}
+
+/** Prompt lines limiting the read to a saved result's lines. */
+const wantText = (o: ReadOptions) =>
+  o.want?.length
+    ? [`THIS COMPANY'S RESULT uses only these lines; read only them (match by meaning; give the MIS's own label), and nothing else: ${o.want.join("; ")}.`]
+    : [];
+
+async function ask<T>(schema: z.ZodType<T>, jsonSchema: unknown, prompt: string, deck: DeckInput | ImageInput | null, model: string): Promise<T> {
   const provider = aiProvider();
   const call = async () => {
     // Busy or briefly failing upstream (429, 5xx): wait and try again, up to 3 more times.
@@ -94,7 +116,7 @@ async function ask<T>(schema: z.ZodType<T>, jsonSchema: unknown, prompt: string,
           system: RULES,
           prompt,
           jsonSchema,
-          model: aiModel,
+          model,
           maxTokens: 32_000,
           ...(deck ? { deck } : {}),
         });
@@ -123,13 +145,22 @@ async function ask<T>(schema: z.ZodType<T>, jsonSchema: unknown, prompt: string,
 }
 
 function finish(format: MisReadDraft["format"], rows: DraftRow[]): MisReadDraft {
+  // Keep only recent periods: those ending within KEEP_MONTHS of the latest period read.
+  const endOf = (p: string) => periodMonths(p).at(-1) ?? "";
+  const latest = rows.flatMap((r) => r.values.map((v) => endOf(v.period))).sort().at(-1);
+  if (latest) {
+    const [y, m] = latest.split("-").map(Number);
+    const t = y * 12 + (m - 1) - (KEEP_MONTHS - 1);
+    const cutoff = `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+    for (const r of rows) r.values = r.values.filter((v) => endOf(v.period) >= cutoff);
+  }
   const kept = rows.filter((r) => r.values.length);
   const periods = [...new Set(kept.flatMap((r) => r.values.map((v) => v.period)))].sort(comparePeriods);
   for (const r of kept) r.values.sort((a, b) => comparePeriods(a.period, b.period));
   return { format, periods, rows: kept };
 }
 
-// â”€â”€â”€ Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Excel ───────────────────────────────────────────────────────────────────
 
 const excelJson = {
   type: "object",
@@ -175,18 +206,19 @@ const excelZ = z.object({
   ),
 });
 
-async function readExcel(data: Buffer, fileName: string, companyName: string): Promise<MisReadDraft> {
+async function readExcel(data: Buffer, fileName: string, companyName: string, o: ReadOptions): Promise<MisReadDraft> {
   const sheets = await readWorkbook(data);
   if (!sheets.length) throw new AiError("failed", "That Excel file has no visible sheets with data.");
   const prompt = [
     `Company: ${companyName}`,
     `File: ${fileName}`,
+    ...wantText(o),
     "The MIS is an Excel file. Its cells follow, sheet by sheet: 'R12: A=Revenue | C=123456789' means row 12, column A holds 'Revenue', column C holds 123456789.",
     "Map the tables in scope: for each, the sheet, a section name, which columns hold which period, and the rows in scope with their row number, label, unit and kind. Give cell addresses only; do not copy figures.",
     "---",
     gridText(sheets),
   ].join("\n");
-  const map = await ask(excelZ, excelJson, prompt, null);
+  const map = await ask(excelZ, excelJson, prompt, null, o.model ?? misModel);
   const rows: DraftRow[] = [];
   map.tables.forEach((t, ti) => {
     const cols = t.columns.filter((c) => /^[A-Z]{1,3}$/i.test(c.col) && isPeriodKey(c.period));
@@ -213,7 +245,7 @@ async function readExcel(data: Buffer, fileName: string, companyName: string): P
   return finish("excel", rows);
 }
 
-// â”€â”€â”€ PDF â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── PDF ─────────────────────────────────────────────────────────────────────
 
 const pdfMapJson = {
   type: "object",
@@ -286,7 +318,7 @@ const pdfValuesZ = z.object({
 const BATCH = 40;
 const MAX_FIGURES = 160;
 
-async function readPdf(data: Buffer, fileName: string, companyName: string): Promise<MisReadDraft> {
+async function readPdf(data: Buffer, fileName: string, companyName: string, o: ReadOptions): Promise<MisReadDraft> {
   const text = await pdfText(data);
   const pdf = { kind: "pdf" as const, data, fileName, text };
   const map = await ask(
@@ -295,12 +327,14 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
     [
       `Company: ${companyName}`,
       `File: ${fileName}`,
+      ...wantText(o),
       "The MIS is attached as a PDF; its text layer follows (columns may be out of order in the text; trust the PDF's layout).",
       "Map the tables in scope: for each, a section name, its actual-figure period columns (header as printed and period key), and the rows in scope with label, unit and kind. Do not copy figures yet.",
       "---",
       text,
     ].join("\n"),
     pdf,
+    o.pdfModel ?? misPdfModel,
   );
   type Spec = RowSpec & { ref: string; periods: { header: string; period: string }[] };
   const specs: Spec[] = [];
@@ -335,12 +369,13 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
             `Company: ${companyName}`,
             "Copy each listed row's figures from the attached MIS, EXACTLY as printed (same digits, separators, brackets or minus for negatives, % signs). Never convert, round, add up or calculate. null where blank or a dash.",
             "Be careful with wide tables: count the columns. In the text layer below, a row's figures are usually on the row's own line, left to right in the table's column order.",
-            "Rows (ref | section | label | columns as 'header â†’ period'):",
-            ...b.map((s) => `${s.ref} | ${s.section} | ${s.label} | ${s.periods.map((p) => `${p.header} â†’ ${p.period}`).join("; ")}`),
+            "Rows (ref | section | label | columns as 'header → period'):",
+            ...b.map((s) => `${s.ref} | ${s.section} | ${s.label} | ${s.periods.map((p) => `${p.header} → ${p.period}`).join("; ")}`),
             "--- Text layer:",
             text,
           ].join("\n"),
           pdf,
+          o.pdfModel ?? misPdfModel,
         ).catch(() => {
           // One bad batch should not lose the whole file: its rows fall back to the text layer below, flagged.
           for (const s of b) failed.add(s.ref);
@@ -351,9 +386,9 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
     for (const d of done) for (const r of d.rows) copied.set(r.ref, r.values);
   }
   if (specs.length && failed.size === specs.length) throw new AiError("failed", "The MIS could not be read. Try again, or enter the figures by hand.");
-  const seen = new Map<string, number>(); // label â†’ how many rows with it so far, to pick the right text line
+  const seen = new Map<string, number>(); // label → how many rows with it so far, to pick the right text line
   const rows: DraftRow[] = specs.map((s) => {
-    const own = lineKey(s.label.split(" â€“ ").pop() ?? s.label);
+    const own = lineKey(s.label.split(" – ").pop() ?? s.label);
     const occurrence = seen.get(own) ?? 0;
     seen.set(own, occurrence + 1);
     const model = new Map<string, string>();
@@ -400,7 +435,7 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
   return finish("pdf", rows);
 }
 
-// â”€â”€â”€ Image (a past result, a screenshot of an MIS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Image (a past result, a screenshot of an MIS) ───────────────────────────
 
 const imageJson = {
   type: "object",
@@ -453,18 +488,20 @@ const imageZ = z.object({
 const IMAGE_MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 
 /** One reading of the image into draft rows (no flags yet). */
-async function readImageOnce(image: ImageInput, fileName: string, companyName: string): Promise<DraftRow[]> {
+async function readImageOnce(image: ImageInput, fileName: string, companyName: string, o: ReadOptions): Promise<DraftRow[]> {
   const map = await ask(
     imageZ,
     imageJson,
     [
       `Company: ${companyName}`,
       `File: ${fileName}`,
+      ...wantText(o),
       "The attached image is a table of the company's figures: a result summary made by the fund, or a page of an MIS.",
       "Read every table in scope: section, and each row's label, unit, kind and figures by period key, each figure EXACTLY as printed (digits, separators, brackets or minus, % sign). Leave out blank or dash cells. Never calculate or round.",
       "Read the column headers carefully and count the columns, so each figure gets its own column's period.",
     ].join("\n"),
     image,
+    o.model ?? misModel,
   );
   const rows: DraftRow[] = [];
   map.tables.forEach((t, ti) =>
@@ -483,10 +520,10 @@ async function readImageOnce(image: ImageInput, fileName: string, companyName: s
 }
 
 /** An image has no text to check against: it's read twice, independently, and the readings are compared. */
-async function readImage(data: Buffer, fileName: string, companyName: string): Promise<MisReadDraft> {
+async function readImage(data: Buffer, fileName: string, companyName: string, o: ReadOptions): Promise<MisReadDraft> {
   const mime = IMAGE_MIME[fileName.toLowerCase().split(".").pop() ?? ""];
   const image: ImageInput = { kind: "image", data, mime, fileName };
-  const [first, second] = await Promise.all([readImageOnce(image, fileName, companyName), readImageOnce(image, fileName, companyName).catch(() => null)]);
+  const [first, second] = await Promise.all([readImageOnce(image, fileName, companyName, o), readImageOnce(image, fileName, companyName, o).catch(() => null)]);
   if (!second) {
     for (const r of first) r.flags.push("Read once only (the second reading failed): check against the image");
     return finish("image", first.map((r) => ({ ...r, flags: [...monthsVsTotals(r.kind, r.values, (n) => fmtLineValue(n, r.unit)), ...r.flags] })));
@@ -501,35 +538,43 @@ async function readImage(data: Buffer, fileName: string, companyName: string): P
       return { key: `${k}|${n}`, row: r };
     });
   };
-  const b = new Map(keyed(second).map((x) => [x.key, x.row]));
+  const secondKeyed = keyed(second);
+  const b = new Map(secondKeyed.map((x) => [x.key, x.row]));
   const used = new Set<string>();
   const rows: DraftRow[] = keyed(first).map(({ key, row }) => {
-    const other = b.get(key);
+    // Same section and label; else the same label alone (the readings may name a table differently).
+    let otherKey: string | undefined = b.has(key) && !used.has(key) ? key : undefined;
+    if (!otherKey) {
+      const label = lineKey(row.label);
+      const same = secondKeyed.filter((x) => !used.has(x.key) && lineKey(x.row.label) === label);
+      if (same.length === 1) otherKey = same[0].key;
+    }
+    const other = otherKey ? b.get(otherKey) : undefined;
     const fmt = (n: number) => fmtLineValue(n, row.unit);
     const flags = monthsVsTotals(row.kind, row.values, fmt);
-    if (!other) flags.push("Found in only one of two readings of the image: check against it");
+    if (!other || !otherKey) flags.push("Found in only one of two readings of the image: check against it");
     else {
-      used.add(key);
+      used.add(otherKey);
       const diff = readingsDiffer(row.values, other.values, fmt);
       if (diff.length) flags.push(`Two readings of the image differ (first one kept): ${diff.join("; ")}`);
       else if (other.unit !== row.unit) flags.push("Two readings of the image differ on the unit: check it");
     }
     return { ...row, flags };
   });
-  for (const x of keyed(second)) {
+  for (const x of secondKeyed) {
     if (used.has(x.key)) continue;
     rows.push({ ...x.row, ref: `B${x.row.ref}`, flags: ["Found in only one of two readings of the image: check against it"] });
   }
   return finish("image", rows);
 }
 
-// â”€â”€â”€ Old .xls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Old .xls ────────────────────────────────────────────────────────────────
 
 function runCmd(cmd: string, args: string[], timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => execFile(cmd, args, { timeout: timeoutMs, windowsHide: true }, (e) => (e ? reject(e) : resolve())));
 }
 
-/** Old .xls â†’ .xlsx via LibreOffice (in the Docker image); null when it isn't available. */
+/** Old .xls → .xlsx via LibreOffice (in the Docker image); null when it isn't available. */
 async function xlsToXlsx(data: Buffer): Promise<Buffer | null> {
   for (const soffice of [env.SOFFICE_PATH, "soffice", "libreoffice"].filter(Boolean)) {
     try {
@@ -545,18 +590,18 @@ async function xlsToXlsx(data: Buffer): Promise<Buffer | null> {
   return null;
 }
 
-// â”€â”€â”€ Entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Entry ───────────────────────────────────────────────────────────────────
 
 /** Reads a whole MIS or result file (PDF, .xlsx, .xlsm, .xls, PNG, JPG, WebP) into draft rows for review. Nothing is saved. */
-export async function readMisHistory(data: Buffer, fileName: string, companyName: string): Promise<MisReadDraft> {
+export async function readMisHistory(data: Buffer, fileName: string, companyName: string, o: ReadOptions = {}): Promise<MisReadDraft> {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
-  if (ext === "pdf") return readPdf(data, fileName, companyName);
-  if (IMAGE_MIME[ext]) return readImage(data, fileName, companyName);
-  if (ext === "xlsx" || ext === "xlsm") return readExcel(data, fileName, companyName);
+  if (ext === "pdf") return readPdf(data, fileName, companyName, o);
+  if (IMAGE_MIME[ext]) return readImage(data, fileName, companyName, o);
+  if (ext === "xlsx" || ext === "xlsm") return readExcel(data, fileName, companyName, o);
   if (ext === "xls") {
     const x = await xlsToXlsx(data);
     if (!x) throw new AiError("failed", "This old .xls file can't be read here. Save it as .xlsx and upload again.");
-    return readExcel(x, fileName, companyName);
+    return readExcel(x, fileName, companyName, o);
   }
   throw new AiError("failed", "Read figures works on PDF, Excel and image (PNG, JPG) files.");
 }

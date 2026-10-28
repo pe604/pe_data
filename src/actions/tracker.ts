@@ -7,6 +7,10 @@ import { db } from "@/lib/db";
 import { dateToISO, fmtDate, isISODate, todayISO } from "@/lib/domain/dates";
 import { defaultMisDue, isQuarterKey, MEETING_STATUS_LABELS, MEETING_STATUSES, MEETING_TYPES, quarterLabel } from "@/lib/domain/quarters";
 import type { MeetingItem, QuarterView } from "@/lib/domain/types";
+import { QUARTER_FILE_KINDS, QUARTER_FILE_LABELS, type QuarterFileKind } from "@/lib/domain/constants";
+import { isReadableFigures } from "@/lib/domain/misHistory";
+import { aiConfigured } from "@/lib/env";
+import { queueRead } from "@/lib/mis/readJobs";
 import { run, UserError } from "@/lib/server/action";
 import { audit } from "@/lib/server/company";
 
@@ -37,7 +41,7 @@ async function loadQuarter(q: string): Promise<QuarterView> {
         people: { where: { role: "PE" }, orderBy: { position: "asc" }, select: { teamMember: { select: { name: true } } } },
         checks: { where: { quarter: q } },
         files: {
-          where: { quarter: q, kind: { in: ["MIS", "RESULT_NOTE"] } },
+          where: { quarter: q, kind: { in: [...QUARTER_FILE_KINDS] } },
           orderBy: { uploadedAt: "asc" },
           select: { id: true, originalName: true, mime: true, kind: true, uploadedAt: true },
         },
@@ -65,6 +69,7 @@ async function loadQuarter(q: string): Promise<QuarterView> {
         resultNoteAt: firstDate(notes),
         misFiles: mis.map(item),
         resultFiles: notes.map(item),
+        otherFiles: c.files.filter((f) => f.kind === "OTHER").map(item),
         remarks: k?.remarks ?? null,
       };
     }),
@@ -93,6 +98,34 @@ export async function setQuarterRemarks(companyId: string, q: string, remarks: s
       await audit(tx, cid, me.id, [{ note: text ? `Updated ${quarterLabel(qk)} remarks: ${text}` : `Cleared ${quarterLabel(qk)} remarks` }]);
     });
     return loadQuarter(qk);
+  });
+}
+
+/**
+ * Moves a quarterly file between MIS, Result note and Other files (e.g. an SHA uploaded as MIS). Leaving MIS stops
+ * and discards any read of it; becoming an MIS starts one (SPEC §15.2, §15.11). Returns whether a read started.
+ */
+export async function moveQuarterFile(companyId: string, fileId: string, kind: string) {
+  return run<{ reading: boolean }>(async () => {
+    const me = await requireRole();
+    const cid = id.parse(companyId);
+    const fid = id.parse(fileId);
+    const to = z.enum(QUARTER_FILE_KINDS).parse(kind);
+    await investedCompany(cid);
+    const f = await db.file.findFirst({ where: { id: fid, companyId: cid }, select: { kind: true, quarter: true, originalName: true } });
+    if (!f || !f.quarter) throw new UserError("That file no longer exists. Reload the page.");
+    if (f.kind === to) return { reading: false };
+    const from = f.kind as QuarterFileKind;
+    await db.$transaction(async (tx) => {
+      await tx.file.update({ where: { id: fid }, data: { kind: to } });
+      if (from === "MIS") await tx.misReadJob.updateMany({ where: { fileId: fid, status: { not: "CLOSED" } }, data: { status: "CLOSED" } });
+      await audit(tx, cid, me.id, [
+        { note: `Moved ${f.originalName} (${quarterLabel(f.quarter ?? "")}) from ${QUARTER_FILE_LABELS[from] ?? from} to ${QUARTER_FILE_LABELS[to]}` },
+      ]);
+    });
+    const reading = to === "MIS" && aiConfigured && isReadableFigures(f.originalName);
+    if (reading) await queueRead(cid, fid, me.id);
+    return { reading };
   });
 }
 

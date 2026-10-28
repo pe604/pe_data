@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { closeMisRead, listMisReads, openMisRead, startMisRead } from "@/actions/misHistory";
+import { moveQuarterFile } from "@/actions/tracker";
+import { QUARTER_FILE_KINDS, QUARTER_FILE_LABELS, type QuarterFileKind } from "@/lib/domain/constants";
 import { todayISO } from "@/lib/domain/dates";
 import { isReadableFigures } from "@/lib/domain/misHistory";
-import { lastEndedQuarter, quarterLabel, quarterOptions } from "@/lib/domain/quarters";
+import { lastEndedQuarter, QUARTER_FILE_EXTS, quarterLabel, quarterOptions } from "@/lib/domain/quarters";
 import type { FileItem, MisReadJobItem, MisReadView } from "@/lib/domain/types";
 import { canView, downloadFile, FileViewer, type ViewableFile } from "../ui/FileViewer";
 import { useStore } from "../store";
@@ -33,8 +35,9 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
   const [showOlder, setShowOlder] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const noteInput = useRef<HTMLInputElement>(null);
-  // MIS and result-note files by quarter, newest quarter first.
-  const quarterFiles = files.filter((f) => f.quarter && (f.kind === "MIS" || f.kind === "RESULT_NOTE"));
+  const otherInput = useRef<HTMLInputElement>(null);
+  // MIS, result-note and other quarterly files by quarter, newest quarter first.
+  const quarterFiles = files.filter((f) => f.quarter && (QUARTER_FILE_KINDS as readonly string[]).includes(f.kind));
   const fileQuarters = [...new Set(quarterFiles.map((f) => f.quarter as string))].sort().reverse();
 
   // Background reads (a large MIS takes minutes): load, and poll while any is running.
@@ -104,6 +107,18 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
     else toast("Uploaded.");
   };
 
+  /** Moves a quarterly file between MIS, result note and other files (an SHA uploaded as MIS, say). */
+  const moveFile = async (fileId: string, to: QuarterFileKind) => {
+    setBusy("Moving…");
+    const r = await moveQuarterFile(companyId, fileId, to);
+    setBusy(null);
+    if (!r.ok) return toast(r.error);
+    toast(`Moved to ${QUARTER_FILE_LABELS[to]}.` + (r.data.reading ? " Reading its figures in the background." : ""));
+    await reload();
+    const l = await listMisReads(companyId);
+    if (l.ok) takeReads(l.data);
+  };
+
   return (
     <section>
       <div className="inv-head">
@@ -123,6 +138,32 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
             <button className="btn sm" type="button" onClick={() => noteInput.current?.click()}>
               Upload result note
             </button>
+            <button className="btn sm" type="button" onClick={() => otherInput.current?.click()}>
+              Upload other file
+            </button>
+            <input
+              ref={otherInput}
+              type="file"
+              hidden
+              multiple
+              aria-label="Other quarterly files"
+              accept={QUARTER_FILE_EXTS.OTHER.map((e) => "." + e).join(",")}
+              onChange={async (e) => {
+                const picked = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                if (!picked.length) return;
+                let done = 0;
+                for (const [i, f] of picked.entries()) {
+                  setBusy(picked.length > 1 ? `Uploading ${i + 1} of ${picked.length}…` : "Uploading…");
+                  const up = await uploadFile(f, { kind: "OTHER", companyId, quarter: uploadQuarter });
+                  if (up.ok) done++;
+                  else toast(`${f.name}: ${up.error}`);
+                }
+                setBusy(null);
+                if (done) toast(`Uploaded ${done} other file${done === 1 ? "" : "s"} for ${quarterLabel(uploadQuarter)}.`);
+                await reload();
+              }}
+            />
             <input
               ref={noteInput}
               type="file"
@@ -206,11 +247,13 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
           {(showOlder ? fileQuarters : fileQuarters.slice(0, 2)).map((q) => (
             <div key={q} className="qfiles-q">
               <div className="qfiles-head">{quarterLabel(q)}</div>
-              {(["MIS", "RESULT_NOTE"] as const).map((kind) => {
+              {QUARTER_FILE_KINDS.map((kind) => {
                 const list = quarterFiles.filter((f) => f.quarter === q && f.kind === kind);
+                // Other files only show when there are some.
+                if (kind === "OTHER" && !list.length) return null;
                 return (
                   <div key={kind} className="qfiles-row">
-                    <span className="qfiles-kind">{kind === "MIS" ? "MIS" : "Result note"}</span>
+                    <span className="qfiles-kind">{QUARTER_FILE_LABELS[kind]}</span>
                     {list.length ? (
                       <ul>
                         {list.map((f) => (
@@ -226,11 +269,25 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
                             <button className="btn-ghost sm" type="button" onClick={() => downloadFile(f.id)}>
                               Download
                             </button>
-                            {!busy && isReadableFigures(f.originalName) && (
+                            {!busy && kind !== "OTHER" && isReadableFigures(f.originalName) && (
                               <button className="btn-ghost sm" type="button" onClick={() => void readFile(f.id)}>
                                 Read figures
                               </button>
                             )}
+                            <select
+                              className="sel sm"
+                              aria-label={`Move ${f.originalName} to`}
+                              value=""
+                              disabled={!!busy}
+                              onChange={(e) => e.target.value && void moveFile(f.id, e.target.value as QuarterFileKind)}
+                            >
+                              <option value="">Move to…</option>
+                              {QUARTER_FILE_KINDS.filter((k) => k !== kind).map((k) => (
+                                <option key={k} value={k}>
+                                  {QUARTER_FILE_LABELS[k]}
+                                </option>
+                              ))}
+                            </select>
                           </li>
                         ))}
                       </ul>

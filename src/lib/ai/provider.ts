@@ -37,6 +37,9 @@ export class AiError extends Error {
   }
 }
 
+/** Running totals of AI use in this process (counts and cost only, never content), for logs and checks. */
+export const aiUsage = { calls: 0, tokensIn: 0, tokensOut: 0, costUsd: 0 };
+
 type ContentPart =
   | { type: "text"; text: string }
   | { type: "file"; file: { filename: string; file_data: string } }
@@ -76,6 +79,8 @@ class OpenRouterProvider implements AiProvider {
           response_format: { type: "json_schema", json_schema: { name: "deck_summary", strict: true, schema: jsonSchema } },
           // NDA decks: only providers that don't store or train on prompts, and that support the schema.
           provider: { data_collection: "deny", require_parameters: true },
+          // Token counts and cost in the answer, for aiUsage (numbers only).
+          usage: { include: true },
           ...(deck?.kind === "pdf" ? { plugins: [{ id: "file-parser", pdf: { engine: "native" } }] } : {}),
         }),
       });
@@ -87,7 +92,14 @@ class OpenRouterProvider implements AiProvider {
     const body = (await res.json().catch(() => null)) as {
       choices?: { message?: { content?: string | null }; finish_reason?: string }[];
       error?: { code?: number; metadata?: { scope?: string } };
+      usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
     } | null;
+    if (body?.usage) {
+      aiUsage.calls++;
+      aiUsage.tokensIn += body.usage.prompt_tokens ?? 0;
+      aiUsage.tokensOut += body.usage.completion_tokens ?? 0;
+      aiUsage.costUsd += body.usage.cost ?? 0;
+    }
     if (res.status === 402) throw new AiError("no_credits", "The AI account is out of credits. Top up OpenRouter and generate again.", 402);
     // The key's own monthly spending limit (set in OpenRouter) is reached: 403 with scope "key_limit".
     if (res.status === 403 && body?.error?.metadata?.scope === "key_limit") {

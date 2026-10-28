@@ -1,7 +1,8 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { readMisHistory, type MisReadDraft } from "@/lib/ai/misRead";
-import { AiError } from "@/lib/ai/provider";
+import { AiError, aiUsage } from "@/lib/ai/provider";
+import { resultFormatZ, usedLineIds } from "@/lib/domain/resultFormat";
 import { storage } from "@/lib/storage";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -39,7 +40,14 @@ async function runJob(jobId: string) {
   try {
     const job = await db.misReadJob.findUniqueOrThrow({ where: { id: jobId }, include: { file: true, company: { select: { name: true } } } });
     if (!job.file) throw new AiError("failed", "That file no longer exists. Upload it again.");
-    const draft = await readMisHistory(await storage().read(job.file.storageKey), job.file.originalName, job.company.name);
+    // With a saved result format, read only the lines it uses (much less to read).
+    const saved = await db.resultFormat.findUnique({ where: { companyId: job.companyId }, select: { spec: true } });
+    const parsed = saved ? resultFormatZ.safeParse(saved.spec) : null;
+    const ids = parsed?.success ? [...usedLineIds(parsed.data)] : [];
+    const want = ids.length ? (await db.misLine.findMany({ where: { id: { in: ids } }, select: { label: true } })).map((l) => l.label) : [];
+    const before = aiUsage.costUsd;
+    const draft = await readMisHistory(await storage().read(job.file.storageKey), job.file.originalName, job.company.name, { want });
+    console.log("[mis-read-job] read", jobId, draft.rows.length, "rows", `$${(aiUsage.costUsd - before).toFixed(4)}`);
     if (!draft.rows.length) throw new AiError("failed", "No P&L or business figures found in this file.");
     const result: StoredRead = { ...draft, fileName: job.file.originalName, source: job.file.kind === "RESULT_NOTE" ? "RESULT" : "MIS" };
     await db.misReadJob.updateMany({

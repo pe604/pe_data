@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       quarter: form.get("quarter") || null,
     });
     if (p.quarter) {
-      if (!p.companyId || !(QUARTER_FILE_KINDS as readonly string[]).includes(p.kind)) throw new UserError("Only MIS and result-note files belong to a quarter.");
+      if (!p.companyId || !(QUARTER_FILE_KINDS as readonly string[]).includes(p.kind)) throw new UserError("Only MIS, result-note and other quarterly files belong to a quarter.");
       const c = await db.company.findUnique({ where: { id: p.companyId }, select: { status: true } });
       if (c?.status !== "INVESTED") throw new UserError("Quarterly files are only for companies in Invested.");
     }

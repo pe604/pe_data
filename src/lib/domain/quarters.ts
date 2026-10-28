@@ -103,7 +103,10 @@ export function misState(misAt: string | null, due: string, today: string): "rec
 export const QUARTER_FILE_EXTS = {
   MIS: ["pdf", "xlsx", "xlsm", "xls", "csv"],
   RESULT_NOTE: ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "png", "jpg", "jpeg", "webp"],
+  OTHER: ["pdf", "docx", "doc", "xlsx", "xls", "xlsm", "pptx", "ppt", "png", "jpg", "jpeg", "webp", "csv", "txt", "zip"],
 } as const;
+/** The types each column takes, for messages. */
+export const QUARTER_FILE_TYPES = { MIS: "PDF, Excel or CSV", RESULT_NOTE: "PDF, Word, Excel, PowerPoint or image", OTHER: "PDF, Office, image, CSV or zip" } as const;
 
 /**
  * Splits picked files (several, or a whole folder) into ones to upload and ones skipped: wrong type, hidden or

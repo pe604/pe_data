@@ -708,3 +708,4 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .mread.failed{border-color:var(--brick);background:var(--brick-soft)}
 .rv-reads{margin:0 28px 12px;padding:8px 12px;border-radius:8px;background:var(--gold-soft);color:var(--ink-2);font-size:13px}
 @media (max-width:760px){.rv-reads{margin:0 16px 12px}}
+.q-count{font-size:12.5px;color:var(--ink-2)}

@@ -496,6 +496,13 @@ test("MIS figures: upload from the company file, build the figures history by ha
   await expect(drawer.locator(".qfiles-q").first()).toContainText("mis.xlsx");
   await expect(drawer.locator(".mf")).toContainText("No figures yet");
 
+  // A file uploaded as MIS by mistake moves to Other files, and back.
+  await drawer.getByLabel("Move mis.xlsx to").selectOption("OTHER");
+  await expect(page.locator(".toast")).toContainText("Moved to Other files.");
+  await expect(drawer.locator(".qfiles-q").first().locator(".qfiles-row", { hasText: "Other files" })).toContainText("mis.xlsx");
+  await drawer.getByLabel("Move mis.xlsx to").selectOption("MIS");
+  await expect(page.locator(".toast")).toContainText("Moved to MIS.");
+
   // Add a line and a quarter, then type figures into the grid.
   const pop = page.locator(".pop");
   await drawer.getByRole("button", { name: "Add line" }).click();

@@ -43,8 +43,10 @@ export const FILE_KIND_LABELS: Record<FileKind, string> = {
   OTHER: "Other",
 };
 /** File types that belong to a quarter (uploaded from the quarterly tracker). */
-export const QUARTER_FILE_KINDS = ["MIS", "RESULT_NOTE"] as const;
+/** Files kept per quarter: MIS, result note, and other quarterly files (SHA, cap tables, …; never read by AI). */
+export const QUARTER_FILE_KINDS = ["MIS", "RESULT_NOTE", "OTHER"] as const;
 export type QuarterFileKind = (typeof QUARTER_FILE_KINDS)[number];
+export const QUARTER_FILE_LABELS: Record<QuarterFileKind, string> = { MIS: "MIS", RESULT_NOTE: "Result note", OTHER: "Other files" };
 
 // Sector master list (SPEC §8). Added on app start if missing; existing names are never renamed (companies use them).
 // Oct 2026: the firm's portfolio sector names, no overlapping pairs (older names such as Consumer & Retail, Power & T&D,
