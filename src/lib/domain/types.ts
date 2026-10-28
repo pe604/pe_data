@@ -179,6 +179,16 @@ export interface MisDraftRowView {
   conflicts: { period: string; saved: number }[];
 }
 
+/** A background read of an MIS or result file (SPEC §15.11). */
+export interface MisReadJobItem {
+  id: string;
+  fileId: string | null;
+  fileName: string;
+  status: "QUEUED" | "RUNNING" | "DONE" | "FAILED";
+  error: string | null;
+  createdAt: string;
+}
+
 export interface MisReadView {
   fileName: string;
   format: "excel" | "pdf" | "image" | "paste";

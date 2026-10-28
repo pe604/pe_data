@@ -701,3 +701,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .rs-derived{text-decoration:underline dotted var(--res-rule);text-underline-offset:3px}
 .rs-problem{color:var(--res-warn)}
 .rv-out{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.mreads{list-style:none;margin:8px 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}
+.mread{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--surface-2);font-size:13px}
+.mread span{flex:1;min-width:200px}
+.mread.done{border-color:var(--green);background:var(--green-soft)}
+.mread.failed{border-color:var(--brick);background:var(--brick-soft)}

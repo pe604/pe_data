@@ -108,13 +108,15 @@ async function ask<T>(schema: z.ZodType<T>, jsonSchema: unknown, prompt: string,
       }
     }
   };
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // The model now and then returns cut-off or malformed JSON: up to three tries.
+  for (let attempt = 0; attempt < 3; attempt++) {
     const text = await call();
     try {
       const r = schema.safeParse(JSON.parse(text));
       if (r.success) return r.data;
+      console.warn("[mis-read] answer did not match the schema", attempt);
     } catch {
-      /* retry */
+      console.warn("[mis-read] answer was not valid JSON", attempt, text.length);
     }
   }
   throw new AiError("failed", "The MIS could not be read. Try again, or enter the figures by hand.");

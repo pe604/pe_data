@@ -2,16 +2,14 @@
 
 // Figures history (SPEC §15.11): read an MIS for review, save reviewed figures, and view or edit the history.
 import { z } from "zod";
-import { readMisHistory } from "@/lib/ai/misRead";
-import { AiError } from "@/lib/ai/provider";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { comparePeriods, isPeriodKey, LINE_KINDS, LINE_UNITS, lineKey, matchLine, MONEY_SCALES, parsePastedTable, periodLabel } from "@/lib/domain/misHistory";
-import type { MisLineItem, MisReadView } from "@/lib/domain/types";
+import type { MisLineItem, MisReadJobItem, MisReadView } from "@/lib/domain/types";
 import { aiConfigured } from "@/lib/env";
+import { queueRead, type StoredRead } from "@/lib/mis/readJobs";
 import { run, UserError } from "@/lib/server/action";
 import { audit } from "@/lib/server/company";
-import { storage } from "@/lib/storage";
 
 const id = z.string().min(1).max(40);
 const period = z.string().refine(isPeriodKey, "Invalid period");
@@ -63,26 +61,74 @@ export async function getMisHistory(companyId: string) {
   });
 }
 
-/** Reads a whole MIS file for review. Nothing is saved. Can take a few minutes on a large file. */
-export async function readMisFigures(companyId: string, fileId: string) {
-  return run<MisReadView>(async () => {
+// ─── Background reads (a large MIS takes minutes) ────────────────────────────
+
+/** The company's open reads (not saved, discarded or dismissed), newest first. */
+async function readsOf(companyId: string): Promise<MisReadJobItem[]> {
+  const jobs = await db.misReadJob.findMany({
+    where: { companyId, status: { not: "CLOSED" }, createdAt: { gt: new Date(Date.now() - 14 * 86_400_000) } },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    include: { file: { select: { originalName: true } } },
+  });
+  return jobs.map((j) => ({
+    id: j.id,
+    fileId: j.fileId,
+    fileName: j.file?.originalName ?? "Deleted file",
+    status: j.status as MisReadJobItem["status"],
+    error: j.error,
+    createdAt: j.createdAt.toISOString(),
+  }));
+}
+
+export async function listMisReads(companyId: string) {
+  return run<MisReadJobItem[]>(async () => {
     await requireRole();
+    const cid = id.parse(companyId);
+    await investedCompany(cid);
+    return readsOf(cid);
+  });
+}
+
+/** Read figures: queues a background read of an MIS or result file. Nothing is saved until the review is. */
+export async function startMisRead(companyId: string, fileId: string) {
+  return run<MisReadJobItem[]>(async () => {
+    const me = await requireRole();
     const cid = id.parse(companyId);
     const fid = id.parse(fileId);
     if (!aiConfigured) throw new UserError("AI reading is not set up. Enter the figures by hand.");
-    const c = await investedCompany(cid);
-    const f = await db.file.findFirst({ where: { id: fid, companyId: cid } });
+    await investedCompany(cid);
+    const f = await db.file.findFirst({ where: { id: fid, companyId: cid }, select: { id: true } });
     if (!f) throw new UserError("That file no longer exists. Upload it again.");
-    let draft;
-    try {
-      draft = await readMisHistory(await storage().read(f.storageKey), f.originalName, c.name);
-    } catch (e) {
-      if (e instanceof AiError) throw new UserError(e.message);
-      console.error("[mis] read failed", fid, (e as Error)?.name);
-      throw new UserError("The MIS could not be read. Try again, or enter the figures by hand.");
-    }
-    if (!draft.rows.length) throw new UserError("No P&L or business figures found in this file.");
-    return toView(cid, { fileName: f.originalName, format: draft.format, source: f.kind === "RESULT_NOTE" ? "RESULT" : "MIS", skipped: [], periods: draft.periods }, draft.rows);
+    await queueRead(cid, fid, me.id);
+    return readsOf(cid);
+  });
+}
+
+/** A finished read as the review screen, matched to the lines saved now. */
+export async function openMisRead(companyId: string, jobId: string) {
+  return run<MisReadView & { jobId: string; fileId: string | null }>(async () => {
+    await requireRole();
+    const cid = id.parse(companyId);
+    const jid = id.parse(jobId);
+    await investedCompany(cid);
+    const job = await db.misReadJob.findFirst({ where: { id: jid, companyId: cid } });
+    if (!job || job.status !== "DONE" || !job.result) throw new UserError("That read isn't ready. Reload the page.");
+    const r = job.result as unknown as StoredRead;
+    const view = await toView(cid, { fileName: r.fileName, format: r.format, source: r.source, skipped: [], periods: r.periods }, r.rows);
+    return { ...view, jobId: jid, fileId: job.fileId };
+  });
+}
+
+/** Discards a finished read, or dismisses a failed one. */
+export async function closeMisRead(companyId: string, jobId: string) {
+  return run<MisReadJobItem[]>(async () => {
+    await requireRole();
+    const cid = id.parse(companyId);
+    const jid = id.parse(jobId);
+    await investedCompany(cid);
+    await db.misReadJob.updateMany({ where: { id: jid, companyId: cid, status: { in: ["DONE", "FAILED"] } }, data: { status: "CLOSED" } });
+    return readsOf(cid);
   });
 }
 
@@ -132,11 +178,12 @@ const saveRow = z.object({
 });
 
 /** Saves reviewed figures (from a file, or pasted) into the history; replaces values for the same line and period. */
-export async function saveMisFigures(companyId: string, fileId: string | null, rows: z.input<typeof saveRow>[]) {
+export async function saveMisFigures(companyId: string, fileId: string | null, rows: z.input<typeof saveRow>[], jobId?: string) {
   return run<MisLineItem[]>(async () => {
     const me = await requireRole();
     const cid = id.parse(companyId);
     const fid = fileId === null ? null : id.parse(fileId);
+    const jid = jobId === undefined ? null : id.parse(jobId);
     const list = z.array(saveRow).min(1, "Pick at least one row to save").max(3000).parse(rows);
     await investedCompany(cid);
     const file = fid ? await db.file.findFirst({ where: { id: fid, companyId: cid }, select: { originalName: true, kind: true } }) : null;
@@ -181,6 +228,8 @@ export async function saveMisFigures(companyId: string, fileId: string | null, r
         }
         const ps = [...periods].sort(comparePeriods);
         const span = ps.length ? (ps.length === 1 ? periodLabel(ps[0]) : `${periodLabel(ps[0])} to ${periodLabel(ps[ps.length - 1])}`) : "";
+        // The background read these figures came from is done with.
+        if (jid) await tx.misReadJob.updateMany({ where: { id: jid, companyId: cid }, data: { status: "CLOSED" } });
         await audit(tx, cid, me.id, [
           { note: `Saved ${figures.toLocaleString("en-IN")} MIS figures (${list.length} lines${span ? `, ${span}` : ""}) ${file ? `from ${file.originalName}` : "from a pasted table"}` },
         ]);

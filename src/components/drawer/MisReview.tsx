@@ -44,6 +44,7 @@ const HOW: Record<MisReadView["format"], string> = {
 export function MisReview({
   companyId,
   fileId,
+  jobId,
   view,
   onClose,
   onSaved,
@@ -51,6 +52,8 @@ export function MisReview({
   companyId: string;
   /** null for a pasted table */
   fileId: string | null;
+  /** The background read the figures came from (closed on save) */
+  jobId?: string;
   view: MisReadView;
   onClose: () => void;
   onSaved: (lines: MisLineItem[]) => void;
@@ -124,6 +127,7 @@ export function MisReview({
           values: Object.entries(s.values).map(([period, value]) => ({ period, value })),
         };
       }),
+      jobId,
     );
     setSaving(false);
     if (!r.ok) return toast(r.error);

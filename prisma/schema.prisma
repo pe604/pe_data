@@ -95,6 +95,7 @@ model User {
   misEntered        MisFigure[]
   misValuesSet      MisValue[]
   resultFormats     ResultFormat[]
+  misReadJobs       MisReadJob[]
 }
 
 /// Names used in PE / Research / Via chips. Not necessarily app users.
@@ -177,6 +178,7 @@ model Company {
   misFigures  MisFigure[]
   misLines    MisLine[]
   resultFormat ResultFormat?
+  misReadJobs  MisReadJob[]
   reminders   ReminderLog[]
   newsWatch   NewsWatch?
   newsItems   NewsItem[]
@@ -232,6 +234,7 @@ model File {
   summaryJobs SummaryJob[]
   misFigures  MisFigure[]
   misValues   MisValue[]
+  misReadJobs MisReadJob[]
 
   @@index([companyId, uploadedAt])
   @@index([companyId, kind])
@@ -623,6 +626,31 @@ model MisValue {
   updatedAt    DateTime @updatedAt
 
   @@unique([lineId, period])
+}
+
+/// A background read of an MIS or result file into draft figures (SPEC §15.11). `result` holds the draft rows
+/// (figures only, never file text); nothing reaches MisValue until the review is saved.
+model MisReadJob {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fileId      String?
+  file        File?     @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  /// QUEUED, RUNNING, DONE, FAILED, CLOSED (saved, discarded or dismissed)
+  status      String    @default("QUEUED")
+  attempts    Int       @default(0)
+  /// User-facing message only
+  error       String?
+  result      Json?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  heartbeatAt DateTime?
+  finishedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@index([companyId, createdAt])
 }
 
 /// A company's result format (SPEC §15.12): columns relative to the quarter, tables of rows. Validated by

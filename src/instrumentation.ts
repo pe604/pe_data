@@ -4,6 +4,8 @@ export async function register() {
     await ensureSectors().catch((e) => console.error("[bootstrap] sectors failed", (e as { code?: string }).code));
     const { startWorker } = await import("@/lib/ai/jobs");
     startWorker();
+    const { startMisReadWorker } = await import("@/lib/mis/readJobs");
+    startMisReadWorker();
     const { startWhatsAppPoller } = await import("@/lib/whatsapp/intake");
     startWhatsAppPoller();
     const { startReminderScheduler } = await import("@/lib/whatsapp/reminders");
