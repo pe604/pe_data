@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { resultFormatZ, type LineData, type ResultFormat } from "@/lib/domain/resultFormat";
 import { run, UserError } from "@/lib/server/action";
 import { audit } from "@/lib/server/company";
+import { investedCompany, loadResultLines } from "@/lib/server/results";
 
 const id = z.string().min(1).max(40);
 
@@ -16,38 +17,27 @@ export interface ResultSetup {
   format: ResultFormat | null;
   locked: boolean;
   savedAt: string | null;
+  /** Result-note files already saved, by quarter (to ask before adding more) */
+  notes: Record<string, string[]>;
 }
 
 async function setupOf(companyId: string): Promise<ResultSetup> {
-  const [lines, saved] = await Promise.all([
-    db.misLine.findMany({
-      where: { companyId },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { values: { select: { period: true, value: true } } },
-    }),
+  const [lines, saved, files] = await Promise.all([
+    loadResultLines(companyId),
     db.resultFormat.findUnique({ where: { companyId } }),
+    db.file.findMany({ where: { companyId, kind: "RESULT_NOTE", quarter: { not: null } }, select: { quarter: true, originalName: true } }),
   ]);
   // A saved format that no longer parses (shouldn't happen) is treated as none rather than breaking the page.
   const parsed = saved ? resultFormatZ.safeParse(saved.spec) : null;
+  const notes: Record<string, string[]> = {};
+  for (const f of files) if (f.quarter) (notes[f.quarter] ??= []).push(f.originalName);
   return {
-    lines: lines.map((l) => ({
-      id: l.id,
-      section: l.section,
-      label: l.label,
-      unit: l.unit as LineData["unit"],
-      kind: l.kind as LineData["kind"],
-      values: Object.fromEntries(l.values.map((v) => [v.period, Number(v.value)])),
-    })),
+    lines,
     format: parsed?.success ? parsed.data : null,
     locked: saved?.locked ?? false,
     savedAt: saved?.updatedAt.toISOString() ?? null,
+    notes,
   };
-}
-
-async function investedCompany(companyId: string) {
-  const c = await db.company.findUnique({ where: { id: companyId }, select: { id: true, status: true } });
-  if (!c) throw new UserError("That company no longer exists. Reload the page.");
-  if (c.status !== "INVESTED") throw new UserError("Results are only for companies in Invested.");
 }
 
 export async function getResultSetup(companyId: string) {

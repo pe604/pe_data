@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconX } from "./icons";
 
@@ -176,9 +176,10 @@ export function ConfirmModal({
   onOk: () => void;
   onCancel: () => void;
 }) {
+  const id = useId();
   return (
-    <Modal onClose={onCancel}>
-      <ModalHead title={title} sub={text} />
+    <Modal onClose={onCancel} labelledBy={id}>
+      <ModalHead id={id} title={title} sub={text} />
       <div className="m-foot">
         <button className="btn" type="button" onClick={onCancel}>
           Cancel

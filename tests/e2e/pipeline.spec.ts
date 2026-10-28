@@ -599,6 +599,29 @@ test("results: figures pasted in the company file build a live preview; the form
   await page.getByRole("tablist", { name: "Invested views" }).getByRole("tab", { name: "Results" }).click();
   await page.getByLabel("Company", { exact: true }).selectOption({ label: a });
   await expect(page.getByLabel(`Result preview: ${a} Private Limited`)).toContainText("This quarter");
+
+  // Downloads save nothing: an image and an Excel with real numbers.
+  const [png] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download image" }).click()]);
+  expect(png.suggestedFilename()).toBe(`${a} result ${quarterLabel(q)}.png`);  const [xlsx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download Excel" }).click()]);
+  expect(xlsx.suggestedFilename()).toBe(`${a} result ${quarterLabel(q)}.xlsx`);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(await xlsx.path());
+  const ws = wb.worksheets[0];
+  expect(ws.getCell("A1").value).toBe(`${a} Private Limited`);
+  expect(ws.getCell("A3").value).toBe("Revenue");
+  expect(ws.getCell("B3").value).toBe(250);
+  expect(ws.getCell("D3").value).toBe("25.00%");
+
+  // Only Save as result note saves: both files go to the quarter's result note (tracker tick).
+  await page.getByRole("button", { name: `Save as result note (${quarterLabel(q)})` }).click();
+  await expect(page.locator(".toast")).toContainText(`Saved the result as ${quarterLabel(q)}'s result note`);
+  // A second save asks first.
+  await page.getByRole("button", { name: `Save as result note (${quarterLabel(q)})` }).click();
+  const ask = page.getByRole("dialog", { name: `Add to ${quarterLabel(q)}'s result note?` });
+  await expect(ask).toContainText(`${a} result ${quarterLabel(q)}.png`);
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("tablist", { name: "Invested views" }).getByRole("tab", { name: "Quarterly tracker" }).click();
+  await expect(page.getByRole("button", { name: `Result note for ${a}` })).toContainText("✓");
 });
 
 test("company updates replace the comment column on Invested; sector allocation pie drills into companies", async ({ page }) => {

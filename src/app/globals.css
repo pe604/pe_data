@@ -680,7 +680,7 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
   display:inline-block;min-width:640px;background:var(--res-white);color:var(--res-ink);font-family:var(--serif);border:1px solid var(--res-rule)}
 .rs-band{position:relative;display:flex;align-items:center;justify-content:center;min-height:84px;padding:10px 190px;background:var(--res-band);border-bottom:2px solid var(--res-ink)}
 .rs-title{font-size:26px;font-weight:700;text-align:center}
-.rs-logo{position:absolute;right:12px;top:50%;transform:translateY(-50%);height:68px;width:auto}
+.rs-logo{position:absolute;right:12px;top:50%;transform:translateY(-50%);height:60px;width:auto}
 .rs-table{border-collapse:collapse;width:100%;font-size:15px;font-variant-numeric:tabular-nums}
 .rs-table th,.rs-table td{border:1px solid var(--res-rule);padding:5px 8px;white-space:nowrap}
 .rs-head th{background:var(--res-navy);color:var(--res-white);font-weight:700;text-align:center}
@@ -700,3 +700,4 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .rs-missing{color:var(--res-warn)}
 .rs-derived{text-decoration:underline dotted var(--res-rule);text-underline-offset:3px}
 .rs-problem{color:var(--res-warn)}
+.rv-out{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}

@@ -7,8 +7,11 @@ import { lastEndedQuarter, quarterLabel, quarterOptions } from "@/lib/domain/qua
 import { buildResult, recommendedFormat, resultQuarters, type ResultFormat } from "@/lib/domain/resultFormat";
 import type { CompanyRow } from "@/lib/domain/types";
 import { useStore } from "../store";
+import { ConfirmModal } from "../ui/overlay";
+import { uploadFile } from "../ui/upload";
 import { ResultBuilder } from "./ResultBuilder";
 import { ResultPreview } from "./ResultPreview";
+import { resultPng } from "./resultImage";
 
 /** Invested tab → Results (SPEC §15.12): build a company's result format beside a live preview; save and lock it. */
 export function ResultsView({ companies }: { companies: CompanyRow[] }) {
@@ -20,6 +23,9 @@ export function ResultsView({ companies }: { companies: CompanyRow[] }) {
   const [dirty, setDirty] = useState(false);
   const [base, setBase] = useState("");
   const [busy, setBusy] = useState(false);
+  const [out, setOut] = useState<"png" | "xlsx" | "save" | null>(null);
+  const [confirmSave, setConfirmSave] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
   const company = options.find((c) => c.id === companyId);
   const quarters = useMemo(() => quarterOptions(todayISO(), 12), []);
   // Names for the recommended title, read in the load effect without reloading when the company list re-renders.
@@ -70,6 +76,55 @@ export function ResultsView({ companies }: { companies: CompanyRow[] }) {
     setBusy(true);
     apply(await setResultLock(companyId, on), on ? "Format locked. It's used for every quarter until unlocked." : "Format unlocked.");
     setBusy(false);
+  };
+
+  // ─── Output (phase C): downloads save nothing; Save as result note uploads both files for the quarter. ───
+  const fileBase = `${company?.name ?? "Result"} result ${quarterLabel(base)}`;
+  const makePng = async () => {
+    const el = previewRef.current?.querySelector(".rs");
+    if (!built || !el) throw new Error("no preview");
+    return resultPng(built, getComputedStyle(el).fontFamily);
+  };
+  const makeExcel = async () => {
+    const res = await fetch(`/api/results/${encodeURIComponent(companyId)}/excel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base, format: draft }),
+    });
+    if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "The Excel file could not be made. Try again.");
+    return res.blob();
+  };
+  const saveBlob = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+  const downloadPng = async () => saveBlob(await makePng(), `${fileBase}.png`);
+  const downloadExcel = async () => saveBlob(await makeExcel(), `${fileBase}.xlsx`);
+  const saveNote = async () => {
+    const [png, xlsx] = await Promise.all([makePng(), makeExcel()]);
+    for (const f of [new File([png], `${fileBase}.png`, { type: "image/png" }), new File([xlsx], `${fileBase}.xlsx`, { type: xlsx.type })]) {
+      const up = await uploadFile(f, { kind: "RESULT_NOTE", companyId, quarter: base });
+      if (!up.ok) throw new Error(up.error);
+    }
+    toast(`Saved the result as ${quarterLabel(base)}'s result note (image and Excel).`);
+    const r = await getResultSetup(companyId);
+    if (r.ok) setSetup(r.data);
+  };
+  const run = async (what: "png" | "xlsx" | "save", fn: () => Promise<void>) => {
+    setOut(what);
+    try {
+      await fn();
+    } catch (e) {
+      toast(e instanceof Error && e.message !== "no preview" && e.message !== "no canvas" ? e.message : "That didn't work. Try again.");
+    } finally {
+      setOut(null);
+    }
   };
 
   if (!options.length) return <p className="muted">No Invested companies yet.</p>;
@@ -163,10 +218,45 @@ export function ResultsView({ companies }: { companies: CompanyRow[] }) {
                 </button>
               </p>
             )}
-            <div className="rv-scroll">{built && <ResultPreview result={built} builder />}</div>
-            <p className="hint">Hover a figure to see how it was worked out. Generating the image and Excel comes next.</p>
+            <div className="rv-scroll" ref={previewRef}>
+              {built && <ResultPreview result={built} builder />}
+            </div>
+            <div className="rv-out">
+              <button className="btn" type="button" disabled={!!out} onClick={() => void run("png", downloadPng)}>
+                {out === "png" ? "Drawing…" : "Download image"}
+              </button>
+              <button className="btn" type="button" disabled={!!out} onClick={() => void run("xlsx", downloadExcel)}>
+                {out === "xlsx" ? "Building…" : "Download Excel"}
+              </button>
+              <span className="tb-spacer" />
+              <button
+                className="btn primary"
+                type="button"
+                disabled={!!out || dirty || !setup.format}
+                title={dirty || !setup.format ? "Save the format first" : undefined}
+                onClick={() => ((setup.notes[base]?.length ?? 0) > 0 ? setConfirmSave(true) : void run("save", saveNote))}
+              >
+                {out === "save" ? "Saving…" : `Save as result note (${quarterLabel(base)})`}
+              </button>
+            </div>
+            <p className="hint">
+              Hover a figure to see how it was worked out. Downloads save nothing; Save as result note adds the image and Excel to {quarterLabel(base)}&apos;s result note.
+              {(dirty || !setup.format) && " Save the format first to save a result note."}
+            </p>
           </div>
         </div>
+      )}
+      {confirmSave && (
+        <ConfirmModal
+          title={`Add to ${quarterLabel(base)}'s result note?`}
+          text={`It already has: ${(setup?.notes[base] ?? []).join(", ")}. The new image and Excel are added alongside; nothing is replaced.`}
+          okLabel="Add them"
+          onOk={() => {
+            setConfirmSave(false);
+            void run("save", saveNote);
+          }}
+          onCancel={() => setConfirmSave(false)}
+        />
       )}
     </div>
   );

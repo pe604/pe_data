@@ -106,6 +106,8 @@ export interface LineData {
 
 export interface BuiltCell {
   text: string;
+  /** The figure behind `text` (period cells), for Excel: money as is, percentages as percent (31.46) */
+  value?: number;
   /** How the figure was worked out, for the builder (hover) */
   how?: string;
   missing?: boolean;
@@ -204,7 +206,7 @@ export function buildResult(format: ResultFormat, lines: LineData[], base: strin
             missing++;
             return { text: "", missing: true };
           }
-          return { text: pct ? fmtPct(v.value) : fmtFigure(v.value), how: v.how ?? undefined };
+          return { text: pct ? fmtPct(v.value) : fmtFigure(v.value), value: v.value, how: v.how ?? undefined };
         }
         if (pct) return { text: "" };
         const a = vals[colIndex.get(c.a) ?? -1];
