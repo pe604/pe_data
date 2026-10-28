@@ -261,12 +261,15 @@ function FilesPop({
       return toast(picked.length ? `None of those are ${kind === "MIS" ? "PDF, Excel or CSV" : "PDF, Word, Excel or PowerPoint"} files.` : "No files picked.");
     }
     let done = 0;
+    let reading = 0;
     const failed: string[] = [];
     for (const [i, f] of todo.entries()) {
       setBusy(todo.length > 1 ? `Uploading ${i + 1} of ${todo.length}…` : "Uploading…");
       const r = await uploadFile(f, { kind, companyId: row.companyId, quarter });
-      if (r.ok) done++;
-      else failed.push(`${f.name}: ${r.error}`);
+      if (r.ok) {
+        done++;
+        if (r.reading) reading++;
+      } else failed.push(`${f.name}: ${r.error}`);
     }
     if (done) await onUploaded();
     setBusy(null);
@@ -275,7 +278,8 @@ function FilesPop({
       skipped.length ? `skipped ${skipped.length} (not ${kind === "MIS" ? "PDF/Excel/CSV" : "PDF/Word/Excel/PowerPoint"})` : "",
       failed.length ? `${failed.length} failed (${failed[0]}${failed.length > 1 ? ", …" : ""})` : "",
     ].filter(Boolean);
-    toast(parts.join("; ") + ".");
+    // MIS figures are read in the background; they wait for review in the company file (MIS & results).
+    toast(parts.join("; ") + "." + (reading ? ` Reading the figures in the background; review them in ${row.name}'s file under MIS & results.` : ""));
   };
   const accept = QUARTER_FILE_EXTS[kind].map((e) => "." + e).join(",");
 

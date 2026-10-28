@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { closeMisRead, listMisReads, openMisRead, startMisRead } from "@/actions/misHistory";
 import { todayISO } from "@/lib/domain/dates";
+import { isReadableFigures } from "@/lib/domain/misHistory";
 import { lastEndedQuarter, quarterLabel, quarterOptions } from "@/lib/domain/quarters";
 import type { FileItem, MisReadJobItem, MisReadView } from "@/lib/domain/types";
 import { canView, downloadFile, FileViewer, type ViewableFile } from "../ui/FileViewer";
@@ -17,9 +18,6 @@ function minutesAgo(iso: string): string {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   return m < 1 ? "started just now" : `started ${m} min ago`;
 }
-
-/** Files Read figures can read: MIS or result note as PDF, Excel or an image. */
-const READABLE = /\.(pdf|xlsx|xlsm|xls|png|jpe?g|webp)$/i;
 
 // Company file → MIS & results (SPEC §15.3, §15.11): quarterly MIS and result-note files, and the figures history.
 
@@ -97,7 +95,13 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
     setBusy(null);
     if (!up.ok) return toast(up.error);
     void reload(); // the file now shows under Quarterly files and in Materials
-    if (READABLE.test(up.file.originalName)) await readFile(up.file.id);
+    // The server starts reading an MIS by itself (SPEC §15.11); show it in the list.
+    if (up.reading) {
+      const r = await listMisReads(companyId);
+      if (r.ok) takeReads(r.data);
+      toast("Uploaded. Its figures are being read in the background and show here to review.");
+    } else if (isReadableFigures(up.file.originalName) && !aiEnabled) toast("AI reading is not set up. Add figures by hand below, or paste them from Excel.");
+    else toast("Uploaded.");
   };
 
   return (
@@ -222,7 +226,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
                             <button className="btn-ghost sm" type="button" onClick={() => downloadFile(f.id)}>
                               Download
                             </button>
-                            {!busy && READABLE.test(f.originalName) && (
+                            {!busy && isReadableFigures(f.originalName) && (
                               <button className="btn-ghost sm" type="button" onClick={() => void readFile(f.id)}>
                                 Read figures
                               </button>

@@ -186,12 +186,22 @@ export function ResultsView({ companies }: { companies: CompanyRow[] }) {
         )}
       </div>
 
+      {setup && (setup.reads.reading > 0 || setup.reads.toReview > 0) && (
+        <p className="rv-reads" role="status">
+          {setup.reads.toReview > 0 &&
+            `Figures from ${setup.reads.toReview} MIS ${setup.reads.toReview === 1 ? "file are" : "files are"} read and waiting for your review. `}
+          {setup.reads.reading > 0 && `${setup.reads.reading} MIS ${setup.reads.reading === 1 ? "file is" : "files are"} still being read. `}
+          <button className="linkbtn" type="button" onClick={() => openDrawer(companyId, "mis")}>
+            Review in the company file
+          </button>
+        </p>
+      )}
       {!setup || !draft ? (
         <p className="muted">Loading…</p>
       ) : !setup.lines.length ? (
         <div className="empty">
           <h3>No figures for {company?.name} yet</h3>
-          <p>Read an MIS or paste figures from Excel in the company file (MIS &amp; results), then build the result here.</p>
+          <p>An MIS is read automatically when it&apos;s uploaded; review and save its figures in the company file (MIS &amp; results), or paste them from Excel there. Then build the result here.</p>
           <button className="btn" type="button" onClick={() => openDrawer(companyId, "mis")}>
             Open company file
           </button>

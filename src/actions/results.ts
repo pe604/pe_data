@@ -19,13 +19,18 @@ export interface ResultSetup {
   savedAt: string | null;
   /** Result-note files already saved, by quarter (to ask before adding more) */
   notes: Record<string, string[]>;
+  /** Background MIS reads: still reading, and read but not yet reviewed (SPEC §15.11) */
+  reads: { reading: number; toReview: number };
 }
 
 async function setupOf(companyId: string): Promise<ResultSetup> {
-  const [lines, saved, files] = await Promise.all([
+  const recent = new Date(Date.now() - 14 * 86_400_000);
+  const [lines, saved, files, reading, toReview] = await Promise.all([
     loadResultLines(companyId),
     db.resultFormat.findUnique({ where: { companyId } }),
     db.file.findMany({ where: { companyId, kind: "RESULT_NOTE", quarter: { not: null } }, select: { quarter: true, originalName: true } }),
+    db.misReadJob.count({ where: { companyId, status: { in: ["QUEUED", "RUNNING"] }, createdAt: { gt: recent } } }),
+    db.misReadJob.count({ where: { companyId, status: "DONE", createdAt: { gt: recent } } }),
   ]);
   // A saved format that no longer parses (shouldn't happen) is treated as none rather than breaking the page.
   const parsed = saved ? resultFormatZ.safeParse(saved.spec) : null;
@@ -37,6 +42,7 @@ async function setupOf(companyId: string): Promise<ResultSetup> {
     locked: saved?.locked ?? false,
     savedAt: saved?.updatedAt.toISOString() ?? null,
     notes,
+    reads: { reading, toReview },
   };
 }
 

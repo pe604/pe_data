@@ -4,7 +4,9 @@ import { isDeckFile } from "@/lib/ai/deck";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { FILE_KIND_LABELS, FILE_KINDS, QUARTER_FILE_KINDS } from "@/lib/domain/constants";
+import { isReadableFigures } from "@/lib/domain/misHistory";
 import { isQuarterKey, quarterLabel } from "@/lib/domain/quarters";
+import { queueRead } from "@/lib/mis/readJobs";
 import type { FileItem } from "@/lib/domain/types";
 import { aiConfigured, env, maxUploadBytes } from "@/lib/env";
 import { UserError } from "@/lib/server/action";
@@ -92,6 +94,21 @@ export async function POST(req: Request) {
       if (!busy) jobId = (await createJob(saved.id, p.companyId, me.id)).id;
     }
 
+    // An MIS for a portfolio company is read into figures straight away, in the background (SPEC §15.11), so
+    // they're ready to review before a result is made. A failure here never fails the upload.
+    let reading = false;
+    if (p.kind === "MIS" && p.companyId && aiConfigured && isReadableFigures(name)) {
+      try {
+        const c = await db.company.findUnique({ where: { id: p.companyId }, select: { status: true } });
+        if (c?.status === "INVESTED") {
+          await queueRead(p.companyId, saved.id, me.id);
+          reading = true;
+        }
+      } catch (e) {
+        console.error("[files] could not queue MIS read", saved.id, (e as { code?: string })?.code);
+      }
+    }
+
     const item: FileItem = {
       id: saved.id,
       originalName: saved.originalName,
@@ -102,7 +119,7 @@ export async function POST(req: Request) {
       uploadedAt: saved.uploadedAt.toISOString(),
       quarter: saved.quarter,
     };
-    return Response.json({ file: item, jobId });
+    return Response.json({ file: item, jobId, reading });
   } catch (e) {
     return errorResponse(e);
   }

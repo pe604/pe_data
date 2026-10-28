@@ -1,7 +1,8 @@
 import type { FileKind } from "@/lib/domain/constants";
 import type { FileItem } from "@/lib/domain/types";
 
-export type UploadResult = { ok: true; file: FileItem; jobId: string | null } | { ok: false; error: string };
+/** `reading`: an MIS whose figures are being read in the background (SPEC §15.11). */
+export type UploadResult = { ok: true; file: FileItem; jobId: string | null; reading: boolean } | { ok: false; error: string };
 
 /** POST /api/files. Without companyId the file is staged for the Add company flow. */
 export async function uploadFile(
@@ -18,7 +19,7 @@ export async function uploadFile(
     const res = await fetch("/api/files", { method: "POST", body: fd });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, error: body.error ?? "The upload failed. Try again." };
-    return { ok: true, file: body.file, jobId: body.jobId ?? null };
+    return { ok: true, file: body.file, jobId: body.jobId ?? null, reading: body.reading === true };
   } catch {
     return { ok: false, error: "The upload failed. Check your connection and try again." };
   }

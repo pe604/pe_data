@@ -90,6 +90,9 @@ export function periodFy(p: string): string {
   return `FY${String(fyOfMonth(y, mo)).padStart(2, "0")}`;
 }
 
+/** Files Read figures can read: PDF, Excel or an image (an MIS is read automatically on upload). */
+export const isReadableFigures = (fileName: string) => /\.(pdf|xlsx|xlsm|xls|png|jpe?g|webp)$/i.test(fileName);
+
 // ─── Units and kinds ─────────────────────────────────────────────────────────
 
 export const LINE_UNITS = ["INR_CR", "PCT", "NUM"] as const;
