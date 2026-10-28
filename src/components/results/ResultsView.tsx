@@ -155,11 +155,13 @@ export function ResultsView({ companies }: { companies: CompanyRow[] }) {
             ))}
           </select>
         </label>
-        <span className={"rv-status" + (locked ? " locked" : dirty ? " dirty" : "")} role="status">
-          {status}
-        </span>
+        {setup && setup.lines.length > 0 && (
+          <span className={"rv-status" + (locked ? " locked" : dirty ? " dirty" : "")} role="status">
+            {status}
+          </span>
+        )}
         <span className="tb-spacer" />
-        {setup && draft && !locked && (
+        {setup && draft && !locked && setup.lines.length > 0 && (
           <>
             <button
               className="btn"
