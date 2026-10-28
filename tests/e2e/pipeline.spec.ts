@@ -518,7 +518,20 @@ test("MIS figures: upload from the company file, build the figures history by ha
   await pop.getByLabel("Name").fill("Net revenue");
   await pop.getByRole("button", { name: "Save" }).click();
   await expect(drawer.getByRole("button", { name: `Net revenue, ${q}` })).toHaveText("(12.98)");
+
+  // Paste a table from Excel: periods are recognised, growth columns left out, the review saves it (no AI).
+  await drawer.getByRole("button", { name: "Paste from Excel" }).click();
+  const paste = page.getByRole("dialog", { name: "Paste from Excel" });
+  await paste.getByLabel("Table").fill(["Rs Cr\tFY25\tFY26\tYoY %", "Net revenue\t900.5\t1,034.2\t15%", "EBITDA margin\t-4.8%\t-3.4%\t"].join("\n"));
+  await paste.getByRole("button", { name: "Review figures" }).click();
+  const review = page.getByRole("dialog", { name: /Review figures/ });
+  await expect(review).toContainText("Columns left out: YoY %");
+  await expect(review).toContainText("1,034.20");
+  await review.getByRole("button", { name: "Save 2 lines" }).click();
+  await expect(page.locator(".toast")).toContainText("Saved 4 figures from the pasted table.");
+
   await drawer.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText("from a pasted table");
   await expect(page.locator(".hist")).toContainText(`set Revenue for ${q} to -12.98`);
   await expect(page.locator(".hist")).toContainText("edited MIS line Revenue (now Net revenue)");
   await page.keyboard.press("Escape");

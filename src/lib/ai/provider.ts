@@ -6,11 +6,14 @@ export type DeckInput =
   | { kind: "pdf"; data: Buffer; fileName: string; text: string }
   | { kind: "text"; text: string; fileName: string };
 
+/** An image to read (a past result, SPEC §15.11); it has no text layer. */
+export type ImageInput = { kind: "image"; data: Buffer; mime: string; fileName: string };
+
 export interface GenerateRequest {
   system: string;
   prompt: string;
   /** The deck to read; omitted for text-only requests (e.g. the news filter, SPEC §15.10). */
-  deck?: DeckInput;
+  deck?: DeckInput | ImageInput;
   jsonSchema: unknown;
   signal?: AbortSignal;
   /** Overrides OPENROUTER_MODEL for this request (e.g. a cheaper model for a yes/no check). */
@@ -36,7 +39,8 @@ export class AiError extends Error {
 
 type ContentPart =
   | { type: "text"; text: string }
-  | { type: "file"; file: { filename: string; file_data: string } };
+  | { type: "file"; file: { filename: string; file_data: string } }
+  | { type: "image_url"; image_url: { url: string } };
 
 /** OpenRouter chat completions (SPEC §2, §9, §13). Never logs deck content. */
 class OpenRouterProvider implements AiProvider {
@@ -48,6 +52,7 @@ class OpenRouterProvider implements AiProvider {
         file: { filename: deck.fileName.replace(/\.pptx$/i, ".pdf"), file_data: "data:application/pdf;base64," + deck.data.toString("base64") },
       });
     }
+    if (deck?.kind === "image") content.push({ type: "image_url", image_url: { url: `data:${deck.mime};base64,${deck.data.toString("base64")}` } });
     content.push({ type: "text", text: prompt }); // includes the deck's text layer (see prompt.ts)
 
     let res: Response;
@@ -81,9 +86,13 @@ class OpenRouterProvider implements AiProvider {
 
     const body = (await res.json().catch(() => null)) as {
       choices?: { message?: { content?: string | null }; finish_reason?: string }[];
-      error?: { code?: number };
+      error?: { code?: number; metadata?: { scope?: string } };
     } | null;
     if (res.status === 402) throw new AiError("no_credits", "The AI account is out of credits. Top up OpenRouter and generate again.", 402);
+    // The key's own monthly spending limit (set in OpenRouter) is reached: 403 with scope "key_limit".
+    if (res.status === 403 && body?.error?.metadata?.scope === "key_limit") {
+      throw new AiError("no_credits", "The AI key has reached its monthly spending limit. Raise the limit in OpenRouter (Settings, Keys) and try again.", 403);
+    }
     if (!res.ok || body?.error) {
       throw new AiError("failed", "The summary could not be written. Try generating it again.", body?.error?.code ?? res.status);
     }

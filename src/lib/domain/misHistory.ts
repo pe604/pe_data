@@ -242,6 +242,136 @@ export function sameFigures(a: (number | null)[], b: (number | null)[]): boolean
   return norm(a) === norm(b);
 }
 
+/**
+ * Two independent readings of the same row (an image is read twice): the periods where they differ, like
+ * "Q2 FY27 read as 12.40 and 12.90". A period read only once counts as a difference.
+ */
+export function readingsDiffer(a: ReadValue[], b: ReadValue[], fmt: (n: number) => string): string[] {
+  const other = new Map(b.map((v) => [v.period, v.value]));
+  const mine = new Map(a.map((v) => [v.period, v.value]));
+  const out: string[] = [];
+  for (const p of [...new Set([...mine.keys(), ...other.keys()])].sort(comparePeriods)) {
+    const x = mine.get(p);
+    const y = other.get(p);
+    const same = x !== undefined && y !== undefined && Math.abs(x - y) <= Math.max(1e-9, Math.abs(x) * 1e-9);
+    if (!same) out.push(`${periodLabel(p)} read as ${x === undefined ? "blank" : fmt(x)} and ${y === undefined ? "blank" : fmt(y)}`);
+  }
+  return out;
+}
+
+// ─── Pasted tables (Paste from Excel) ────────────────────────────────────────
+
+const MONTH_NAMES = "JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUNE?|JULY?|AUG(?:UST)?|SEPT?(?:EMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?";
+const FY_PART = String.raw`FY ?(\d{4}|\d{2})(?: ?[-–/] ?(\d{4}|\d{2}))?`;
+/** "FY27", "FY2027", "FY 2026-27" → "27" (the year the financial year ends). */
+const fyDigits = (first: string, second?: string) => (second ?? first).slice(-2);
+const year4 = (y: string) => (y.length === 2 ? 2000 + Number(y) : Number(y));
+
+function monthHeader(s: string): string | null {
+  const m = new RegExp(`^(${MONTH_NAMES})[ \\-/.,]*(\\d{4}|\\d{2})$`).exec(s);
+  if (!m) return null;
+  const mi = MON.findIndex((x) => m[1].startsWith(x.toUpperCase()));
+  return `${year4(m[2])}-${String(mi + 1).padStart(2, "0")}`;
+}
+
+/**
+ * A column header as a period key, or null: "Q2 FY27", "Q2FY27", "2QFY27", "Q2 FY2027", "H1 FY27", "1HFY27", "FY26",
+ * "FY 2025-26", "Sep-26", "Sep 2026", "Sep'26", "September 2026", "2026-09", "YTD Sep-26", "Sep-26 YTD".
+ */
+export function headerToPeriod(header: string): string | null {
+  const raw = header.trim();
+  if (isPeriodKey(raw)) return raw;
+  const s = raw
+    .toUpperCase()
+    .replace(/[’'`]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  let m: RegExpExecArray | null;
+  if ((m = /^YTD[ \-]?(.+)$/.exec(s) ?? /^(.+?)[ \-]?YTD$/.exec(s))) {
+    const mk = monthHeader(m[1].trim());
+    return mk ? `YTD-${mk}` : null;
+  }
+  if ((m = new RegExp(`^Q([1-4])[ \\-]?${FY_PART}$`).exec(s) ?? new RegExp(`^([1-4])Q[ \\-]?${FY_PART}$`).exec(s))) return `FY${fyDigits(m[2], m[3])}-Q${m[1]}`;
+  if ((m = new RegExp(`^${FY_PART}[ \\-]?Q([1-4])$`).exec(s))) return `FY${fyDigits(m[1], m[2])}-Q${m[3]}`;
+  if ((m = new RegExp(`^H([12])[ \\-]?${FY_PART}$`).exec(s) ?? new RegExp(`^([12])H[ \\-]?${FY_PART}$`).exec(s))) return `FY${fyDigits(m[2], m[3])}-H${m[1]}`;
+  if ((m = new RegExp(`^${FY_PART}[ \\-]?H([12])$`).exec(s))) return `FY${fyDigits(m[1], m[2])}-H${m[3]}`;
+  if ((m = new RegExp(`^${FY_PART}$`).exec(s))) return `FY${fyDigits(m[1], m[2])}`;
+  return monthHeader(s);
+}
+
+export interface PastedRow {
+  ref: string;
+  section: string;
+  label: string;
+  unit: LineUnit;
+  unitLabel: string | null;
+  kind: LineKind;
+  values: ReadValue[];
+  flags: string[];
+}
+
+export interface PastedTable {
+  periods: string[];
+  /** Header cells that weren't periods (growth columns, notes), as printed */
+  skipped: string[];
+  rows: PastedRow[];
+}
+
+/**
+ * A table copied from Excel (tab-separated): the first row with period headers is the header; line names come from
+ * the first filled cell left of the first period column. A row with a name and no figures starts a new section.
+ * Labels with "%" or "margin", or "%" figures, are percentages (ratio); the rest money in `scale` (flow).
+ */
+export function parsePastedTable(text: string, scale: MoneyScale, section: string): PastedTable {
+  const grid = text
+    .split(/\r?\n/)
+    .map((l) => l.split("\t").map((c) => c.trim()))
+    .filter((cells) => cells.some((c) => c !== ""));
+  const headerAt = grid.findIndex((cells) => cells.some((c, i) => i > 0 && headerToPeriod(c) !== null));
+  if (headerAt < 0) return { periods: [], skipped: [], rows: [] };
+  const header = grid[headerAt];
+  const firstCol = header.findIndex((c, i) => i > 0 && headerToPeriod(c) !== null);
+  const cols: { i: number; period: string }[] = [];
+  const skipped: string[] = [];
+  header.forEach((c, i) => {
+    if (i < firstCol || !c) return;
+    const p = headerToPeriod(c);
+    if (p && !cols.some((x) => x.period === p)) cols.push({ i, period: p });
+    else if (!skipped.includes(c)) skipped.push(c);
+  });
+  let sec = section.trim();
+  const rows: PastedRow[] = [];
+  for (const cells of grid.slice(headerAt + 1)) {
+    const label = cells.slice(0, firstCol).find((c) => c !== "") ?? "";
+    if (!label) continue;
+    const filled = cols.filter((c) => parseFigure(cells[c.i] ?? "") !== null);
+    if (!filled.length) {
+      sec = label;
+      continue;
+    }
+    const pct = /%|margin/i.test(label) || filled.some((c) => (cells[c.i] ?? "").includes("%"));
+    const unit: LineUnit = pct ? "PCT" : "INR_CR";
+    const values: ReadValue[] = filled.map((c) => {
+      const raw = cells[c.i] ?? "";
+      const n = parseFigure(raw) ?? 0; // filled: parses
+      return { period: c.period, value: pct ? n : moneyToCr(n, scale), raw };
+    });
+    const kind: LineKind = pct ? "RATIO" : "FLOW";
+    rows.push({
+      ref: `P${rows.length}`,
+      section: sec,
+      label,
+      unit,
+      unitLabel: null,
+      kind,
+      values,
+      flags: monthsVsTotals(kind, values, (n) => fmtLineValue(n, unit)),
+    });
+  }
+  const periods = [...new Set(rows.flatMap((r) => r.values.map((v) => v.period)))].sort(comparePeriods);
+  return { periods, skipped, rows };
+}
+
 // ─── Display ─────────────────────────────────────────────────────────────────
 
 /** A stored value for display: ₹ Cr to 2 decimals, percent to 1, other numbers as is (up to 2 decimals). */

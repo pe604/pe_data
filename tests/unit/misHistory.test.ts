@@ -6,8 +6,11 @@ import {
   lineKey,
   matchLine,
   moneyToCr,
+  headerToPeriod,
   monthsVsTotals,
   notInText,
+  parsePastedTable,
+  readingsDiffer,
   parseFigure,
   periodFy,
   periodLabel,
@@ -106,6 +109,12 @@ describe("checks", () => {
     expect(monthsVsTotals("FLOW", [r("2026-04", "0.7"), r("2026-05", "0.7"), r("2026-06", "0.7"), r("FY27-Q1", "2.4")], fmt)).toHaveLength(1);
   });
 
+  it("compares two readings of an image", () => {
+    const r = (period: string, value: number) => ({ period, value, raw: String(value) });
+    expect(readingsDiffer([r("FY27-Q2", 12.4), r("FY27-Q1", 10)], [r("FY27-Q1", 10), r("FY27-Q2", 12.4)], fmt)).toEqual([]);
+    expect(readingsDiffer([r("FY27-Q2", 12.4)], [r("FY27-Q2", 12.9), r("FY26", 40)], fmt)).toEqual(["FY26 read as blank and 40.00", "Q2 FY27 read as 12.40 and 12.90"]);
+  });
+
   it("flags printed figures missing from the file's text", () => {
     const text = "Total revenue 499 1,522 821 1,034 740 1,140 ".repeat(10);
     const vals = [
@@ -113,6 +122,61 @@ describe("checks", () => {
       { period: "2026-08", value: 74, raw: "(741)" },
     ];
     expect(notInText(vals, text)).toEqual(["Aug 2026 (741)"]);
+  });
+});
+
+describe("paste from Excel (SPEC §15.11)", () => {
+  it("recognises period headers as people write them", () => {
+    const cases: [string, string | null][] = [
+      ["Q2 FY27", "FY27-Q2"],
+      ["Q2FY27", "FY27-Q2"],
+      ["2QFY27", "FY27-Q2"],
+      ["Q2 FY2027", "FY27-Q2"],
+      ["q1 fy 2026-27", "FY27-Q1"],
+      ["FY27 Q3", "FY27-Q3"],
+      ["H1 FY27", "FY27-H1"],
+      ["1HFY27", "FY27-H1"],
+      ["FY26", "FY26"],
+      ["FY 2025-26", "FY26"],
+      ["FY2026", "FY26"],
+      ["Sep-26", "2026-09"],
+      ["Sept 2026", "2026-09"],
+      ["Sep'26", "2026-09"],
+      ["September 2026", "2026-09"],
+      ["2026-09", "2026-09"],
+      ["YTD Sep-26", "YTD-2026-09"],
+      ["Sep-26 YTD", "YTD-2026-09"],
+      ["YoY %", null],
+      ["Q2 FY27 YoY", null],
+      ["Particulars", null],
+    ];
+    for (const [h, want] of cases) expect([h, headerToPeriod(h)]).toEqual([h, want]);
+  });
+
+  it("reads a pasted result table: periods, sections, units, skipped columns", () => {
+    const text = [
+      "Rs Cr\tQ2 FY26\tQ1 FY27\tQ2 FY27\tYoY %\tH1 FY27",
+      "Revenue\t250.5\t270.1\t291.3\t16%\t561.4",
+      "EBITDA\t(12.0)\t(10.3)\t(9.9)\t\t(20.2)",
+      "EBITDA margin\t-4.8%\t-3.8%\t-3.4%\t\t-3.6%",
+      "",
+      "Key metrics",
+      "Orders (lakh)\t1,250\t1,320\t-\t\t",
+    ].join("\r\n");
+    const t = parsePastedTable(text, "Cr", "P&L");
+    expect(t.periods).toEqual(["FY26-Q2", "FY27-Q1", "FY27-Q2", "FY27-H1"]);
+    expect(t.skipped).toEqual(["YoY %"]);
+    expect(t.rows.map((r) => [r.section, r.label, r.unit, r.kind, r.values.length])).toEqual([
+      ["P&L", "Revenue", "INR_CR", "FLOW", 4],
+      ["P&L", "EBITDA", "INR_CR", "FLOW", 4],
+      ["P&L", "EBITDA margin", "PCT", "RATIO", 4],
+      ["Key metrics", "Orders (lakh)", "INR_CR", "FLOW", 2],
+    ]);
+    expect(t.rows[1].values[0]).toEqual({ period: "FY26-Q2", value: -12, raw: "(12.0)" });
+    expect(t.rows[2].values[2].value).toBe(-3.4);
+    // Money in lakh is stored in ₹ Cr.
+    expect(parsePastedTable("x\tFY26\nRevenue\t2,500", "Lakh", "").rows[0].values[0].value).toBe(25);
+    expect(parsePastedTable("no periods here\nRevenue\t1", "Cr", "P&L").rows).toEqual([]);
   });
 });
 

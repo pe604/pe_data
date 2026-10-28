@@ -84,7 +84,12 @@ describe("splitUploads (quarterly tracker multi-file / folder upload)", () => {
     expect(r.upload.map((x) => x.name)).toEqual(["Sep MIS.xlsx", "Q2.PDF", "data.csv"]);
     expect(r.skipped.map((x) => x.name)).toEqual(["notes.docx", ".DS_Store", "~$Sep MIS.xlsx", "empty.pdf"]);
   });
-  it("result notes take Word and PowerPoint too", () => {
-    expect(splitUploads([f("note.docx"), f("deck.pptx"), f("img.png")], "RESULT_NOTE").upload.map((x) => x.name)).toEqual(["note.docx", "deck.pptx"]);
+  it("result notes take Word, PowerPoint and images (past results) too", () => {
+    expect(splitUploads([f("note.docx"), f("deck.pptx"), f("img.png"), f("old.JPG"), f("notes.txt")], "RESULT_NOTE").upload.map((x) => x.name)).toEqual([
+      "note.docx",
+      "deck.pptx",
+      "img.png",
+      "old.JPG",
+    ]);
   });
 });

@@ -181,7 +181,11 @@ export interface MisDraftRowView {
 
 export interface MisReadView {
   fileName: string;
-  format: "excel" | "pdf";
+  format: "excel" | "pdf" | "image" | "paste";
+  /** Where saved figures come from: an MIS file, a result note, or a pasted table */
+  source: "MIS" | "RESULT" | "IMPORT";
+  /** Pasted columns that weren't periods (paste only) */
+  skipped: string[];
   periods: string[];
   rows: MisDraftRowView[];
   /** Existing lines, for merging a row into one */

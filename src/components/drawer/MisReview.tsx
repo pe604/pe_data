@@ -34,6 +34,13 @@ type RowState = {
 
 type Show = "all" | "flagged" | "new" | "conflicts";
 
+const HOW: Record<MisReadView["format"], string> = {
+  excel: "Figures come straight from the Excel cells.",
+  pdf: "Figures were copied from the PDF and checked against its text.",
+  image: "Figures were read from the image twice and the readings compared.",
+  paste: "Figures come straight from the pasted table.",
+};
+
 export function MisReview({
   companyId,
   fileId,
@@ -42,7 +49,8 @@ export function MisReview({
   onSaved,
 }: {
   companyId: string;
-  fileId: string;
+  /** null for a pasted table */
+  fileId: string | null;
   view: MisReadView;
   onClose: () => void;
   onSaved: (lines: MisLineItem[]) => void;
@@ -119,7 +127,7 @@ export function MisReview({
     );
     setSaving(false);
     if (!r.ok) return toast(r.error);
-    toast(`Saved ${figures.toLocaleString("en-IN")} figures from ${view.fileName}.`);
+    toast(`Saved ${figures.toLocaleString("en-IN")} figures from ${fileId ? view.fileName : "the pasted table"}.`);
     onSaved(r.data);
   };
 
@@ -130,7 +138,7 @@ export function MisReview({
       <ModalHead
         id="mr-title"
         title={`Review figures: ${view.fileName}`}
-        sub={`${view.rows.length} lines, ${view.periods.map(periodLabel).join(", ")}. ${view.format === "excel" ? "Figures come straight from the Excel cells." : "Figures were copied from the PDF and checked against its text."} Nothing is saved until you click Save.`}
+        sub={`${view.rows.length} lines, ${view.periods.map(periodLabel).join(", ")}. ${HOW[view.format]}${view.skipped.length ? ` Columns left out: ${view.skipped.join(", ")}.` : ""} Nothing is saved until you click Save.`}
         onClose={onClose}
       />
       <div className="m-content mr">

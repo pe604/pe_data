@@ -9,7 +9,11 @@ import { canView, downloadFile, FileViewer, type ViewableFile } from "../ui/File
 import { useStore } from "../store";
 import { uploadFile } from "../ui/upload";
 import { MisFigures } from "./MisFigures";
+import { MisPaste } from "./MisPaste";
 import { MisReview } from "./MisReview";
+
+/** Files Read figures can read: MIS or result note as PDF, Excel or an image. */
+const READABLE = /\.(pdf|xlsx|xlsm|xls|png|jpe?g|webp)$/i;
 
 // Company file → MIS & results (SPEC §15.3, §15.11): quarterly MIS and result-note files, and the figures history.
 
@@ -18,7 +22,8 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
   const today = todayISO();
   const [busy, setBusy] = useState<string | null>(null);
   const [uploadQuarter, setUploadQuarter] = useState(() => lastEndedQuarter(today));
-  const [review, setReview] = useState<{ fileId: string; view: MisReadView } | null>(null);
+  const [review, setReview] = useState<{ fileId: string | null; view: MisReadView } | null>(null);
+  const [pasting, setPasting] = useState(false);
   const [version, setVersion] = useState(0);
   const [viewing, setViewing] = useState<ViewableFile | null>(null);
   const [showOlder, setShowOlder] = useState(false);
@@ -30,8 +35,8 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
 
   /** AI-reads a stored MIS file into the review screen (nothing is saved until Save). */
   const readFile = async (fileId: string) => {
-    if (!aiEnabled) return toast("AI reading is not set up. Add figures by hand below.");
-    setBusy("Reading the whole MIS… a large file can take a few minutes. You can keep working in other tabs.");
+    if (!aiEnabled) return toast("AI reading is not set up. Add figures by hand below, or paste them from Excel.");
+    setBusy("Reading the whole file… a large one can take a few minutes. You can keep working in other tabs.");
     const r = await readMisFigures(companyId, fileId);
     setBusy(null);
     if (!r.ok) return toast(r.error);
@@ -44,7 +49,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
     setBusy(null);
     if (!up.ok) return toast(up.error);
     void reload(); // the file now shows under Quarterly files and in Materials
-    if (/\.(pdf|xlsx|xlsm|xls)$/i.test(up.file.originalName)) await readFile(up.file.id);
+    if (READABLE.test(up.file.originalName)) await readFile(up.file.id);
   };
 
   return (
@@ -71,7 +76,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
               type="file"
               hidden
               aria-label="Result note file"
-              accept=".pdf,.docx,.doc,.xlsx,.pptx"
+              accept=".pdf,.docx,.doc,.xlsx,.pptx,.png,.jpg,.jpeg,.webp"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 e.target.value = "";
@@ -99,7 +104,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
           </div>
         )}
       </div>
-      <p className="hint">Files uploaded here or from the Quarterly tracker. Read figures adds an MIS to the figures history below.</p>
+      <p className="hint">Files uploaded here or from the Quarterly tracker. Read figures adds an MIS or a past result (PDF, Excel or image) to the figures history below.</p>
       {busy && (
         <p className="muted" role="status">
           {busy}
@@ -130,7 +135,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
                             <button className="btn-ghost sm" type="button" onClick={() => downloadFile(f.id)}>
                               Download
                             </button>
-                            {kind === "MIS" && !busy && /\.(pdf|xlsx|xlsm|xls)$/i.test(f.originalName) && (
+                            {!busy && READABLE.test(f.originalName) && (
                               <button className="btn-ghost sm" type="button" onClick={() => void readFile(f.id)}>
                                 Read figures
                               </button>
@@ -157,9 +162,24 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
 
       <div className="inv-head" style={{ marginTop: 18 }}>
         <h3>Figures</h3>
+        {!busy && (
+          <button className="btn sm" type="button" onClick={() => setPasting(true)}>
+            Paste from Excel
+          </button>
+        )}
       </div>
       <MisFigures companyId={companyId} version={version} onChanged={() => void reload()} />
 
+      {pasting && (
+        <MisPaste
+          companyId={companyId}
+          onClose={() => setPasting(false)}
+          onRead={(view) => {
+            setPasting(false);
+            setReview({ fileId: null, view });
+          }}
+        />
+      )}
       {review && (
         <MisReview
           companyId={companyId}

@@ -102,7 +102,7 @@ export function misState(misAt: string | null, due: string, today: string): "rec
 /** File types the tracker uploads for each column (all also on the server's allow-list). */
 export const QUARTER_FILE_EXTS = {
   MIS: ["pdf", "xlsx", "xlsm", "xls", "csv"],
-  RESULT_NOTE: ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt"],
+  RESULT_NOTE: ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "png", "jpg", "jpeg", "webp"],
 } as const;
 
 /**

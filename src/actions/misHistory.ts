@@ -6,7 +6,7 @@ import { readMisHistory } from "@/lib/ai/misRead";
 import { AiError } from "@/lib/ai/provider";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { comparePeriods, isPeriodKey, LINE_KINDS, LINE_UNITS, lineKey, matchLine, periodLabel } from "@/lib/domain/misHistory";
+import { comparePeriods, isPeriodKey, LINE_KINDS, LINE_UNITS, lineKey, matchLine, MONEY_SCALES, parsePastedTable, periodLabel } from "@/lib/domain/misHistory";
 import type { MisLineItem, MisReadView } from "@/lib/domain/types";
 import { aiConfigured } from "@/lib/env";
 import { run, UserError } from "@/lib/server/action";
@@ -82,26 +82,45 @@ export async function readMisFigures(companyId: string, fileId: string) {
       throw new UserError("The MIS could not be read. Try again, or enter the figures by hand.");
     }
     if (!draft.rows.length) throw new UserError("No P&L or business figures found in this file.");
-    const lines = await db.misLine.findMany({
-      where: { companyId: cid },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { values: { select: { period: true, value: true } } },
-    });
-    return {
-      fileName: f.originalName,
-      format: draft.format,
-      periods: draft.periods,
-      lines: lines.map((l) => ({ id: l.id, section: l.section, label: l.label, unit: l.unit as MisLineItem["unit"] })),
-      rows: draft.rows.map((r) => {
-        const m = matchLine(r.section, r.label, lines);
-        const saved = m ? lines.find((l) => l.id === m.id)?.values : undefined;
-        const conflicts = (saved ?? [])
-          .map((s) => ({ period: s.period, saved: Number(s.value), mine: r.values.find((v) => v.period === s.period)?.value }))
-          .filter((x): x is { period: string; saved: number; mine: number } => x.mine !== undefined && Math.abs(x.mine - x.saved) > Math.max(1e-6, Math.abs(x.saved) * 1e-6))
-          .map(({ period, saved }) => ({ period, saved }));
-        return { ...r, matchId: m?.id ?? null, conflicts };
-      }),
-    };
+    return toView(cid, { fileName: f.originalName, format: draft.format, source: f.kind === "RESULT_NOTE" ? "RESULT" : "MIS", skipped: [], periods: draft.periods }, draft.rows);
+  });
+}
+
+/** Read rows → the review screen: each row's matching saved line, and periods where a different value is saved. */
+async function toView(cid: string, head: Omit<MisReadView, "rows" | "lines">, rows: Omit<MisReadView["rows"][number], "matchId" | "conflicts">[]): Promise<MisReadView> {
+  const lines = await db.misLine.findMany({
+    where: { companyId: cid },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    include: { values: { select: { period: true, value: true } } },
+  });
+  return {
+    ...head,
+    lines: lines.map((l) => ({ id: l.id, section: l.section, label: l.label, unit: l.unit as MisLineItem["unit"] })),
+    rows: rows.map((r) => {
+      const m = matchLine(r.section, r.label, lines);
+      const saved = m ? lines.find((l) => l.id === m.id)?.values : undefined;
+      const conflicts = (saved ?? [])
+        .map((s) => ({ period: s.period, saved: Number(s.value), mine: r.values.find((v) => v.period === s.period)?.value }))
+        .filter((x): x is { period: string; saved: number; mine: number } => x.mine !== undefined && Math.abs(x.mine - x.saved) > Math.max(1e-6, Math.abs(x.saved) * 1e-6))
+        .map(({ period, saved }) => ({ period, saved }));
+      return { ...r, matchId: m?.id ?? null, conflicts };
+    }),
+  };
+}
+
+/** Paste from Excel: a copied table → the review screen. No AI; nothing is saved. */
+export async function importMisTable(companyId: string, text: string, scale: string, section: string) {
+  return run<MisReadView>(async () => {
+    await requireRole();
+    const cid = id.parse(companyId);
+    const input = z
+      .object({ text: z.string().trim().min(1, "Paste a table first").max(500_000, "That table is too big to paste; split it"), scale: z.enum(MONEY_SCALES), section: z.string().trim().max(120) })
+      .parse({ text, scale, section });
+    await investedCompany(cid);
+    const t = parsePastedTable(input.text, input.scale, input.section);
+    if (!t.periods.length) throw new UserError("No period headers found. The first row should have periods like Q2 FY27, H1 FY27, FY26 or Sep-26.");
+    if (!t.rows.length) throw new UserError("No figures found under the period headers.");
+    return toView(cid, { fileName: "pasted table", format: "paste", source: "IMPORT", skipped: t.skipped, periods: t.periods }, t.rows);
   });
 }
 
@@ -112,7 +131,7 @@ const saveRow = z.object({
   values: z.array(z.object({ period, value })).max(400),
 });
 
-/** Saves reviewed figures (from a file, or typed/imported) into the history; replaces values for the same line and period. */
+/** Saves reviewed figures (from a file, or pasted) into the history; replaces values for the same line and period. */
 export async function saveMisFigures(companyId: string, fileId: string | null, rows: z.input<typeof saveRow>[]) {
   return run<MisLineItem[]>(async () => {
     const me = await requireRole();
@@ -120,9 +139,10 @@ export async function saveMisFigures(companyId: string, fileId: string | null, r
     const fid = fileId === null ? null : id.parse(fileId);
     const list = z.array(saveRow).min(1, "Pick at least one row to save").max(3000).parse(rows);
     await investedCompany(cid);
-    const file = fid ? await db.file.findFirst({ where: { id: fid, companyId: cid }, select: { originalName: true } }) : null;
+    const file = fid ? await db.file.findFirst({ where: { id: fid, companyId: cid }, select: { originalName: true, kind: true } }) : null;
     if (fid && !file) throw new UserError("That file no longer exists. Upload it again.");
-    const source = fid ? "MIS" : "MANUAL";
+    // From a file: MIS or result note by the file's type. Without one: a pasted table.
+    const source = file ? (file.kind === "RESULT_NOTE" ? "RESULT" : "MIS") : "IMPORT";
     let figures = 0;
     const periods = new Set<string>();
     await db.$transaction(
@@ -162,7 +182,7 @@ export async function saveMisFigures(companyId: string, fileId: string | null, r
         const ps = [...periods].sort(comparePeriods);
         const span = ps.length ? (ps.length === 1 ? periodLabel(ps[0]) : `${periodLabel(ps[0])} to ${periodLabel(ps[ps.length - 1])}`) : "";
         await audit(tx, cid, me.id, [
-          { note: `Saved ${figures.toLocaleString("en-IN")} MIS figures (${list.length} lines${span ? `, ${span}` : ""})${file ? ` from ${file.originalName}` : ""}` },
+          { note: `Saved ${figures.toLocaleString("en-IN")} MIS figures (${list.length} lines${span ? `, ${span}` : ""}) ${file ? `from ${file.originalName}` : "from a pasted table"}` },
         ]);
       },
       { timeout: 120_000, maxWait: 20_000 },
