@@ -468,7 +468,7 @@ test("meetings: plan, mark done, listed in the Meetings view and the company fil
   await expect(drawer).toContainText("Met the CFO");
 });
 
-test("MIS figures: upload from the company file, enter figures (AI off in tests), see the financials table", async ({ page }) => {
+test("MIS figures: upload from the company file, build the figures history by hand (AI off in tests)", async ({ page }) => {
   const a = uniq("Misco");
   await page.goto("/");
   await openTab(page, "Invested");
@@ -491,20 +491,36 @@ test("MIS figures: upload from the company file, enter figures (AI off in tests)
     mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     buffer,
   });
-  const form = drawer.getByRole("form", { name: "MIS figures" });
-  await expect(form).toContainText("AI reading is not set up");
-  await form.getByLabel(/^Revenue/).fill("12.98");
-  await form.getByLabel(/^EBITDA/).fill("1.22");
-  await form.getByLabel(/^PAT/).fill("(0.5)");
-  await form.getByLabel(/^Cash and bank/).fill("5.89");
-  await expect(form).toContainText("EBITDA margin 9.4%");
-  await form.getByRole("button", { name: "Save figures" }).click();
-  await expect(page.getByRole("status").first()).toContainText(`${q} figures saved.`);
-  const table = drawer.locator(".mis-table");
-  await expect(table).toContainText("12.98");
-  await expect(table).toContainText("(0.5)");
-  await expect(table).toContainText("9.4%");
+  // Without an AI key the upload is kept and the reader says so; figures can still be entered by hand.
+  await expect(page.locator(".toast")).toContainText("AI reading is not set up");
   await expect(drawer.locator(".qfiles-q").first()).toContainText("mis.xlsx");
+  await expect(drawer.locator(".mf")).toContainText("No figures yet");
+
+  // Add a line and a quarter, then type figures into the grid.
+  const pop = page.locator(".pop");
+  await drawer.getByRole("button", { name: "Add line" }).click();
+  await pop.getByLabel("Name").fill("Revenue");
+  await pop.getByLabel("Section").fill("P&L");
+  await pop.getByRole("button", { name: "Add line" }).click();
+  await expect(page.locator(".toast")).toContainText("Line added.");
+  const qKey = lastEndedQuarter(todayISO());
+  await drawer.getByRole("button", { name: "Add period" }).click();
+  await pop.getByLabel("Period").fill(qKey);
+  await pop.getByRole("button", { name: "Add column" }).click();
+  const cell = drawer.getByRole("button", { name: `Revenue, ${q}` });
+  await cell.click();
+  await pop.getByLabel("Figure").fill("(12.98)");
+  await pop.getByRole("button", { name: "Save" }).click();
+  await expect(cell).toHaveText("(12.98)");
+
+  // Rename the line; the figure stays with it.
+  await drawer.getByRole("button", { name: "Revenue", exact: true }).click();
+  await pop.getByLabel("Name").fill("Net revenue");
+  await pop.getByRole("button", { name: "Save" }).click();
+  await expect(drawer.getByRole("button", { name: `Net revenue, ${q}` })).toHaveText("(12.98)");
+  await drawer.getByRole("tab", { name: "History" }).click();
+  await expect(page.locator(".hist")).toContainText(`set Revenue for ${q} to -12.98`);
+  await expect(page.locator(".hist")).toContainText("edited MIS line Revenue (now Net revenue)");
   await page.keyboard.press("Escape");
 
   // The MIS uploaded from the company file ticks the tracker for that quarter.

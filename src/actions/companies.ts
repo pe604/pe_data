@@ -17,7 +17,6 @@ import {
   asFund,
   num,
   peopleOf,
-  toMisItem,
   replacePeople,
   type Change,
 } from "@/lib/server/company";
@@ -406,7 +405,6 @@ export async function getCompanyDetail(companyId: string) {
           auditLogs: { include: { actor: { select: { name: true } } }, orderBy: { at: "desc" }, take: 500 },
           rounds: { orderBy: [{ date: "asc" }, { createdAt: "asc" }] },
           contacts: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
-          misFigures: { include: { sourceFile: { select: { originalName: true } } }, orderBy: { quarter: "asc" } },
         },
       }),
       db.summaryJob.findFirst({
@@ -482,7 +480,6 @@ export async function getCompanyDetail(companyId: string) {
         phone: x.phone,
         isPrimary: x.isPrimary,
       })),
-      mis: c.misFigures.map(toMisItem),
     };
   });
 }

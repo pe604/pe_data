@@ -437,9 +437,22 @@ The Invested tab has three views: **Portfolio**, **Quarterly tracker**, **Meetin
 
 ### 15.3 Quarterly files and MIS reader (company file → Investment)
 - **Quarterly MIS and results**: each quarter with its MIS and Result note files (View, Download), **Upload MIS** for a chosen quarter, and **Read figures** on any MIS file.
-- **Reading:** the model only *copies* the quarter's figures exactly as printed, plus the unit printed (Cr, Lakh, Mn, Thousand, Rupees): the quarter total if printed, else each of the three months (actuals only; never YTD, full-year or budget). Revenue = revenue from operations (not other income); EBITDA as labelled; PAT; cash and bank at quarter end. The code converts to ₹ Cr and adds the three months when there's no quarter total (never a partial quarter). Every copied figure is checked against the file's text; misses are listed.
-- **Review before saving**; nothing is saved until **Save figures** (`MisFigure`, one per company per quarter). Losses as -12.5 or (12.5). **Enter manually** also works.
-- **Table:** last 6 quarters: Revenue, Revenue YoY, EBITDA, EBITDA %, PAT, Cash and bank; Edit and Remove per quarter.
+- **Read figures** now reads the whole MIS into the company's figures history (§15.11). The earlier quarter-only reader (Revenue / EBITDA / PAT / cash into `MisFigure`) is replaced; its saved rows were carried into the history.
+
+### 15.11 Results generator, phase A: the figures history (2026-10-27)
+The goal (phases B–D): generate each portfolio company's quarterly result (image + Excel, in the Niveshaay style, in a format locked per company) from its MIS. Phase A builds the data underneath.
+- **Figures history per company:** line items (`MisLine`: label, section, unit, kind, order, other labels seen) and their values by period (`MisValue`: one per line per period, with where it came from: MIS file, result image, manual or import).
+  - **Periods:** month `2026-07`, quarter `FY27-Q2`, half-year `FY27-H1`, year `FY27`, year-to-date `YTD-2026-09` (Apr–Sep). Balances are stored at the period they close (Mar-26 balance → `2026-03`).
+  - **Units:** money is stored in ₹ Cr (converted from rupees, thousand, lakh, mn, cr, bn); percentages as percent; other numbers as printed with their unit label (e.g. "# lakhs", "INR/meter").
+  - **Kind:** flow (adds up over time: revenue, costs, volumes), balance (period-end figure: cash, debt, users, AUM), ratio (recalculated, never added: margins, per-unit figures).
+- **Reading an MIS** (any MIS file, Read figures): scope is the P&L and key business metrics (volumes, users, AUM, cash, debt, working capital, capacity, headcount totals); not detailed ageing, loan-facility, customer or order lists. Actuals only: never budget, plan, variance or % of revenue columns.
+  - **Excel:** the model maps the structure (which sheet/rows are in scope, which columns are which periods, units, kind); **figures are read straight from the cells** at full precision, never copied by the model.
+  - **PDF:** the model maps the structure, then copies each figure as printed in batches; every figure must be found in the file's text, misses are flagged.
+  - **Checks:** months that don't add up to a printed quarter (flows), and values that differ from what's already saved, are flagged.
+  - **Matching:** rows match existing lines by section and label (or a label seen before); otherwise they're new. The review lets you rename, change unit/kind, merge into an existing line, or leave rows out.
+- **Review before saving** (full-screen): every row and period, editable, with flags; **Save** writes the figures (History note per file). Nothing is saved before that.
+- **Figures grid** (company file → MIS & results): sections × periods, switchable Months / Quarters / Half-years / Years / YTD; click a cell to edit or clear; add a line or a period by hand; rename, re-unit, re-kind, move or delete a line. Each value shows where it came from.
+- Later in phase A: **past result images** (read figures off a result made earlier) and **Excel import** (paste a table).
 
 ### 15.5 Company file for Invested companies (2026-10-20)
 - Tabs: **Overview** (invested by fund, latest update, contacts, rounds) · **MIS & results** (upload MIS / result note for a quarter, files of the latest 2 quarters with "Show older", financials table with Edit/Remove in each quarter's header menu) · **Updates** (form behind an Add update button) · **Meetings** · **Files** (materials, plus the deck summary in a collapsed section) · **History** (comments, then the change log). Pipeline and Rejected companies keep Summary · Materials · Comments · History.

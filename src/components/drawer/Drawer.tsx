@@ -325,7 +325,7 @@ function DrawerBody({
         ) : current === "overview" ? (
           <InvestmentTab detail={detail} reload={reload} goUpdates={() => setTab("updates")} />
         ) : current === "mis" ? (
-          <MisSection companyId={c.id} items={detail.mis} files={detail.files} reload={reload} />
+          <MisSection companyId={c.id} files={detail.files} reload={reload} />
         ) : current === "files" ? (
           <>
             <MaterialsTab detail={detail} reload={reload} />

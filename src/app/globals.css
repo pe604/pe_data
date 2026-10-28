@@ -612,3 +612,34 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .inv-head .acts{display:flex;gap:6px}
 .q-upload{display:inline-flex;align-items:center;justify-content:center;width:30px;height:24px;border:1px dashed var(--rule);border-radius:6px;color:var(--muted)}
 .q-c.editable:hover .q-upload,.q-c.editable:focus-visible .q-upload{color:var(--green);border-color:var(--green)}
+/* Figures history: review and grid (SPEC 15.11) */
+.inp.sm{height:28px;font-size:12.5px;padding:0 7px}
+.mr{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
+.mr-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+.mr-scroll{overflow:auto;flex:1;min-height:0;border:1px solid var(--rule);border-radius:8px}
+.mr-table{border-collapse:separate;border-spacing:0;font-size:12.5px;min-width:100%}
+.mr-table th{position:sticky;top:0;z-index:2;background:var(--surface);text-align:left;font-weight:500;color:var(--muted);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--rule);white-space:nowrap}
+.mr-table td{padding:3px 8px;border-bottom:1px solid var(--rule-2);vertical-align:middle;white-space:nowrap}
+.mr-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.mr-inc{width:28px;position:sticky;left:0;background:var(--surface);z-index:1}
+.mr-line{position:sticky;left:28px;background:var(--surface);z-index:1;min-width:230px}
+.mr-table th.mr-inc,.mr-table th.mr-line{z-index:3}
+.mr-line .inp{width:100%}
+.mr-uk{display:flex;gap:4px}
+.mr-sec td{background:var(--bg-2,var(--rule-2));font-weight:600;color:var(--ink-2);padding:6px 8px}
+.mr-off td{opacity:.45}
+.mr-cell{cursor:text;min-width:84px}
+.mr-cell:hover{background:var(--rule-2)}
+.mr-cell .inp{width:96px;text-align:right}
+.mr-conflict{background:var(--gold-soft)}
+.mr-flags td{border-bottom:1px solid var(--rule-2);font-size:12px;white-space:normal;padding-top:0}
+.mf-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.mf-table td,.mf-table th{white-space:nowrap}
+.mf-sec td{font-weight:600;color:var(--ink-2);background:var(--rule-2);padding:5px 8px}
+.mf-line{min-width:200px}
+.mf-name{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.mf-name:hover{color:var(--green);text-decoration:underline}
+.mf-unit{margin-left:6px;font-size:11px;color:var(--muted)}
+.mf-cell{cursor:pointer}
+.mf-cell:hover{background:var(--rule-2)}
+.mf-manual{font-style:italic}

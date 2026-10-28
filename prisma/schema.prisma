@@ -93,6 +93,7 @@ model User {
   meetingsCreated   Meeting[]
   updatesAdded      CompanyUpdate[]
   misEntered        MisFigure[]
+  misValuesSet      MisValue[]
 }
 
 /// Names used in PE / Research / Via chips. Not necessarily app users.
@@ -173,6 +174,7 @@ model Company {
   checks      QuarterCheck[]
   meetings    Meeting[]
   misFigures  MisFigure[]
+  misLines    MisLine[]
   reminders   ReminderLog[]
   newsWatch   NewsWatch?
   newsItems   NewsItem[]
@@ -227,6 +229,7 @@ model File {
   summaries   Summary[]
   summaryJobs SummaryJob[]
   misFigures  MisFigure[]
+  misValues   MisValue[]
 
   @@index([companyId, uploadedAt])
   @@index([companyId, kind])
@@ -573,4 +576,49 @@ model NewsItem {
 
   @@unique([companyId, url])
   @@index([verdict, alertedAt, digestedAt])
+}
+
+/// A line item in a company's figures history (SPEC §15.11), e.g. "Net Revenue" in section "P&L".
+model MisLine {
+  id        String     @id @default(cuid())
+  companyId String
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  label     String
+  /// Normalised label, for matching rows from the next MIS (see domain/misHistory.ts lineKey)
+  key       String
+  /// Group the line belongs to, e.g. "P&L", "Amazon.in", "Business metrics"; "" for none
+  section   String     @default("")
+  /// INR_CR (money, stored in ₹ Cr), PCT (percent), NUM (other number, with unitLabel)
+  unit      String
+  unitLabel String?
+  /// FLOW (adds up over time), STOCK (period-end balance), RATIO (recalculated, never added)
+  kind      String
+  sortOrder Int
+  /// Other labels this line has had in MIS files, for matching
+  aliases   String[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  values    MisValue[]
+
+  @@unique([companyId, section, key])
+  @@index([companyId, sortOrder])
+}
+
+/// One figure for one line and period (SPEC §15.11). Period keys: 2026-07, FY27-Q2, FY27-H1, FY27, YTD-2026-09.
+model MisValue {
+  id           String   @id @default(cuid())
+  lineId       String
+  line         MisLine  @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  period       String
+  value        Decimal  @db.Decimal(24, 6)
+  /// MIS, RESULT (read off a result image), MANUAL, IMPORT
+  source       String
+  sourceFileId String?
+  sourceFile   File?    @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  updatedById  String
+  updatedBy    User     @relation(fields: [updatedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([lineId, period])
 }

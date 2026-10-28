@@ -138,31 +138,54 @@ export interface CompanyDetail {
   activeJob: JobItem | null;
   rounds: RoundItem[];
   contacts: ContactItem[];
-  /** Quarterly financials from MIS, oldest quarter first (₹ Cr). */
-  mis: MisItem[];
 }
 
-export interface MisItem {
-  quarter: string;
-  revenue: number | null;
-  ebitda: number | null;
-  pat: number | null;
-  cash: number | null;
-  note: string | null;
-  sourceFileId: string | null;
-  sourceFileName: string | null;
+// ─── Figures history (SPEC §15.11) ───────────────────────────────────────────
+
+export type LineUnitKey = "INR_CR" | "PCT" | "NUM";
+export type LineKindKey = "FLOW" | "STOCK" | "RATIO";
+
+export interface MisCell {
+  value: number;
+  source: "MIS" | "RESULT" | "MANUAL" | "IMPORT";
+  fileName: string | null;
+  at: string;
 }
 
-/** What the MIS reader found, for review before saving (₹ Cr). */
-export interface MisReadResult {
-  revenue: number | null;
-  ebitda: number | null;
-  pat: number | null;
-  cash: number | null;
-  unit: string | null;
-  source: Record<"revenue" | "ebitda" | "pat", "quarter" | "months" | null>;
-  /** Figures the model gave that aren't in the file's text: check these. */
-  unmatched: string[];
+/** A line item with its stored values by period key. */
+export interface MisLineItem {
+  id: string;
+  section: string;
+  label: string;
+  unit: LineUnitKey;
+  unitLabel: string | null;
+  kind: LineKindKey;
+  values: Record<string, MisCell>;
+}
+
+/** A row read from an MIS, for review before saving. Values are in stored units (₹ Cr, %, number). */
+export interface MisDraftRowView {
+  ref: string;
+  section: string;
+  label: string;
+  unit: LineUnitKey;
+  unitLabel: string | null;
+  kind: LineKindKey;
+  values: { period: string; value: number; raw: string }[];
+  flags: string[];
+  /** The existing line it matches, if any */
+  matchId: string | null;
+  /** Periods where a different value is already saved (stored units) */
+  conflicts: { period: string; saved: number }[];
+}
+
+export interface MisReadView {
+  fileName: string;
+  format: "excel" | "pdf";
+  periods: string[];
+  rows: MisDraftRowView[];
+  /** Existing lines, for merging a row into one */
+  lines: { id: string; section: string; label: string; unit: LineUnitKey }[];
 }
 
 export interface RoundItem {
