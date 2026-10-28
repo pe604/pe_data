@@ -99,6 +99,13 @@ describe("checks", () => {
     expect(monthsVsTotals("FLOW", [v("2026-07", 1), v("FY27-Q2", 9)], fmt)).toEqual([]);
   });
 
+  it("allows for figures rounded to the printed decimals", () => {
+    const r = (period: string, raw: string) => ({ period, value: Number(raw), raw });
+    // 0.7 + 0.7 + 0.7 = 2.1, printed quarter 2.2: within rounding of four one-decimal figures.
+    expect(monthsVsTotals("FLOW", [r("2026-04", "0.7"), r("2026-05", "0.7"), r("2026-06", "0.7"), r("FY27-Q1", "2.2")], fmt)).toEqual([]);
+    expect(monthsVsTotals("FLOW", [r("2026-04", "0.7"), r("2026-05", "0.7"), r("2026-06", "0.7"), r("FY27-Q1", "2.4")], fmt)).toHaveLength(1);
+  });
+
   it("flags printed figures missing from the file's text", () => {
     const text = "Total revenue 499 1,522 821 1,034 740 1,140 ".repeat(10);
     const vals = [

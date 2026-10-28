@@ -321,6 +321,7 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
   }
   if (cur.length) batches.push(cur);
   const copied = new Map<string, { period: string; raw: string | null }[]>();
+  const failed = new Set<string>();
   for (let i = 0; i < batches.length; i += 3) {
     const done = await Promise.all(
       batches.slice(i, i + 3).map((b) =>
@@ -337,11 +338,16 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
             text,
           ].join("\n"),
           pdf,
-        ),
+        ).catch(() => {
+          // One bad batch should not lose the whole file: its rows fall back to the text layer below, flagged.
+          for (const s of b) failed.add(s.ref);
+          return { rows: [] };
+        }),
       ),
     );
     for (const d of done) for (const r of d.rows) copied.set(r.ref, r.values);
   }
+  if (specs.length && failed.size === specs.length) throw new AiError("failed", "The MIS could not be read. Try again, or enter the figures by hand.");
   const seen = new Map<string, number>(); // label → how many rows with it so far, to pick the right text line
   const rows: DraftRow[] = specs.map((s) => {
     const own = lineKey(s.label.split(" – ").pop() ?? s.label);
@@ -355,7 +361,10 @@ async function readPdf(data: Buffer, fileName: string, companyName: string): Pro
     const nums = (m: Map<string, string>) => s.periods.map((p) => parseFigure(m.get(p.period) ?? null));
     const flags: string[] = [];
     let chosen = model;
-    if (fromLine) {
+    if (failed.has(s.ref)) {
+      if (fromLine) chosen = fromLine;
+      flags.push(fromLine ? "The AI could not copy this row; taken from the file's text: check against the file" : "The AI could not copy this row: enter its figures by hand");
+    } else if (fromLine) {
       const a = nums(model);
       const b = nums(fromLine);
       const same = a.every((x, i) => x === b[i]);

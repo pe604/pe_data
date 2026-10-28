@@ -163,22 +163,32 @@ export interface ReadValue {
   raw: string;
 }
 
+/** Half a unit of the figure's last printed digit, in stored units (e.g. "2.9" in ₹ Cr → 0.05). */
+function halfStep(v: ReadValue | undefined): number {
+  if (!v) return 0;
+  const printed = parseFigure(v.raw);
+  if (printed === null || printed === 0) return 0;
+  const decimals = /\.(\d+)/.exec(v.raw)?.[1].length ?? 0;
+  return 0.5 * 10 ** -decimals * Math.abs(v.value / printed);
+}
+
 /**
  * Flows only: for each quarter (or half / year) printed alongside all its months, whether the months add up to it.
  * Returns readable problems like "Q2 FY27: months add up to 291.40, file shows 289.10".
  */
 export function monthsVsTotals(kind: LineKind, values: ReadValue[], fmt: (n: number) => string): string[] {
   if (kind !== "FLOW") return [];
-  const byPeriod = new Map(values.map((v) => [v.period, v.value]));
+  const byPeriod = new Map(values.map((v) => [v.period, v]));
   const out: string[] = [];
   for (const v of values) {
     const t = periodType(v.period);
     if (t !== "quarter" && t !== "half" && t !== "year") continue;
     const ms = periodMonths(v.period);
     if (!ms.every((m) => byPeriod.has(m))) continue;
-    const sum = ms.reduce((a, m) => a + (byPeriod.get(m) ?? 0), 0);
-    // Allow rounding: half a unit of the last printed digit per month, or 0.5% of the total.
-    const tol = Math.max(Math.abs(v.value) * 0.005, 0.0051 * ms.length, 1e-9);
+    const sum = ms.reduce((a, m) => a + (byPeriod.get(m)?.value ?? 0), 0);
+    // Allow rounding: half a unit of the last printed digit of each month and of the total, or 0.5% of the total.
+    const printed = ms.reduce((a, m) => a + halfStep(byPeriod.get(m)), halfStep(v));
+    const tol = Math.max(Math.abs(v.value) * 0.005, 0.0051 * ms.length, printed * 1.0001, 1e-9);
     if (Math.abs(sum - v.value) > tol) out.push(`${periodLabel(v.period)}: months add up to ${fmt(sum)}, file shows ${fmt(v.value)}`);
   }
   return out;
