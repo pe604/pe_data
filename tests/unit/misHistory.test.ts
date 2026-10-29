@@ -97,7 +97,10 @@ describe("checks", () => {
     expect(monthsVsTotals("FLOW", ok, fmt)).toEqual([]);
     const bad = [v("2026-07", 100), v("2026-08", 80), v("2026-09", 120), v("FY27-Q2", 250)];
     expect(monthsVsTotals("FLOW", bad, fmt)).toEqual(["Q2 FY27: months add up to 300.00, file shows 250.00"]);
-    expect(monthsVsTotals("STOCK", bad, fmt)).toEqual([]);
+    expect(monthsVsTotals("RATIO", bad, fmt)).toEqual([]);
+    // Balances: a quarter equals its last month.
+    expect(monthsVsTotals("STOCK", [v("2026-09", 120), v("FY27-Q2", 120)], fmt)).toEqual([]);
+    expect(monthsVsTotals("STOCK", bad, fmt)).toEqual(["Q2 FY27: 250.00 but Sep 2026 shows 120.00"]);
     // A quarter without all its months isn't checked.
     expect(monthsVsTotals("FLOW", [v("2026-07", 1), v("FY27-Q2", 9)], fmt)).toEqual([]);
   });

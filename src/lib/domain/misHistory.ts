@@ -176,13 +176,25 @@ function halfStep(v: ReadValue | undefined): number {
 }
 
 /**
- * Flows only: for each quarter (or half / year) printed alongside all its months, whether the months add up to it.
- * Returns readable problems like "Q2 FY27: months add up to 300.00, file shows 250.00".
+ * Flows: for each quarter (or half / year) printed alongside all its months, whether the months add up to it
+ * ("Q2 FY27: months add up to 300.00, file shows 250.00"). Balances: whether a quarter (half, year, YTD) equals its
+ * last month ("Q4 FY26: 1,164 but Mar 2026 shows 1,113"), which catches figures read into the wrong column.
  */
 export function monthsVsTotals(kind: LineKind, values: ReadValue[], fmt: (n: number) => string): string[] {
-  if (kind !== "FLOW") return [];
   const byPeriod = new Map(values.map((v) => [v.period, v]));
   const out: string[] = [];
+  if (kind === "STOCK") {
+    for (const v of values) {
+      if (periodType(v.period) === "month") continue;
+      const end = periodMonths(v.period).at(-1);
+      const e = end ? byPeriod.get(end) : undefined;
+      if (!e) continue;
+      const tol = Math.max(halfStep(v) + halfStep(e), Math.abs(v.value) * 1e-6, 1e-9);
+      if (Math.abs(e.value - v.value) > tol) out.push(`${periodLabel(v.period)}: ${fmt(v.value)} but ${periodLabel(end ?? "")} shows ${fmt(e.value)}`);
+    }
+    return out;
+  }
+  if (kind !== "FLOW") return [];
   for (const v of values) {
     const t = periodType(v.period);
     if (t !== "quarter" && t !== "half" && t !== "year") continue;

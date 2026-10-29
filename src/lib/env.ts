@@ -86,4 +86,5 @@ export const aiModel = env.OPENROUTER_MODEL || "google/gemini-2.5-pro";
  * cells) and images, and one that reads PDFs natively for PDFs. Both checked against real MIS files.
  */
 export const misModel = env.OPENROUTER_MIS_MODEL || "deepseek/deepseek-v4.1-flash";
-export const misPdfModel = env.OPENROUTER_MIS_PDF_MODEL || "google/gemini-3.1-flash-lite";
+// Flash, not Flash-Lite: in testing Lite read only the first summary table and missed the operating metrics.
+export const misPdfModel = env.OPENROUTER_MIS_PDF_MODEL || "google/gemini-3-flash-preview";
