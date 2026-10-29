@@ -574,18 +574,24 @@ test("results: figures pasted in the company file build a live preview; the form
   const paste = page.getByRole("dialog", { name: "Paste from Excel" });
   await paste
     .getByLabel("Table")
-    .fill([`Rs Cr\t${quarterLabel(prev)}\t${quarterLabel(q)}`, "Revenue\t200\t250", "COGS\t120\t150", "EBITDA\t-12\t-10"].join("\n"));
+    .fill(
+      [`Rs Cr\t${quarterLabel(prev)}\t${quarterLabel(q)}`, "Revenue\t200\t250", "Online\t120\t150", "Offline\t80\t100", "COGS\t120\t150", "EBITDA\t-12\t-10"].join("\n"),
+    );
   await paste.getByRole("button", { name: "Review figures" }).click();
-  await page.getByRole("dialog", { name: /Review figures/ }).getByRole("button", { name: "Save 3 lines" }).click();
-  await expect(page.locator(".toast")).toContainText("Saved 6 figures");
+  await page.getByRole("dialog", { name: /Review figures/ }).getByRole("button", { name: "Save 5 lines" }).click();
+  await expect(page.locator(".toast")).toContainText("Saved 10 figures");
 
-  // Numbers dashboard (SPEC §15.13): the new figures redraw the charts and the table, margin worked out.
-  const revCard = drawer.locator(".nb-card", { hasText: "Revenue" });
-  await expect(revCard).toContainText("250.00");
+  // Numbers dashboard (SPEC §15.13): the new figures redraw the tiles, charts, split and table.
+  await expect(drawer.locator(".nb-tile").first()).toContainText("250.00");
+  const revCard = drawer.locator(".nb-card:not(.nb-split)", { hasText: "Revenue" });
   await expect(revCard).toContainText("25.00% QoQ");
   await expect(revCard.getByRole("img")).toHaveAttribute("aria-label", `Revenue: ${quarterLabel(prev)} 200.00, ${quarterLabel(q)} 250.00`);
-  await expect(drawer.locator(".nb-card", { hasText: "EBITDA margin" })).toContainText("(4.0%)");
-  await expect(drawer.locator(".nb-table").first()).toContainText("COGS");  await drawer.getByRole("tab", { name: "Overview" }).click();
+  await expect(drawer.locator(".nb-card", { hasText: "EBITDA margin" })).toContainText(`EBITDA margin: (4.0%) in ${quarterLabel(q)}`);
+  const split = drawer.locator(".nb-split");
+  await expect(split).toContainText(`Revenue split, ${quarterLabel(q)}`);
+  await expect(split.locator("tr", { hasText: "Online" })).toContainText("60.0%");
+  await expect(drawer.locator(".nb-table tr.part")).toHaveCount(2);
+  await expect(drawer.locator(".nb-table")).toContainText("COGS");  await drawer.getByRole("tab", { name: "Overview" }).click();
   await expect(drawer.locator(".nb-keys")).toContainText("250.00");
   await drawer.getByRole("button", { name: "All numbers" }).click();
 
