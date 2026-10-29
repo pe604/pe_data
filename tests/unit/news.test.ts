@@ -42,10 +42,11 @@ describe("news agent helpers (SPEC §15.10)", () => {
   });
 
   it("runs the latest due check slot", () => {
-    expect(dueSlot(7)).toBeNull();
-    expect(dueSlot(8)).toBe(8);
-    expect(dueSlot(15)).toBe(12);
-    expect(dueSlot(23)).toBe(20);
+    expect(dueSlot(8)).toBeNull();
+    expect(dueSlot(9)).toBe(9);
+    expect(dueSlot(17)).toBe(9);
+    expect(dueSlot(18)).toBe(18);
+    expect(dueSlot(23)).toBe(18);
   });
 
   it("writes one message per item, with Big news for high importance and the short link", () => {

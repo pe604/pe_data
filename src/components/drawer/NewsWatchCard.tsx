@@ -93,7 +93,7 @@ export function NewsWatchCard({ companyId, onFound }: { companyId: string; onFou
           {w.linkedinUrl && !w.linkedin && <p className="hint warn-text">LinkedIn isn&rsquo;t connected (APIFY_TOKEN), so only news is searched.</p>}
           <p className="hint">
             {w.lastCheckedAt ? `Last checked ${fmtTime(w.lastCheckedAt)}` : "Not checked yet"} · {w.seen} item{w.seen === 1 ? "" : "s"} seen, {w.material} material.
-            Checked at 8 am, 12 pm, 4 pm and 8 pm.
+            Checked at 9 am and 6 pm.
           </p>
         </div>
       )}

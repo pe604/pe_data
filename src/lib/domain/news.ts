@@ -30,7 +30,7 @@ export const IMPORTANCE = ["high", "medium", "low"] as const;
 export type Importance = (typeof IMPORTANCE)[number];
 
 /** Checks run from these Asia/Kolkata hours; each material item is sent on its own right after. */
-export const NEWS_CHECK_HOURS = [8, 12, 16, 20] as const;
+export const NEWS_CHECK_HOURS = [9, 18] as const;
 
 /** The latest check slot due at `hour` (IST), or null before the first one. */
 export function dueSlot(hour: number): number | null {
