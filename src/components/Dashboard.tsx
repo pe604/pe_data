@@ -49,6 +49,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const [detailVersion, setDetailVersion] = useState(0);
   // Invested tab sub-view (SPEC §15).
   const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings" | "results">("portfolio");
+  // The company Results opens on, when opened from a company file (Numbers → Make result).
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
 
   const rowsRef = useRef(companies);
   useEffect(() => {
@@ -114,6 +116,19 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
     [putRow, toast],
   );
 
+  const setTab = useCallback((tab: Tab) => {
+    setView((v) => {
+      // Filters and sorts a tab doesn't show must not keep applying there (Invested hides Priority, Stage, Via).
+      const shown = filtersForTab(tab);
+      const f = { ...v.f, stage: [] as string[] };
+      for (const k of SET_KEYS) if (!shown.includes(k)) f[k] = [];
+      const sorts = sortsForTab(tab).map(([k]) => k);
+      // Each tab opens on its own default sort (Rejected: date rejected, oldest first).
+      const sort = tab !== v.tab || !sorts.includes(v.sort) ? defaultSortFor(tab) : v.sort;
+      return { ...v, tab, f, sort };
+    });
+  }, []);
+
   const openDrawer = useCallback((id: string, tab?: DrawerTab) => {
     setOpenId(id);
     if (tab) setDrawerTab(tab);
@@ -163,23 +178,16 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       setPeMeta,
       toast,
       openDrawer,
+      openResults: (companyId) => {
+        setOpenId(null);
+        setResultsFor(companyId);
+        setInvView("results");
+        setTab("invested");
+      },
       openAdd: () => setAddOpen(true),
     }),
-    [initial, companies, sectors, team, peMeta, detailVersion, putRow, syncRow, removeRow, mutate, addTeamNames, refresh, toast, openDrawer],
+    [initial, companies, sectors, team, peMeta, detailVersion, putRow, syncRow, removeRow, mutate, addTeamNames, refresh, toast, openDrawer, setTab],
   );
-
-  const setTab = (tab: Tab) => {
-    setView((v) => {
-      // Filters and sorts a tab doesn't show must not keep applying there (Invested hides Priority, Stage, Via).
-      const shown = filtersForTab(tab);
-      const f = { ...v.f, stage: [] as string[] };
-      for (const k of SET_KEYS) if (!shown.includes(k)) f[k] = [];
-      const sorts = sortsForTab(tab).map(([k]) => k);
-      // Each tab opens on its own default sort (Rejected: date rejected, oldest first).
-      const sort = tab !== v.tab || !sorts.includes(v.sort) ? defaultSortFor(tab) : v.sort;
-      return { ...v, tab, f, sort };
-    });
-  };
 
   const inTab = useMemo(() => companies.filter((c) => c.status === TAB_STATUS[view.tab]), [companies, view.tab]);
   const counts = useMemo(
@@ -237,7 +245,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
         ) : view.tab === "invested" && counts.invested > 0 && invView === "meetings" ? (
           <MeetingsView companies={inTab} />
         ) : view.tab === "invested" && counts.invested > 0 && invView === "results" ? (
-          <ResultsView companies={inTab} />
+          <ResultsView key={resultsFor ?? ""} companies={inTab} initialId={resultsFor} />
         ) : (
           <>
             {view.tab === "invested" && counts.invested > 0 && <PortfolioBar rows={inTab} view={view} />}

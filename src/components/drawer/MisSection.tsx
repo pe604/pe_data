@@ -21,9 +21,21 @@ function minutesAgo(iso: string): string {
   return m < 1 ? "started just now" : `started ${m} min ago`;
 }
 
-// Company file → MIS & results (SPEC §15.3, §15.11): quarterly MIS and result-note files, and the figures history.
+// Company file → Numbers, below the dashboard (SPEC §15.3, §15.11, §15.13): quarterly MIS, result-note and other
+// files, and the figures history (collapsed).
 
-export function MisSection({ companyId, files, reload }: { companyId: string; files: FileItem[]; reload: () => Promise<void> }) {
+export function MisSection({
+  companyId,
+  files,
+  reload,
+  onFiguresChanged,
+}: {
+  companyId: string;
+  files: FileItem[];
+  reload: () => Promise<void>;
+  /** Saved or edited figures (the dashboard above redraws) */
+  onFiguresChanged?: () => void;
+}) {
   const { toast, aiEnabled } = useStore();
   const today = todayISO();
   const [busy, setBusy] = useState<string | null>(null);
@@ -122,7 +134,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
   return (
     <section>
       <div className="inv-head">
-        <h3>Quarterly MIS and results</h3>
+        <h3>Quarterly files</h3>
         {!busy && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <select className="sel" aria-label="Quarter for the MIS" value={uploadQuarter} onChange={(e) => setUploadQuarter(e.target.value)}>
@@ -197,7 +209,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
           </div>
         )}
       </div>
-      <p className="hint">Files uploaded here or from the Quarterly tracker. Read figures adds an MIS or a past result (PDF, Excel or image) to the figures history below.</p>
+      <p className="hint">Files uploaded here or from the Quarterly tracker. An MIS is read automatically; Read figures also reads a past result (PDF, Excel or image).</p>
       {busy && (
         <p className="muted" role="status">
           {busy}
@@ -308,15 +320,27 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
       )}
       {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
 
-      <div className="inv-head" style={{ marginTop: 18 }}>
-        <h3>Figures</h3>
-        {!busy && (
-          <button className="btn sm" type="button" onClick={() => setPasting(true)}>
-            Paste from Excel
-          </button>
-        )}
-      </div>
-      <MisFigures companyId={companyId} version={version} onChanged={() => void reload()} />
+      <details className="deck-summary nb-edit">
+        <summary>Edit figures</summary>
+        <div className="inv-head">
+          <p className="hint" style={{ margin: 0 }}>
+            Every figure by period. Click a cell to correct it.
+          </p>
+          {!busy && (
+            <button className="btn sm" type="button" onClick={() => setPasting(true)}>
+              Paste from Excel
+            </button>
+          )}
+        </div>
+        <MisFigures
+          companyId={companyId}
+          version={version}
+          onChanged={() => {
+            onFiguresChanged?.();
+            void reload();
+          }}
+        />
+      </details>
 
       {pasting && (
         <MisPaste
@@ -338,6 +362,7 @@ export function MisSection({ companyId, files, reload }: { companyId: string; fi
           onSaved={() => {
             setReview(null);
             setVersion((v) => v + 1);
+            onFiguresChanged?.();
             void reload();
             void listMisReads(companyId).then((r) => r.ok && takeReads(r.data));
           }}

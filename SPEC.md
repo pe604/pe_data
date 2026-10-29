@@ -477,8 +477,17 @@ The goal (phases B–D): generate each portfolio company's quarterly result (ima
   - **Save as result note** saves both files as that quarter's **Result note** (the tracker's "Made" tick, Materials, History), **only when clicked**. It needs the format saved first (no unsaved changes), and asks before adding to a quarter that already has a result note. File names: "<Company> result Q2 FY27.png" / ".xlsx".
 - **Next:** phase D, AI-suggested format from a past result.
 
+### 15.13 Numbers dashboard (company file → Numbers, 2026-10-29)
+- One company's figures as charts and tables, inside its company file (not portfolio-wide). Read-only: figures are added and corrected in the figures grid below it or through MIS reads.
+- **Which figures:** the rows of the company's saved result format (else the recommended one, §15.12): lines, ratios (margins) and formulas, with the format's labels; headings are skipped. Then **Operating metrics**: figures-history lines that aren't in the format and aren't P&L lines (AUM, users, orders, assets with their fee-based / non-fee split, …).
+- **Periods:** **Quarters** (the last 8 up to the latest quarter with figures, the default) or **Years** (the last 5 full financial years). Values come from the period calculator (§15.12), so worked-out figures count; columns with no figure at all are dropped.
+- **Charts:** one card per key row of the format (style "key"): money and counts as bars (losses below the line in brick), percentages as a line; the latest figure and its change vs the previous period and vs the same quarter last year (NM rule as the result). Plain SVG in the app's colours, light and dark; each chart has a text alternative.
+- **Tables:** result rows, then operating metrics: label, a small trend line, one column per period (Indian grouping, money to 2 decimals, negatives in brackets), tabular numerals; scrolls sideways on phones.
+- **Make result** opens Invested → Results on this company. With no figures: the empty state says to upload an MIS (read automatically) or paste from Excel below.
+- **Overview → Key numbers:** the latest quarter's figure for up to 4 key rows with the change vs the same quarter last year, and a link to Numbers.
+
 ### 15.5 Company file for Invested companies (2026-10-20)
-- Tabs: **Overview** (invested by fund, latest update, contacts, rounds) · **MIS & results** (upload MIS / result note for a quarter, files of the latest 2 quarters with "Show older", financials table with Edit/Remove in each quarter's header menu) · **Updates** (form behind an Add update button) · **Meetings** · **Files** (materials, plus the deck summary in a collapsed section) · **History** (comments, then the change log). Pipeline and Rejected companies keep Summary · Materials · Comments · History.
+- Tabs (simplified 2026-10-29, six to four): **Overview** (invested by fund, key numbers of the latest quarter, latest update, contacts, rounds) · **Numbers** (the numbers dashboard, §15.13, then the quarterly MIS / result note / other files with background reads, then the editable figures grid in a collapsed section) · **Updates** (company updates, then meetings) · **Files** (materials, the deck summary in a collapsed section, comments, then the change log). Links to the old tabs land on their new home (MIS & results → Numbers, Meetings → Updates, History → Files). Pipeline and Rejected companies keep Summary · Materials · Comments · History.
 - Banner: "First invested <date> · ₹ X Cr in N rounds". "Restore to pipeline" and "Change date received" sit in a **More** menu.
 
 ### 15.6 Rejected tab sort

@@ -6,11 +6,12 @@ import { fmtDate, todayISO } from "@/lib/domain/dates";
 import { fmtCr, fmtCrNumber, parseCr } from "@/lib/domain/money";
 import { FUNDS, holdingOf, INSTRUMENTS, splitParts, suggestedStake, type Fund } from "@/lib/domain/portfolio";
 import { NewsWatchCard } from "./NewsWatchCard";
+import { KeyNumbers } from "./NumbersTab";
 import type { CompanyDetail, ContactItem, RoundItem } from "@/lib/domain/types";
 import { useStore } from "../store";
 
-// Overview tab for an Invested company (SPEC §15): amount invested (by fund), latest update, contacts, rounds.
-// Amounts in ₹ Cr. MIS and result notes have their own tab (MisSection).
+// Overview tab for an Invested company (SPEC §15.5): amount invested (by fund), key numbers, latest update, contacts,
+// rounds. Amounts in ₹ Cr. Figures, MIS and result notes have their own tab (NumbersTab).
 
 const ROUND_NAMES = ["Seed", "Pre-Series A", "Series A", "Series B", "Series C", "Series D", "Pre-IPO", "Bridge", "Secondary"];
 
@@ -27,7 +28,17 @@ const fmtPct = (n: number | null) => (n === null ? "–" : `${n.toLocaleString("
 export const fundLabel = (k: Fund | "unset") => (k === "unset" ? "Fund not set" : k);
 
 /** Company file → Overview for an Invested company: invested by fund, latest update, contacts, rounds. */
-export function InvestmentTab({ detail, reload, goUpdates }: { detail: CompanyDetail; reload: () => Promise<void>; goUpdates: () => void }) {
+export function InvestmentTab({
+  detail,
+  reload,
+  goUpdates,
+  goNumbers,
+}: {
+  detail: CompanyDetail;
+  reload: () => Promise<void>;
+  goUpdates: () => void;
+  goNumbers: () => void;
+}) {
   const { putRow, toast } = useStore();
   const c = detail.row;
   const h = c.holding ?? holdingOf([]);
@@ -63,6 +74,8 @@ export function InvestmentTab({ detail, reload, goUpdates }: { detail: CompanyDe
           </span>
         </div>
       </div>
+
+      <KeyNumbers companyId={c.id} companyName={c.name} goNumbers={goNumbers} />
 
       <section>
         <div className="inv-head">

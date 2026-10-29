@@ -709,3 +709,50 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .rv-reads{margin:0 28px 12px;padding:8px 12px;border-radius:8px;background:var(--gold-soft);color:var(--ink-2);font-size:13px}
 @media (max-width:760px){.rv-reads{margin:0 16px 12px}}
 .q-count{font-size:12.5px;color:var(--ink-2)}
+
+/* Numbers dashboard (SPEC §15.13) */
+.nb section{margin-bottom:20px}
+.nb .inv-head h3 .nb-sub{font-weight:400;font-size:13px}
+.nb-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nb .rv-reads{margin:0 0 12px}
+.nb-empty{padding:8px 0}
+.nb-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.nb-card{margin:0;border:1px solid var(--rule);border-radius:8px;background:var(--surface-2);padding:10px 12px 6px;min-width:0}
+.nb-card figcaption{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-bottom:2px}
+.nb-label{flex:1 1 100%;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.nb-latest{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.nb-chgs{display:flex;gap:10px;flex-wrap:wrap}
+.nb-chg{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.nb-chg.up{color:var(--green)}
+.nb-chg.down{color:var(--brick)}
+.chart{display:block;width:100%;height:auto}
+.chart-zero{stroke:var(--rule);stroke-width:1}
+.chart-bar{fill:var(--s3)}
+.chart-bar.last{fill:var(--green)}
+.chart-bar.neg{fill:var(--brick);opacity:.55}
+.chart-bar.neg.last{opacity:1}
+.chart-line{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart-dot{fill:var(--surface);stroke:var(--green);stroke-width:1.5}
+.chart-dot.last{fill:var(--green)}
+.chart-x{font-size:9.5px;fill:var(--muted);font-family:var(--sans)}
+.nb-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.nb-table th,.nb-table td{padding:6px 8px;border-bottom:1px solid var(--rule-2);white-space:nowrap}
+.nb-table thead th{font-weight:500;color:var(--muted);font-size:12px;border-bottom:1px solid var(--rule);text-align:left}
+.nb-table thead th:first-child{color:var(--ink-2)}
+.nb-table tbody th{text-align:left;font-weight:400;color:var(--ink);white-space:normal;min-width:150px}
+.nb-table tr.key th{font-weight:600;color:var(--green)}
+.nb-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.nb-table td.neg{color:var(--brick)}
+.nb-spark-h{width:70px}
+.nb-h4{font-size:13px;font-weight:600;margin:16px 0 6px;color:var(--ink-2)}
+.spark{display:block}
+.spark polyline{fill:none;stroke:var(--green);stroke-width:1.5;stroke-linejoin:round}
+.spark.down polyline{stroke:var(--brick)}
+.spark-none{display:inline-block;width:64px}
+.nb-keys{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.nb-key{background:var(--surface-2);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.nb-key .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nb-key strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.nb-edit .inv-head{margin-top:8px}
+.tab-gap{height:22px}
+@media (max-width:760px){.nb-cards{grid-template-columns:1fr}.nb-keys{grid-template-columns:repeat(2,minmax(0,1fr))}}

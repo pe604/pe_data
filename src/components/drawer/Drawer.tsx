@@ -18,7 +18,7 @@ import { normaliseTab, useStore, type DrawerTab } from "../store";
 import { IconX } from "../ui/icons";
 import { Popover, ReasonModal } from "../ui/overlay";
 import { fmtCr } from "@/lib/domain/money";
-import { MisSection } from "./MisSection";
+import { NumbersTab } from "./NumbersTab";
 import { CommentsTab, HistoryTab } from "./CommentsHistory";
 import { InvestmentTab } from "./InvestmentTab";
 import { UpdatesTab } from "./UpdatesTab";
@@ -191,11 +191,9 @@ function DrawerBody({
   const tabs: [DrawerTab, string, number | null][] = invested
     ? [
         ["overview", "Overview", null],
-        ["mis", "MIS & results", null],
+        ["numbers", "Numbers", null],
         ["updates", "Updates", c.updateCount || null],
-        ["meetings", "Meetings", null],
         ["files", "Files", detail?.files.length ?? c.fileCount],
-        ["history", "History", detail?.comments.length ?? (c.commentCount || null)],
       ]
     : [
         ["summary", "Summary", null],
@@ -323,9 +321,9 @@ function DrawerBody({
         {!detail ? (
           <p className="muted">Loading…</p>
         ) : current === "overview" ? (
-          <InvestmentTab detail={detail} reload={reload} goUpdates={() => setTab("updates")} />
-        ) : current === "mis" ? (
-          <MisSection companyId={c.id} files={detail.files} reload={reload} />
+          <InvestmentTab detail={detail} reload={reload} goUpdates={() => setTab("updates")} goNumbers={() => setTab("numbers")} />
+        ) : current === "numbers" ? (
+          <NumbersTab companyId={c.id} companyName={c.name} files={detail.files} reload={reload} />
         ) : current === "files" ? (
           <>
             <MaterialsTab detail={detail} reload={reload} />
@@ -333,17 +331,17 @@ function DrawerBody({
               <summary>Deck summary (from when the deal was in the pipeline)</summary>
               <SummaryTab detail={detail} reload={reload} goMaterials={() => setTab("files")} setBusyEditing={setBusyEditing} />
             </details>
-          </>
-        ) : current === "history" && invested ? (
-          <>
+            <h3 className="sec-title">Comments{detail.comments.length ? ` (${detail.comments.length})` : ""}</h3>
             <CommentsTab detail={detail} reload={reload} setBusyEditing={setBusyEditing} />
             <h3 className="sec-title">History</h3>
             <HistoryTab detail={detail} />
           </>
         ) : current === "updates" ? (
-          <UpdatesTab companyId={c.id} />
-        ) : current === "meetings" ? (
-          <CompanyMeetings companyId={c.id} />
+          <>
+            <UpdatesTab companyId={c.id} />
+            <div className="tab-gap" />
+            <CompanyMeetings companyId={c.id} />
+          </>
         ) : current === "summary" ? (
           <SummaryTab detail={detail} reload={reload} goMaterials={() => setTab("materials")} setBusyEditing={setBusyEditing} />
         ) : current === "materials" ? (

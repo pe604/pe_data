@@ -240,12 +240,15 @@ const REVENUE = /^(net |total )?(revenue|revenues|sales)( from operations)?$|^in
 /** A short id for rows and columns. */
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
+/** The P&L section of the figures history (not "P&L – segment" sub-sections). */
+export const isPnlSection = (section: string) => /p\s*&\s*l|profit|pnl|income statement|financial/i.test(section) && !/–/.test(section);
+
 /**
  * The format to start from: the P&L lines in order with key rows by name, a margin under gross profit, EBITDA and
  * PAT where the MIS has none, and columns this quarter, previous, change, same quarter last year, change (+ FY for Q4).
  */
 export function recommendedFormat(companyName: string, lines: LineData[], base: string): ResultFormat {
-  const pnl = lines.filter((l) => /p\s*&\s*l|profit|pnl|income statement|financial/i.test(l.section) && !/–/.test(l.section));
+  const pnl = lines.filter((l) => isPnlSection(l.section));
   const chosen = (pnl.length ? pnl : lines.filter((l) => l.unit === "INR_CR")).slice(0, 40);
   const revenue = chosen.find((l) => l.unit === "INR_CR" && REVENUE.test(l.label.trim()));
   const rows: ResultRow[] = [];

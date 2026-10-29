@@ -14,10 +14,10 @@ import { ResultPreview } from "./ResultPreview";
 import { resultPng } from "./resultImage";
 
 /** Invested tab → Results (SPEC §15.12): build a company's result format beside a live preview; save and lock it. */
-export function ResultsView({ companies }: { companies: CompanyRow[] }) {
+export function ResultsView({ companies, initialId }: { companies: CompanyRow[]; initialId?: string | null }) {
   const { toast, openDrawer } = useStore();
   const options = useMemo(() => companies.map((c) => ({ id: c.id, name: c.name })).sort((a, b) => a.name.localeCompare(b.name)), [companies]);
-  const [companyId, setCompanyId] = useState(() => options[0]?.id ?? "");
+  const [companyId, setCompanyId] = useState(() => (initialId && options.some((c) => c.id === initialId) ? initialId : (options[0]?.id ?? "")));
   const [setup, setSetup] = useState<ResultSetup | null>(null);
   const [draft, setDraft] = useState<ResultFormat | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -201,7 +201,7 @@ export function ResultsView({ companies }: { companies: CompanyRow[] }) {
       ) : !setup.lines.length ? (
         <div className="empty">
           <h3>No figures for {company?.name} yet</h3>
-          <p>An MIS is read automatically when it&apos;s uploaded; review and save its figures in the company file (MIS &amp; results), or paste them from Excel there. Then build the result here.</p>
+          <p>An MIS is read automatically when it&apos;s uploaded; review and save its figures in the company file (Numbers), or paste them from Excel there. Then build the result here.</p>
           <button className="btn" type="button" onClick={() => openDrawer(companyId, "mis")}>
             Open company file
           </button>

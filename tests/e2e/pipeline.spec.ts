@@ -236,7 +236,7 @@ test("Invested tab: rounds with fund give total invested with a Hedgehogs / Samb
   await expect(drawer.locator(".inv-sum")).toContainText("₹ 15 Cr");
   await expect(drawer.locator(".inv-sum")).toContainText("Hedgehogs ₹ 10 Cr · Sambhav ₹ 5 Cr");
 
-  await drawer.getByRole("tab", { name: "History" }).click();
+  await drawer.getByRole("tab", { name: /Files/ }).click();
   await expect(page.locator(".hist")).toContainText("added investment Seed (Hedgehogs): ₹ 10 Cr on 10 Jun 2024");
   await page.keyboard.press("Escape");
 
@@ -422,7 +422,7 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
 
   // Company file: both files listed under the quarter, viewable and downloadable.
   await page.getByRole("button", { name: "Mokobara", exact: true }).click();
-  await expect(drawer.getByRole("tab", { name: /MIS & results/ })).toHaveAttribute("aria-selected", "true");
+  await expect(drawer.getByRole("tab", { name: "Numbers" })).toHaveAttribute("aria-selected", "true");
   const q = drawer.locator(".qfiles-q").first();
   await expect(q).toContainText(quarterLabel(lastEndedQuarter(todayISO())));
   await expect(q).toContainText("mokobara-mis.pdf");
@@ -430,7 +430,7 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
   await q.getByRole("button", { name: "View" }).first().click();
   await expect(page.locator(".pdf-frame")).toBeVisible();
   await page.keyboard.press("Escape");
-  await drawer.getByRole("tab", { name: "History" }).click();
+  await drawer.getByRole("tab", { name: /Files/ }).click();
   await expect(page.locator(".hist")).toContainText("uploaded mokobara-mis.pdf (MIS,");
   await expect(page.locator(".hist")).toContainText("added contact Priya Shah (CFO)");
 });
@@ -464,7 +464,8 @@ test("meetings: plan, mark done, listed in the Meetings view and the company fil
   await expect(page.locator(".mtg-group", { hasText: "Past" })).toContainText("Met the CFO");
   await page.locator(".mtg-group", { hasText: "Past" }).getByRole("button", { name: "Mokobara" }).click();
   const drawer = page.locator(".drawer.open");
-  await expect(drawer.getByRole("tab", { name: /Meetings/ })).toHaveAttribute("aria-selected", "true");
+  await expect(drawer.getByRole("tab", { name: /Updates/ })).toHaveAttribute("aria-selected", "true");
+  await expect(drawer.getByRole("heading", { name: "Company updates" })).toBeVisible();
   await expect(drawer).toContainText("Met the CFO");
 });
 
@@ -479,8 +480,11 @@ test("MIS figures: upload from the company file, build the figures history by ha
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
   await row(page, a).locator("td.c-amt").first().click();
   const drawer = page.locator(".drawer.open");
-  await drawer.getByRole("tab", { name: /MIS & results/ }).click();
-  await expect(drawer.getByRole("heading", { name: "Quarterly MIS and results" })).toBeVisible();
+  // Four tabs for an Invested company (SPEC §15.5).
+  await expect(drawer.getByRole("tab")).toHaveText(["Overview", "Numbers", "Updates", /Files/]);
+  await drawer.getByRole("tab", { name: "Numbers" }).click();
+  await expect(drawer.getByRole("heading", { name: "Quarterly files" })).toBeVisible();
+  await expect(drawer.locator(".nb-empty")).toContainText("No figures yet");
 
   const wb = new ExcelJS.Workbook();
   wb.addWorksheet("P&L").addRow(["Revenue", 410.2, 431.8, 455.6]);
@@ -494,6 +498,7 @@ test("MIS figures: upload from the company file, build the figures history by ha
   // Without an AI key the upload is kept and the reader says so; figures can still be entered by hand.
   await expect(page.locator(".toast")).toContainText("AI reading is not set up");
   await expect(drawer.locator(".qfiles-q").first()).toContainText("mis.xlsx");
+  await drawer.locator("summary", { hasText: "Edit figures" }).click();
   await expect(drawer.locator(".mf")).toContainText("No figures yet");
 
   // A file uploaded as MIS by mistake moves to Other files, and back.
@@ -537,7 +542,7 @@ test("MIS figures: upload from the company file, build the figures history by ha
   await review.getByRole("button", { name: "Save 2 lines" }).click();
   await expect(page.locator(".toast")).toContainText("Saved 4 figures from the pasted table.");
 
-  await drawer.getByRole("tab", { name: "History" }).click();
+  await drawer.getByRole("tab", { name: /Files/ }).click();
   await expect(page.locator(".hist")).toContainText("from a pasted table");
   await expect(page.locator(".hist")).toContainText(`set Revenue for ${q} to -12.98`);
   await expect(page.locator(".hist")).toContainText("edited MIS line Revenue (now Net revenue)");
@@ -559,11 +564,12 @@ test("results: figures pasted in the company file build a live preview; the form
   await dlg.locator("details").getByRole("button", { name: "Add to Invested" }).click();
   await row(page, a).locator("td.c-amt").first().click();
   const drawer = page.locator(".drawer.open");
-  await drawer.getByRole("tab", { name: /MIS & results/ }).click();
+  await drawer.getByRole("tab", { name: "Numbers" }).click();
 
   // Made-up figures (tests are public), pasted for the last two ended quarters.
   const q = lastEndedQuarter(todayISO());
   const prev = shiftQuarter(q, -1);
+  await drawer.locator("summary", { hasText: "Edit figures" }).click();
   await drawer.getByRole("button", { name: "Paste from Excel" }).click();
   const paste = page.getByRole("dialog", { name: "Paste from Excel" });
   await paste
@@ -572,11 +578,20 @@ test("results: figures pasted in the company file build a live preview; the form
   await paste.getByRole("button", { name: "Review figures" }).click();
   await page.getByRole("dialog", { name: /Review figures/ }).getByRole("button", { name: "Save 3 lines" }).click();
   await expect(page.locator(".toast")).toContainText("Saved 6 figures");
-  await page.keyboard.press("Escape");
 
-  // Results view: recommended format, live preview for the latest quarter with figures.
-  await page.getByRole("tablist", { name: "Invested views" }).getByRole("tab", { name: "Results" }).click();
-  await page.getByLabel("Company", { exact: true }).selectOption({ label: a });
+  // Numbers dashboard (SPEC §15.13): the new figures redraw the charts and the table, margin worked out.
+  const revCard = drawer.locator(".nb-card", { hasText: "Revenue" });
+  await expect(revCard).toContainText("250.00");
+  await expect(revCard).toContainText("25.00% QoQ");
+  await expect(revCard.getByRole("img")).toHaveAttribute("aria-label", `Revenue: ${quarterLabel(prev)} 200.00, ${quarterLabel(q)} 250.00`);
+  await expect(drawer.locator(".nb-card", { hasText: "EBITDA margin" })).toContainText("(4.0%)");
+  await expect(drawer.locator(".nb-table").first()).toContainText("COGS");  await drawer.getByRole("tab", { name: "Overview" }).click();
+  await expect(drawer.locator(".nb-keys")).toContainText("250.00");
+  await drawer.getByRole("button", { name: "All numbers" }).click();
+
+  // Make result opens the Results view on this company, at the latest quarter with figures.
+  await drawer.getByRole("button", { name: "Make result" }).click();
+  await expect(page.locator(".drawer.open")).toHaveCount(0);
   await expect(page.getByLabel("Result quarter")).toHaveValue(q);
   const preview = page.getByLabel(`Result preview: ${a}`);
   await expect(preview).toContainText("250.00");

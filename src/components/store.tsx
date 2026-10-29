@@ -13,19 +13,21 @@ import type {
 
 /**
  * Company file tabs. Pipeline/Rejected: summary · materials · comments · history.
- * Invested (SPEC §15): overview · mis · updates · meetings · files · history (comments sit in History, the deck
- * summary in Files). `normaliseTab` maps a tab to the equivalent one for the company's status.
+ * Invested (SPEC §15.5): overview · numbers · updates · files (MIS files sit in Numbers, meetings in Updates, the deck
+ * summary, comments and history in Files). "mis" and "meetings" are kept as aliases for links into those sections.
+ * `normaliseTab` maps a tab to the equivalent one for the company's status.
  */
-export type DrawerTab = "summary" | "materials" | "comments" | "history" | "overview" | "mis" | "updates" | "meetings" | "files";
+export type DrawerTab = "summary" | "materials" | "comments" | "history" | "overview" | "numbers" | "mis" | "updates" | "meetings" | "files";
 
 export function normaliseTab(tab: DrawerTab, invested: boolean): DrawerTab {
   if (invested) {
-    if (tab === "summary" || tab === "materials") return "files";
-    if (tab === "comments") return "history";
+    if (tab === "summary" || tab === "materials" || tab === "comments" || tab === "history") return "files";
+    if (tab === "mis") return "numbers";
+    if (tab === "meetings") return "updates";
     return tab;
   }
   if (tab === "files") return "materials";
-  if (tab === "overview" || tab === "mis" || tab === "updates" || tab === "meetings") return "summary";
+  if (tab === "overview" || tab === "numbers" || tab === "mis" || tab === "updates" || tab === "meetings") return "summary";
   return tab;
 }
 
@@ -66,6 +68,8 @@ export interface Store {
   setPeMeta: (m: DashboardData["peMeta"]) => void;
   toast: (msg: string, action?: { label: string; run: () => void }) => void;
   openDrawer: (id: string, tab?: DrawerTab) => void;
+  /** Invested → Results on this company (closes the company file). */
+  openResults: (companyId: string) => void;
   openAdd: () => void;
 }
 
