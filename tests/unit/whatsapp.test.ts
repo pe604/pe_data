@@ -22,6 +22,13 @@ describe("parseVia (SPEC §14)", () => {
     expect(parseVia("referred by arjun", TEAM)).toBe("Arjun");
     expect(parseVia("thru keyurr", TEAM)).toBe("Keyur");
   });
+  it("reads 'By Raghav' at the start of a caption, and 'sent by' / 'shared by' anywhere", () => {
+    expect(parseVia("By Raghav", ["Raghav Bajaj", "Keyur", "Arjun"])).toBe("Raghav Bajaj");
+    expect(parseVia("Curefoods deck\nby: keyur", TEAM)).toBe("Keyur");
+    expect(parseVia("Deck shared by arjun", TEAM)).toBe("Arjun");
+    expect(parseVia("Pitch deck by Acme Capital", TEAM)).toBeNull();
+    expect(parseVia("Presentation - IG Defence (1).pdf", TEAM)).toBeNull();
+  });
   it("keeps outside names in Title Case", () => {
     expect(parseVia("from rahul mehta at avendus", TEAM)).toBe("Rahul Mehta");
     expect(parseVia("via Sanjay Gupta, banker", TEAM)).toBe("Sanjay Gupta");

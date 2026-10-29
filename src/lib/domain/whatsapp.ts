@@ -60,14 +60,17 @@ const NOT_A_PERSON = new Set([
 ]);
 
 const VIA_RE =
-  /(?:^|[\s,.(\-–:])(?:from\s*\/\s*via|via\s*\/\s*from|referred\s+by|ref(?:erred)?\s*(?:by)?|from|via|through|thru)\s*[:\-–]?\s+([^\n,.;:()!?\/|]+)/i;
+  /(?:^|[\s,.(\-–:])(?:from\s*\/\s*via|via\s*\/\s*from|referred\s+by|(?:sent|shared|forwarded)\s+by|ref(?:erred)?\s*(?:by)?|from|via|through|thru)\s*[:\-–]?\s+([^\n,.;:()!?\/|]+)/i;
+// "By Raghav" counts only at the start of a line ("Deck by Acme Capital" doesn't name who it came through).
+const LEADING_BY_RE = /^\s*by\s*[:\-–]?\s+([^\n,.;:()!?\/|]+)/im;
 
 /**
  * The person a deck came through, from a caption or message ("from/Via arvind sir", "via: Keyur").
  * Returns a team member's name when it matches one, otherwise the name in Title Case, or null.
  */
 export function parseVia(text: string | null | undefined, team: string[]): string | null {
-  const m = VIA_RE.exec(String(text ?? ""));
+  const t = String(text ?? "");
+  const m = VIA_RE.exec(t) ?? LEADING_BY_RE.exec(t);
   if (!m) return null;
   const words = m[1]
     .trim()
