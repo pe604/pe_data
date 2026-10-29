@@ -61,7 +61,7 @@ const system = [
   "For each item decide:",
   "- about_company: true only if the item is really about THIS company (not another company with a similar name, not a passing mention). Use the sector, website and names to tell them apart.",
   "- material: true if it matters to an investor: a product launch; a big order, contract or tender win; a fundraise, valuation, acquisition, merger or IPO plan; expansion, a new plant or capacity; a key management or board change; regulatory, tax or legal action; financial results; negative news (fraud, default, layoffs, accident, recall, dispute, raid). Routine marketing, hiring posts, events and webinars, greetings, thought leadership and minor awards are NOT material.",
-  "- repeat: true if it reports the same event as one of the already recorded updates, or as an earlier item in this list.",
+  "- repeat: true if it reports the same event as one of the already recorded updates, or as an earlier item in this list. Outlets report one event differently: the amount in another currency (₹190 crore vs about US$20 million) or rounded, the investor or the purpose named in one report and not the other, a different headline angle. A second fundraise, order or plant within a few weeks is almost always the same event unless the item clearly says it is a new or further one.",
   "- category: the best fit from the list; OTHER if none.",
   "- importance: high for a big order, fundraise / M&A / IPO, negative news, regulatory or legal action, or a key person leaving; medium for other material items; low otherwise.",
   "- summary: one plain sentence (max 200 characters) with the concrete facts (amounts, customer, product, place). No hype, no emojis.",
