@@ -23,6 +23,18 @@ async function sample(): Promise<Buffer> {
 }
 
 describe("Excel grid (SPEC §15.11)", () => {
+  it("skips a date cell holding an impossible date instead of failing the whole read", async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("P&L");
+    ws.getCell("A1").value = "Revenue";
+    ws.getCell("B1").value = 1e12;
+    ws.getCell("B1").numFmt = "dd-mm-yy";
+    ws.getCell("C1").value = 120;
+    const text = gridText(await readWorkbook(Buffer.from(await wb.xlsx.writeBuffer())));
+    expect(text).toContain("Revenue");
+    expect(text).toContain("120");
+  });
+
   it("letters columns", () => {
     expect([1, 26, 27, 52, 53].map(colLetter)).toEqual(["A", "Z", "AA", "AZ", "BA"]);
   });

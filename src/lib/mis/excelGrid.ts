@@ -40,7 +40,11 @@ function cellOf(cell: ExcelJS.Cell): GridCell | null {
     else if ("error" in v) raw = null;
   }
   if (raw === null || raw === undefined || raw === "") return null;
-  if (raw instanceof Date) return { text: raw.toISOString().slice(0, 10), num: null, pct: false };
+  if (raw instanceof Date) {
+    // A huge number in a date-formatted cell loads as an invalid Date; one such cell mustn't stop the whole read.
+    if (Number.isNaN(raw.getTime())) return null;
+    return { text: raw.toISOString().slice(0, 10), num: null, pct: false };
+  }
   if (typeof raw === "number") {
     if (!Number.isFinite(raw)) return null;
     return { text: pct ? `${+(raw * 100).toFixed(4)}%` : String(+raw.toFixed(6)), num: raw, pct };
