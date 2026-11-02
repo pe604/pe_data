@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { eventDateLabel, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
+import { parseEventbrite, parseEventsEye, parseTradeIndia, usableListings, type ListingItem } from "@/lib/domain/eventListings";
+import { eventDateLabel, eventDigestText, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 
 const ev = (p: Partial<EventItem>): EventItem => ({
@@ -9,6 +10,8 @@ const ev = (p: Partial<EventItem>): EventItem => ({
   sector: null,
   organiser: null,
   city: null,
+  venue: null,
+  description: null,
   startDate: null,
   endDate: null,
   dateNote: null,
@@ -76,12 +79,91 @@ describe("events (SPEC §15.14)", () => {
   });
 
   it("writes the PE Events message", () => {
-    const e = ev({ name: "Space Expo", tier: "TOP", sector: "Space", city: "Bengaluru", startDate: "2027-03-01", endDate: "2027-03-03", why: "Worth meeting founders.", url: "https://example.com/" });
+    const e = ev({
+      name: "Space Expo",
+      tier: "TOP",
+      sector: "Space",
+      city: "Bengaluru",
+      venue: "BIEC",
+      description: "A trade show for space companies.",
+      startDate: "2027-03-01",
+      endDate: "2027-03-03",
+      why: "Worth meeting founders.",
+      url: "https://example.com/",
+    });
     expect(eventText(e, true)).toBe(
-      "*New top event: Space Expo*\nSector expo, Space\n1–3 Mar 2027, Bengaluru\nWorth meeting founders.\nCheck dates with the organiser.\nhttps://example.com/",
+      "⭐ *NEW TOP EVENT*\n*Space Expo*\n\n📅 1–3 Mar 2027 (check dates)\n🏙️ Bengaluru\n📍 BIEC\n\n🏷️ Sector expo · Space\n\nA trade show for space companies.\n\n💡 Worth meeting founders.\n\n🔗 https://example.com/",
     );
-    expect(eventText(e, false).split("\n")[0]).toBe("*Dates found: Space Expo*");
-    expect(eventText(ev({ name: "No date" }), true)).toBe("*New event: No date*\nSector expo\nDate to be confirmed");
+    expect(eventText(e, false).split("\n")[0]).toBe("🔄 *UPDATED EVENT*");
+    expect(eventText(ev({ name: "No date" }), true)).toBe("🆕 *NEW EVENT*\n*No date*\n\n📅 Date to be confirmed\n\n🏷️ Sector expo");
+  });
+
+  it("sums up the first listing read in one message", () => {
+    const text = eventDigestText([ev({ name: "B", tier: "TOP", startDate: "2027-02-01", city: "Pune" }), ev({ name: "A", tier: "TOP", startDate: "2027-01-01" }), ev({ name: "C", startDate: "2027-01-01" })]);
+    expect(text).toBe("📅 *3 upcoming events added to the Events tab*\n\n⭐ 1 Jan 2027: A\n⭐ 1 Feb 2027: B, Pune\n\nFrom now on, only new events are posted here.");
+  });
+
+  it("reads EventsEye rows", () => {
+    const html = `<tr><td><a href="f-solar-show-1-1.html"><b>SOLAR &amp; STORAGE SHOW</b><i>Solar and storage trade fair</i></a></td><td>every year</td>
+      <td><a href="cy1_trade-shows-pune.html">Pune</a><a href="pl1_trade-shows_pune_1.html">Pune Centre</a></td><td>03/29/2027<br><i>4 days</i></td></tr><tr><td>header</td></tr>`;
+    expect(parseEventsEye(html)).toEqual([
+      {
+        url: "https://www.eventseye.com/fairs/f-solar-show-1-1.html",
+        site: "EventsEye",
+        name: "SOLAR & STORAGE SHOW",
+        description: "Solar and storage trade fair",
+        city: "Pune",
+        venue: "Pune Centre",
+        startDate: "2027-03-29",
+        endDate: "2027-04-01",
+      },
+    ]);
+  });
+
+  it("reads TradeIndia fairs, in India only", () => {
+    const data = {
+      props: {
+        list: [
+          { fair_name: "Water Expo 2027", fair_date: "Thu, 25 Feb, 2027 - Sat, 27 Feb, 2027", fair_url: "https://wwww.tradeindia.com/tradeshows/1/water.html", city: "Chennai", venue: "Trade Centre", country: "India", fair_categories: [{ category_name: "Machinery" }] },
+          { fair_name: "Abroad Expo", fair_date: "Thu, 25 Feb, 2027", fair_url: "https://www.tradeindia.com/tradeshows/2/x.html", country: "China" },
+        ],
+      },
+    };
+    const got = parseTradeIndia(`<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(data)}</script>`);
+    expect(got.map((g) => [g.name, g.startDate, g.endDate, g.url, g.description])).toEqual([["Water Expo 2027", "2027-02-25", "2027-02-27", "https://www.tradeindia.com/tradeshows/1/water.html", "Machinery"]]);
+    expect(parseTradeIndia("<html>changed</html>")).toEqual([]);
+  });
+
+  it("reads Eventbrite, in person only", () => {
+    const data = {
+      search_data: {
+        events: {
+          results: [
+            { name: "Founders meet", url: "https://www.eventbrite.com/e/1?aff=x", start_date: "2027-01-05", end_date: "2027-01-05", primary_venue: { name: "Hall", address: { city: "Mumbai" } } },
+            { name: "Webinar", url: "https://www.eventbrite.com/e/2", start_date: "2027-01-05", is_online_event: true },
+          ],
+        },
+      },
+    };
+    const got = parseEventbrite(`window.__SERVER_DATA__ = ${JSON.stringify(data)};\n`);
+    expect(got.map((g) => [g.name, g.url, g.city, g.endDate])).toEqual([["Founders meet", "https://www.eventbrite.com/e/1", "Mumbai", null]]);
+  });
+
+  it("keeps listings that are upcoming, in our sectors and not listed twice", () => {
+    const item = (name: string, startDate: string, url: string, description = ""): ListingItem => ({ name, startDate, url, description, site: "EventsEye", city: null, venue: null, endDate: null });
+    const got = usableListings(
+      [
+        item("Solar Expo 2027", "2027-03-01", "https://a.example/1"),
+        item("Solar Expo", "2027-03-02", "https://b.example/2"),
+        item("Battery Show", "2027-01-01", "https://a.example/3"),
+        item("Wedding Fair", "2027-01-01", "https://a.example/4"),
+        item("Old Solar Fair", "2026-01-01", "https://a.example/5"),
+        item("Far Solar Fair", "2030-01-01", "https://a.example/6"),
+      ],
+      "2026-11-02",
+      (a, b) => sameEvent(a, b),
+    );
+    expect(got.map((g) => g.name)).toEqual(["Battery Show", "Solar Expo 2027"]);
   });
 
   it("scans once a week from Monday 9 am", () => {

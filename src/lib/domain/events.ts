@@ -38,6 +38,7 @@ export const EVENT_SECTORS = [
   "Water",
   "Recycling",
   "Mobility and auto components",
+  "Industrials and manufacturing",
   "Logistics",
   "Fintech",
   "Consumer",
@@ -50,6 +51,8 @@ export interface EventItem {
   sector: string | null;
   organiser: string | null;
   city: string | null;
+  venue: string | null;
+  description: string | null;
   startDate: string | null;
   endDate: string | null;
   dateNote: string | null;
@@ -132,23 +135,30 @@ export function sameEvent(a: Pick<EventItem, "name" | "startDate">, b: Pick<Even
 
 /** The message for the PE Events group: a new event, or dates found for one already on the list. */
 export function eventText(
-  e: Pick<EventItem, "name" | "kind" | "sector" | "tier" | "city" | "organiser" | "startDate" | "endDate" | "why" | "url">,
+  e: Pick<EventItem, "name" | "kind" | "sector" | "tier" | "city" | "venue" | "description" | "startDate" | "endDate" | "why" | "url">,
   isNew: boolean,
 ): string {
-  const head = `*${isNew ? (e.tier === "TOP" ? "New top event" : "New event") : "Dates found"}: ${e.name}*`;
-  const type = [EVENT_KIND_LABELS[e.kind], e.sector].filter(Boolean).join(", ");
-  const when = [eventDateLabel(e), e.city].filter(Boolean).join(", ");
-  return [
-    head,
-    type,
-    when,
-    e.organiser ? `By ${e.organiser}` : "",
-    e.why ?? "",
-    e.startDate ? "Check dates with the organiser." : "",
-    e.url ?? "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const head = isNew ? (e.tier === "TOP" ? "⭐ *NEW TOP EVENT*" : "🆕 *NEW EVENT*") : "🔄 *UPDATED EVENT*";
+  const place = [`📅 ${eventDateLabel(e)}${e.startDate ? " (check dates)" : ""}`, e.city ? `🏙️ ${e.city}` : "", e.venue ? `📍 ${e.venue}` : ""];
+  const blocks = [
+    `${head}\n*${e.name}*`,
+    place.filter(Boolean).join("\n"),
+    `🏷️ ${[EVENT_KIND_LABELS[e.kind], e.sector].filter(Boolean).join(" · ")}`,
+    e.description ?? "",
+    e.why ? `💡 ${e.why}` : "",
+    e.url ? `🔗 ${e.url}` : "",
+  ];
+  return blocks.filter(Boolean).join("\n\n");
+}
+
+/** One message for the first read of the listing sites, instead of one message per event. */
+export function eventDigestText(added: Pick<EventItem, "name" | "tier" | "city" | "startDate" | "endDate">[]): string {
+  const top = added
+    .filter((e) => e.tier === "TOP" && e.startDate)
+    .sort((a, b) => (a.startDate as string).localeCompare(b.startDate as string))
+    .slice(0, 15)
+    .map((e) => `⭐ ${eventDateLabel(e)}: ${e.name}${e.city ? `, ${e.city}` : ""}`);
+  return [`📅 *${added.length} upcoming events added to the Events tab*`, top.join("\n"), "From now on, only new events are posted here."].filter(Boolean).join("\n\n");
 }
 
 // ─── Weekly scan ─────────────────────────────────────────────────────────────

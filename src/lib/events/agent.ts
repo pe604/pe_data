@@ -2,18 +2,24 @@ import "server-only";
 import { db } from "@/lib/db";
 import { judgeEvents, type EventCandidate } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
-import { EVENT_LINKEDIN_PAGES, EVENT_QUERIES, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind } from "@/lib/domain/events";
+import { usableListings, type ListingItem } from "@/lib/domain/eventListings";
+import { EVENT_LINKEDIN_PAGES, EVENT_QUERIES, eventDigestText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
 import { fetchLinkedinPosts } from "@/lib/news/agent";
 import { sendText } from "@/lib/whatsapp/evolution";
+import { fetchListings } from "./listings";
 
-// Events tracker (SPEC §15.14). Built to stay cheap: Google News is free, Apify is capped per page, and a keyword
-// check runs before any AI. Logs counts and error codes only: never article text, posts or AI output.
+// Events tracker (SPEC §15.14). Built to stay cheap: Google News and the listing sites are free, Apify is capped per
+// page, and a keyword check runs before any AI. Logs counts and error codes only: never article text, posts or AI output.
 
 const SEEDED = "events:seeded:v1";
 export const LAST_SCAN = "events:last-scan";
+const LISTINGS_READ = "events:listings-read:v1";
+const FIRST_LISTINGS = 250;
+const WEEKLY_LISTINGS = 40;
+type Added = { name: string; tier: EventTier; city: string | null; startDate: string | null; endDate: string | null };
 const NEWS_DAYS = 7;
 const LINKEDIN_POSTS = 5;
 const MAX_ITEMS = 40;
@@ -72,14 +78,16 @@ async function gather(): Promise<EventCandidate[][]> {
   return out;
 }
 
-/** One scan: gather, drop what isn't worth paying for, judge, add what's new. */
+const asISO = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+const loadKnown = () => db.event.findMany({ select: { id: true, name: true, startDate: true, endDate: true, city: true, venue: true, description: true, organiser: true, url: true } });
+
+/** One scan of news and LinkedIn: gather, drop what isn't worth paying for, judge, add what's new. */
 export async function scanEvents(): Promise<{ items: number; judged: number; added: number }> {
   const all = roundRobin(await gather());
   const unique = all.filter((r, i) => all.findIndex((x) => x.url === r.url) === i);
   const seen = new Set((await db.eventSeen.findMany({ where: { url: { in: unique.map((u) => u.url) } }, select: { url: true } })).map((s) => s.url));
   const fresh = unique.filter((u) => !seen.has(u.url));
-  const known = await db.event.findMany({ select: { id: true, name: true, startDate: true, endDate: true, city: true, organiser: true, url: true } });
-  const asISO = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+  const known = await loadKnown();
   const tracked = known.map((k) => ({ name: k.name, startDate: asISO(k.startDate) }));
   const worthJudging = (f: EventCandidate) => looksLikeEvent(`${f.title} ${f.text}`) && !mentionsTracked(f.title, tracked);
   // Links dropped here are recorded too, so they aren't looked at again.
@@ -89,11 +97,46 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
     .slice(0, MAX_ITEMS)
     .map((f, i) => ({ ...f, key: `E${i + 1}` }));
   if (skip.length) await db.eventSeen.createMany({ data: skip.map((s) => ({ url: s.url })), skipDuplicates: true });
+  const r = await judgeAndAdd(todo, known, { quiet: false, maxBatches: MAX_BATCHES });
+  return { items: fresh.length, judged: r.judged, added: r.added.length };
+}
 
+/** One read of the listing sites. Free up to the AI step; `cap` limits what reaches it, soonest events first. */
+export async function scanListings(opts: { quiet: boolean; cap: number }): Promise<{ listed: number; items: number; judged: number; added: Added[] }> {
+  const listed = await fetchListings();
+  const same = (a: { name: string; startDate: string | null }, b: { name: string; startDate: string | null }) => sameEvent({ name: a.name, startDate: a.startDate }, { name: b.name, startDate: b.startDate });
+  const usable = usableListings(listed, todayISO(), same);
+  const seen = new Set((await db.eventSeen.findMany({ where: { url: { in: usable.map((u) => u.url) } }, select: { url: true } })).map((s) => s.url));
+  const fresh = usable.filter((u) => !seen.has(u.url));
+  const known = await loadKnown();
+  const isTracked = (l: ListingItem) => known.some((k) => k.startDate && same({ name: k.name, startDate: asISO(k.startDate) }, l));
+  const skip = fresh.filter(isTracked);
+  if (skip.length) await db.eventSeen.createMany({ data: skip.map((s) => ({ url: s.url })), skipDuplicates: true });
+  const todo = fresh
+    .filter((l) => !isTracked(l))
+    .slice(0, opts.cap)
+    .map(
+      (l, i): EventCandidate => ({
+        key: `E${i + 1}`,
+        source: "LISTING",
+        listing: l,
+        title: l.name,
+        text: [l.description, `Dates: ${l.startDate}${l.endDate ? ` to ${l.endDate}` : ""}`, l.city ? `City: ${l.city}` : "", l.venue ? `Venue: ${l.venue}` : ""].filter(Boolean).join(". "),
+        url: l.url,
+        publishedAt: null,
+        outlet: l.site,
+      }),
+    );
+  const r = await judgeAndAdd(todo, known, { quiet: opts.quiet, maxBatches: Math.ceil(opts.cap / BATCH) });
+  return { listed: listed.length, items: fresh.length, judged: r.judged, added: r.added };
+}
+
+/** Judges in batches and adds what's new. `quiet` adds without a message each. */
+async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typeof loadKnown>>, opts: { quiet: boolean; maxBatches: number }): Promise<{ judged: number; added: Added[] }> {
   const today = todayISO();
   let judged = 0;
-  let added = 0;
-  for (let b = 0; b < MAX_BATCHES; b++) {
+  const added: Added[] = [];
+  for (let b = 0; b < opts.maxBatches; b++) {
     const batch = todo.slice(b * BATCH, (b + 1) * BATCH);
     if (!batch.length) break;
     let verdicts;
@@ -111,12 +154,16 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
     judged += batch.length;
     await db.eventSeen.createMany({ data: batch.map((x) => ({ url: x.url })), skipDuplicates: true });
     for (const v of verdicts) {
-      const start = isoOrNull(v.start_date);
-      const end = isoOrNull(v.end_date);
-      if ((end ?? start ?? today) < today) continue;
       const item = batch.find((x) => x.key === v.key);
       const name = v.name.trim().slice(0, 200);
       if (!item || !name) continue;
+      // A listing's own dates and place, never the model's reading of them.
+      const start = item.listing ? item.listing.startDate : isoOrNull(v.start_date);
+      const end = item.listing ? item.listing.endDate : isoOrNull(v.end_date);
+      if ((end ?? start ?? today) < today) continue;
+      const city = (item.listing?.city ?? v.city)?.trim().slice(0, 100) || null;
+      const venue = (item.listing?.venue ?? v.venue)?.trim().slice(0, 200) || null;
+      const description = v.description.trim().slice(0, 300) || null;
       const match = (v.same_as ? byKey.get(v.same_as) : undefined) ?? known.find((k) => sameEvent({ name: k.name, startDate: asISO(k.startDate) }, { name, startDate: start }));
       if (match) {
         // Only fill in what is blank: never overwrite the team's edits.
@@ -125,11 +172,13 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
             startDate: day(start),
             endDate: end ? day(end) : null,
             dateNote: null,
-            city: match.city ?? v.city,
+            city: match.city ?? city,
+            venue: match.venue ?? venue,
+            description: match.description ?? description,
             organiser: match.organiser ?? v.organiser,
             url: match.url ?? safeEventUrl(item.url),
           };
-          await db.event.update({ where: { id: match.id }, data: { ...data, alertPending: true } });
+          await db.event.update({ where: { id: match.id }, data: { ...data, alertPending: !opts.quiet } });
           Object.assign(match, data);
         }
         continue;
@@ -142,19 +191,21 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
           tier: v.tier,
           startDate: start ? day(start) : null,
           endDate: end ? day(end) : null,
-          city: v.city?.trim().slice(0, 100) || null,
+          city,
+          venue,
+          description,
           organiser: v.organiser?.trim().slice(0, 150) || null,
           why: v.why.trim().slice(0, 300) || null,
           url: safeEventUrl(item.url),
           source: item.source,
-          alertPending: true,
+          alertPending: !opts.quiet,
         },
       });
-      known.push({ id: c.id, name, startDate: c.startDate, endDate: c.endDate, city: c.city, organiser: c.organiser, url: c.url });
-      added++;
+      known.push({ id: c.id, name, startDate: c.startDate, endDate: c.endDate, city, venue, description, organiser: c.organiser, url: c.url });
+      added.push({ name, tier: v.tier, city, startDate: start, endDate: end });
     }
   }
-  return { items: fresh.length, judged, added };
+  return { judged, added };
 }
 
 /**
@@ -198,13 +249,35 @@ async function weeklyScan(now: Date): Promise<void> {
   if (!isScanDue(weekday, hour)) return;
   if (!(await claim(`events:scan:${todayISO(now)}`))) return;
   const r = await scanEvents();
+  const l = await scanListings({ quiet: false, cap: WEEKLY_LISTINGS });
+  const sum = { items: r.items + l.items, judged: r.judged + l.judged, added: r.added + l.added.length };
+  await saveLastScan(now, sum);
+  console.log(`[events] scan: ${r.items} new links, ${l.items} new listings, ${sum.judged} judged, ${sum.added} added`);
+}
+
+const saveLastScan = async (now: Date, r: { items: number; judged: number; added: number }) => {
   const value = JSON.stringify({ at: now.toISOString(), ...r });
   await db.appSetting.upsert({ where: { key: LAST_SCAN }, create: { key: LAST_SCAN, value }, update: { value } });
-  console.log(`[events] scan: ${r.items} new links, ${r.judged} judged, ${r.added} added`);
+};
+
+/** Once: fills the list from the listing sites straight away, with one summary message instead of one each. */
+async function firstListingRead(now: Date): Promise<void> {
+  if (!aiConfigured || (await db.appSetting.findUnique({ where: { key: LISTINGS_READ } }))) return;
+  const r = await scanListings({ quiet: true, cap: FIRST_LISTINGS });
+  if (!r.judged || !(await claim(LISTINGS_READ))) return; // read or AI failed: try again at the next tick
+  await saveLastScan(now, { items: r.items, judged: r.judged, added: r.added.length });
+  console.log(`[events] first listing read: ${r.listed} listed, ${r.judged} judged, ${r.added.length} added`);
+  if (!r.added.length || !whatsappConfigured || !eventsWhatsappTo) return;
+  try {
+    await sendText(eventsWhatsappTo, eventDigestText(r.added));
+  } catch (e) {
+    console.error("[events] digest failed", errCode(e));
+  }
 }
 
 export async function eventsTick(now = new Date()): Promise<void> {
   await seedEvents();
+  await firstListingRead(now);
   await weeklyScan(now);
   const sent = await sendEventAlerts();
   if (sent) console.log(`[events] ${sent} sent`);

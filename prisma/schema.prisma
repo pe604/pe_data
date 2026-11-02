@@ -391,6 +391,9 @@ model Event {
   sector         String?
   organiser      String?
   city           String?
+  venue          String?
+  /// What the event is, one or two sentences. `why` says why it matters to us
+  description    String?
   startDate      DateTime? @db.Date
   endDate        DateTime? @db.Date
   /// When there is no date yet, e.g. "Last held 10–11 Mar 2026"
@@ -405,7 +408,7 @@ model Event {
   status         String    @default("NEW")
   attendees      String[]
   notes          String?
-  /// SEED, MANUAL, NEWS or LINKEDIN
+  /// SEED, MANUAL, NEWS, LINKEDIN or LISTING
   source         String    @default("MANUAL")
   /// True when the PE Events group still has to hear about this event (found by the scan, or its dates were found)
   alertPending   Boolean   @default(false)

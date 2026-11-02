@@ -28,6 +28,8 @@ const BLANK: Input = {
   sector: null,
   organiser: null,
   city: null,
+  venue: null,
+  description: null,
   startDate: null,
   endDate: null,
   dateNote: null,
@@ -114,6 +116,10 @@ function EventForm({ initial, onDone, onCancel }: { initial: EventItem | null; o
           <input className="inp" value={f.city ?? ""} onChange={(e) => set({ city: str(e.target.value) })} />
         </label>
         <label className="field">
+          <span>Venue</span>
+          <input className="inp" value={f.venue ?? ""} onChange={(e) => set({ venue: str(e.target.value) })} />
+        </label>
+        <label className="field">
           <span>Organiser</span>
           <input className="inp" value={f.organiser ?? ""} onChange={(e) => set({ organiser: str(e.target.value) })} />
         </label>
@@ -145,6 +151,10 @@ function EventForm({ initial, onDone, onCancel }: { initial: EventItem | null; o
           <span>Who is going</span>
           <ChipPicker value={f.attendees} onChange={(v) => set({ attendees: v })} pool={pools.PE} label="Who is going" />
         </div>
+        <label className="field" style={{ gridColumn: "1 / -1" }}>
+          <span>What it is</span>
+          <input className="inp" value={f.description ?? ""} onChange={(e) => set({ description: str(e.target.value) })} />
+        </label>
         <label className="field" style={{ gridColumn: "1 / -1" }}>
           <span>Why it matters</span>
           <input className="inp" value={f.why ?? ""} onChange={(e) => set({ why: str(e.target.value) })} />
@@ -185,8 +195,9 @@ function EventRow({ e, onStatus, onEdit, onDelete }: { e: EventItem; onStatus: (
           {e.tier === "TOP" && <span className="ev-top">Top</span>}
           {!e.datesConfirmed && e.kind !== "OWN" && <span className="ev-check-tag">{e.startDate ? "Check dates" : "No date yet"}</span>}
         </div>
-        <div className="ev-meta">{[EVENT_KIND_LABELS[e.kind], e.sector, e.city, e.organiser].filter(Boolean).join(" · ")}</div>
+        <div className="ev-meta">{[EVENT_KIND_LABELS[e.kind], e.sector, e.city, e.venue, e.organiser].filter(Boolean).join(" · ")}</div>
         {e.dateNote && !e.startDate && <div className="ev-meta">{e.dateNote}</div>}
+        {e.description && <div className="ev-why">{e.description}</div>}
         {e.why && <div className="ev-why">{e.why}</div>}
         {e.attendees.length > 0 && <div className="ev-meta">Going: {e.attendees.join(", ")}</div>}
         {e.notes && <div className="ev-why">{e.notes}</div>}
@@ -243,7 +254,7 @@ export function EventsView() {
         (!sector || e.sector === sector) &&
         (status ? e.status === status : e.status !== "SKIPPED") &&
         (!topOnly || e.tier === "TOP") &&
-        (!s || [e.name, e.organiser, e.city, e.sector].some((v) => v?.toLowerCase().includes(s))),
+        (!s || [e.name, e.organiser, e.city, e.venue, e.sector].some((v) => v?.toLowerCase().includes(s))),
     );
   }, [list, q, kind, sector, status, topOnly]);
   const g = groupEvents(shown, todayISO());
