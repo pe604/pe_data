@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventDateLabel, eventNewsUrl, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
+import { eventDateLabel, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 
 const ev = (p: Partial<EventItem>): EventItem => ({
@@ -73,6 +73,15 @@ describe("events (SPEC §15.14)", () => {
     expect(mentionsTracked("Bengaluru Tech Summit to focus on AI", tracked)).toBe(true);
     expect(mentionsTracked("IVCA Conclave dates announced", tracked)).toBe(false);
     expect(roundRobin([[1, 2, 3], [4], [5, 6]])).toEqual([1, 4, 5, 2, 6, 3]);
+  });
+
+  it("writes the PE Events message", () => {
+    const e = ev({ name: "Space Expo", tier: "TOP", sector: "Space", city: "Bengaluru", startDate: "2027-03-01", endDate: "2027-03-03", why: "Worth meeting founders.", url: "https://example.com/" });
+    expect(eventText(e, true)).toBe(
+      "*New top event: Space Expo*\nSector expo, Space\n1–3 Mar 2027, Bengaluru\nWorth meeting founders.\nCheck dates with the organiser.\nhttps://example.com/",
+    );
+    expect(eventText(e, false).split("\n")[0]).toBe("*Dates found: Space Expo*");
+    expect(eventText(ev({ name: "No date" }), true)).toBe("*New event: No date*\nSector expo\nDate to be confirmed");
   });
 
   it("scans once a week from Monday 9 am", () => {

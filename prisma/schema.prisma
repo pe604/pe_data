@@ -407,6 +407,10 @@ model Event {
   notes          String?
   /// SEED, MANUAL, NEWS or LINKEDIN
   source         String    @default("MANUAL")
+  /// True when the PE Events group still has to hear about this event (found by the scan, or its dates were found)
+  alertPending   Boolean   @default(false)
+  /// Last message to the PE Events group
+  alertedAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

@@ -533,13 +533,13 @@ The goal (phases B–D): generate each portfolio company's quarterly result (ima
 - **Starting list:** researched events, added once when the app starts. A date is marked confirmed only when official or several independent sources agree. Nothing is invented: when no date is known it stays blank.
 - **Weekly scan, built to stay cheap:** Mondays from 09:00 IST, once. Google News (free) for a fixed list of targeted searches, last 7 days, and the latest posts of a fixed list of organisers' LinkedIn pages via Apify (at most 5 posts a page). A keyword check drops anything that doesn't look like an event **before any AI is used**, every URL is judged only once (`EventSeen`), and each run is capped at 40 items, 6 AI batches. Target: under $1 a month.
 - **AI filter:** cheap check model, `data_collection: deny`. Keeps only real upcoming events in India (or aimed at Indian investors) that fit the scope, with name, type, sector, tier, dates and city as stated in the item. It never guesses dates. Found events are always **Check dates** and status New, and are matched against existing events by name and year: a match only fills in dates that were blank, and never overwrites the team's edits.
-- **No WhatsApp messages** for events.
+- **WhatsApp:** the **PE Events** group (`EVENTS_WHATSAPP_GROUP`) gets one message for each event the scan adds, and one when the scan finds dates for an event that had none. Nothing is sent for the starting list, for events the team adds or edits, or for events already over. Messages wait if the group isn't set. Never twice: the scan's AI is given the tracked list and links an item to a tracked event even under another name, and an event is marked as told before its message goes, so a failed send is retried but a restart can't repeat it.
 - Never log article text, posts or AI output; ids and counts only.
 
 ## 16. Non-goals (for now)
 
 - Email ingestion
-- Notifications other than the idle deal reminders (§15.7) and Research assignment messages (§15.8)
+- Notifications other than the idle deal reminders (§15.7), Research assignment messages (§15.8), news alerts (§15.10) and event alerts (§15.14)
 - A banker column
 - Deck page references in summaries
 - Parked status

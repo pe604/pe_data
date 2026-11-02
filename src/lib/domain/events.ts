@@ -130,6 +130,27 @@ export function sameEvent(a: Pick<EventItem, "name" | "startDate">, b: Pick<Even
   return isDuplicateName(bareName(a.name), bareName(b.name));
 }
 
+/** The message for the PE Events group: a new event, or dates found for one already on the list. */
+export function eventText(
+  e: Pick<EventItem, "name" | "kind" | "sector" | "tier" | "city" | "organiser" | "startDate" | "endDate" | "why" | "url">,
+  isNew: boolean,
+): string {
+  const head = `*${isNew ? (e.tier === "TOP" ? "New top event" : "New event") : "Dates found"}: ${e.name}*`;
+  const type = [EVENT_KIND_LABELS[e.kind], e.sector].filter(Boolean).join(", ");
+  const when = [eventDateLabel(e), e.city].filter(Boolean).join(", ");
+  return [
+    head,
+    type,
+    when,
+    e.organiser ? `By ${e.organiser}` : "",
+    e.why ?? "",
+    e.startDate ? "Check dates with the organiser." : "",
+    e.url ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 // ─── Weekly scan ─────────────────────────────────────────────────────────────
 
 /** Targeted Google News searches: free, but what they return is what the AI step has to pay for. */

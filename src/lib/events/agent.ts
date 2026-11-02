@@ -2,11 +2,12 @@ import "server-only";
 import { db } from "@/lib/db";
 import { judgeEvents, type EventCandidate } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
-import { EVENT_LINKEDIN_PAGES, EVENT_QUERIES, eventNewsUrl, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent } from "@/lib/domain/events";
+import { EVENT_LINKEDIN_PAGES, EVENT_QUERIES, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
-import { aiConfigured, apifyConfigured } from "@/lib/env";
+import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
 import { fetchLinkedinPosts } from "@/lib/news/agent";
+import { sendText } from "@/lib/whatsapp/evolution";
 
 // Events tracker (SPEC §15.14). Built to stay cheap: Google News is free, Apify is capped per page, and a keyword
 // check runs before any AI. Logs counts and error codes only: never article text, posts or AI output.
@@ -96,8 +97,13 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
     const batch = todo.slice(b * BATCH, (b + 1) * BATCH);
     if (!batch.length) break;
     let verdicts;
+    // Rebuilt for each batch, so an event added by an earlier batch counts as tracked.
+    const byKey = new Map(known.map((k, i) => [`K${i + 1}`, k]));
+    const list = [...byKey]
+      .filter(([, k]) => (asISO(k.endDate) ?? asISO(k.startDate) ?? today) >= today)
+      .map(([key, k]) => ({ key, name: k.name, date: asISO(k.startDate), city: k.city }));
     try {
-      verdicts = await judgeEvents(today, batch);
+      verdicts = await judgeEvents(today, batch, list);
     } catch (e) {
       console.error("[events] judge failed", errCode(e)); // not marked seen, so the next scan retries these
       continue;
@@ -111,7 +117,7 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
       const item = batch.find((x) => x.key === v.key);
       const name = v.name.trim().slice(0, 200);
       if (!item || !name) continue;
-      const match = known.find((k) => sameEvent({ name: k.name, startDate: asISO(k.startDate) }, { name, startDate: start }));
+      const match = (v.same_as ? byKey.get(v.same_as) : undefined) ?? known.find((k) => sameEvent({ name: k.name, startDate: asISO(k.startDate) }, { name, startDate: start }));
       if (match) {
         // Only fill in what is blank: never overwrite the team's edits.
         if (!match.startDate && start) {
@@ -123,7 +129,7 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
             organiser: match.organiser ?? v.organiser,
             url: match.url ?? safeEventUrl(item.url),
           };
-          await db.event.update({ where: { id: match.id }, data });
+          await db.event.update({ where: { id: match.id }, data: { ...data, alertPending: true } });
           Object.assign(match, data);
         }
         continue;
@@ -141,6 +147,7 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
           why: v.why.trim().slice(0, 300) || null,
           url: safeEventUrl(item.url),
           source: item.source,
+          alertPending: true,
         },
       });
       known.push({ id: c.id, name, startDate: c.startDate, endDate: c.endDate, city: c.city, organiser: c.organiser, url: c.url });
@@ -150,10 +157,40 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
   return { items: fresh.length, judged, added };
 }
 
+/**
+ * Tells the PE Events group, one message each. An event is marked as told before its message goes, and only a send
+ * that clearly failed is put back, so a restart or a retry can never post it twice. Events already over are dropped.
+ */
+export async function sendEventAlerts(): Promise<number> {
+  if (!whatsappConfigured || !eventsWhatsappTo) return 0;
+  const today = todayISO();
+  const pending = await db.event.findMany({ where: { alertPending: true }, orderBy: [{ tier: "asc" }, { startDate: "asc" }] }); // "TOP" sorts first
+  let sent = 0;
+  for (const e of pending) {
+    const asISO = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+    const startDate = asISO(e.startDate);
+    const endDate = asISO(e.endDate);
+    const over = (endDate ?? startDate ?? today) < today;
+    const taken = await db.event.updateMany({ where: { id: e.id, alertPending: true }, data: { alertPending: false, ...(over ? {} : { alertedAt: new Date() }) } });
+    if (!taken.count || over) continue;
+    // Found by the scan and never posted: new. Anything else (a starting-list event, or one already posted): dates found.
+    const isNew = !e.alertedAt && e.source !== "SEED" && e.source !== "MANUAL";
+    try {
+      await sendText(eventsWhatsappTo, eventText({ ...e, kind: e.kind as EventKind, tier: e.tier as "TOP" | "WORTH_A_LOOK", startDate, endDate }, isNew));
+      sent++;
+      await new Promise((r) => setTimeout(r, 2000)); // spaced out so WhatsApp doesn't flag the number
+    } catch (err) {
+      console.error("[events] send failed", e.id, errCode(err));
+      // A timeout may still have been delivered, so it isn't retried.
+      if ((err as Error).name !== "TimeoutError") await db.event.updateMany({ where: { id: e.id }, data: { alertPending: true, alertedAt: e.alertedAt } });
+    }
+  }
+  return sent;
+}
+
 const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", hour12: false });
 
-export async function eventsTick(now = new Date()): Promise<void> {
-  await seedEvents();
+async function weeklyScan(now: Date): Promise<void> {
   if (!aiConfigured) return;
   const parts = fmt.formatToParts(now);
   const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
@@ -164,6 +201,13 @@ export async function eventsTick(now = new Date()): Promise<void> {
   const value = JSON.stringify({ at: now.toISOString(), ...r });
   await db.appSetting.upsert({ where: { key: LAST_SCAN }, create: { key: LAST_SCAN, value }, update: { value } });
   console.log(`[events] scan: ${r.items} new links, ${r.judged} judged, ${r.added} added`);
+}
+
+export async function eventsTick(now = new Date()): Promise<void> {
+  await seedEvents();
+  await weeklyScan(now);
+  const sent = await sendEventAlerts();
+  if (sent) console.log(`[events] ${sent} sent`);
 }
 
 const g = globalThis as unknown as { __events?: { timer: NodeJS.Timeout; running: boolean } };

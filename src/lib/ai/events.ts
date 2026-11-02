@@ -23,6 +23,7 @@ const found = z.object({
   city: z.string().nullable(),
   organiser: z.string().nullable(),
   why: z.string(),
+  same_as: z.string().nullable(),
 });
 export type FoundEvent = z.infer<typeof found>;
 
@@ -36,7 +37,7 @@ const schema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["key", "keep", "name", "kind", "sector", "tier", "start_date", "end_date", "city", "organiser", "why"],
+        required: ["key", "keep", "name", "kind", "sector", "tier", "start_date", "end_date", "city", "organiser", "why", "same_as"],
         properties: {
           key: { type: "string" },
           keep: { type: "boolean" },
@@ -49,6 +50,7 @@ const schema = {
           city: { type: ["string", "null"] },
           organiser: { type: ["string", "null"] },
           why: { type: "string" },
+          same_as: { type: ["string", "null"] },
         },
       },
     },
@@ -67,12 +69,24 @@ const system = [
   "start_date and end_date: YYYY-MM-DD, only if the item states them. Never guess or work out a date; use null.",
   "city, organiser: as stated, else null. name: the event's proper name with its year if stated.",
   "why: one plain sentence on why it matters to a PE investor (max 160 characters). For dropped items use an empty string.",
+  "same_as: the team must never be told about the same event twice. If an item is about an event in the Already tracked list, even under a different name, short form, spelling or language, and it is the same edition, set same_as to that event's key. Otherwise null.",
+  "If two items are about the same event, keep only the first and drop the other.",
   "Return one entry per item, with its key. When keep is false, fill the other fields with any valid value.",
 ].join("\n");
 
-export async function judgeEvents(today: string, items: EventCandidate[], opts: { signal?: AbortSignal } = {}): Promise<FoundEvent[]> {
+export interface TrackedEvent {
+  key: string;
+  name: string;
+  date: string | null;
+  city: string | null;
+}
+
+export async function judgeEvents(today: string, items: EventCandidate[], tracked: TrackedEvent[], opts: { signal?: AbortSignal } = {}): Promise<FoundEvent[]> {
   const prompt = [
     `Today: ${today}`,
+    "",
+    "Already tracked:",
+    ...tracked.map((t) => `[${t.key}] ${t.name}, ${t.date ?? "no date yet"}${t.city ? `, ${t.city}` : ""}`),
     "",
     "Items:",
     ...items.map((i) =>

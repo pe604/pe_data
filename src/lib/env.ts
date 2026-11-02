@@ -41,6 +41,8 @@ const schema = z.object({
   // Portfolio news agent (SPEC §15.10): LinkedIn posts via Apify; WhatsApp group for news (default: the intake group)
   APIFY_TOKEN: z.string().optional().default(""),
   NEWS_WHATSAPP_GROUP: z.string().optional().default(""),
+  // The WhatsApp group for new events (SPEC §15.14). Unset = no event messages
+  EVENTS_WHATSAPP_GROUP: z.string().optional().default(""),
   // The dashboard's public address (e.g. https://pe.example.com), for short news links in WhatsApp (APP_URL/n/<code>)
   APP_URL: z.string().url().optional(),
   NODE_ENV: z.string().optional().default("development"),
@@ -68,6 +70,8 @@ export const apifyConfigured = Boolean(env.APIFY_TOKEN);
  * Unset = no news messages (news is still saved to company updates).
  */
 export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP;
+/** The WhatsApp group for new events. Unset = no event messages: they wait until it is set. */
+export const eventsWhatsappTo = env.EVENTS_WHATSAPP_GROUP;
 
 /** Short link for a news item (SPEC §15.10), or the original link when APP_URL isn't set. */
 export const newsLink = (code: string | null, url: string) => (env.APP_URL && code ? `${env.APP_URL.replace(/\/+$/, "")}/n/${code}` : url);
