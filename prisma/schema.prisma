@@ -380,6 +380,45 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+// ─── Events tracker (SPEC §15.14) ────────────────────────────────────────────
+
+model Event {
+  id             String    @id @default(cuid())
+  name           String
+  /// NETWORKING, BANKER, FAMILY_OFFICE, SECTOR_EXPO, OWN
+  kind           String
+  /// A label from EVENT_SECTORS (domain/events.ts), not a pipeline sector
+  sector         String?
+  organiser      String?
+  city           String?
+  startDate      DateTime? @db.Date
+  endDate        DateTime? @db.Date
+  /// When there is no date yet, e.g. "Last held 10–11 Mar 2026"
+  dateNote       String?
+  /// True once the dates are checked against the organiser or several sources
+  datesConfirmed Boolean   @default(false)
+  url            String?
+  /// TOP or WORTH_A_LOOK
+  tier           String    @default("WORTH_A_LOOK")
+  why            String?
+  /// NEW, INTERESTED, GOING, SKIPPED, ATTENDED
+  status         String    @default("NEW")
+  attendees      String[]
+  notes          String?
+  /// SEED, MANUAL, NEWS or LINKEDIN
+  source         String    @default("MANUAL")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([startDate])
+}
+
+/// Every link the weekly scan has judged, so none is paid for twice.
+model EventSeen {
+  url       String   @id
+  createdAt DateTime @default(now())
+}
+
 /// Written before a hard delete; survives the delete.
 model DeletionLog {
   id          String   @id @default(cuid())

@@ -44,7 +44,7 @@ interface ApifyPost {
 }
 
 /** Company posts since `sinceMs`, by normalised company page URL. One Apify run for all pages. */
-async function fetchLinkedinPosts(pages: string[], sinceMs: number): Promise<Map<string, RawItem[]>> {
+export async function fetchLinkedinPosts(pages: string[], sinceMs: number, maxPosts = 10): Promise<Map<string, RawItem[]>> {
   const out = new Map<string, RawItem[]>();
   if (!pages.length) return out;
   const res = await fetch("https://api.apify.com/v2/acts/harvestapi~linkedin-company-posts/run-sync-get-dataset-items?timeout=280", {
@@ -52,7 +52,7 @@ async function fetchLinkedinPosts(pages: string[], sinceMs: number): Promise<Map
     headers: { Authorization: `Bearer ${env.APIFY_TOKEN}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       targetUrls: pages,
-      maxPosts: 10,
+      maxPosts,
       postedLimitDate: new Date(sinceMs).toISOString(),
       // Company pages mostly repost founders' and partners' announcements, so keep reposts.
       includeReposts: true,

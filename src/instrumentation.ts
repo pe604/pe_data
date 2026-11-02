@@ -12,5 +12,7 @@ export async function register() {
     startReminderScheduler();
     const { startNewsScheduler } = await import("@/lib/news/agent");
     startNewsScheduler();
+    const { startEventsScheduler } = await import("@/lib/events/agent");
+    startEventsScheduler();
   }
 }

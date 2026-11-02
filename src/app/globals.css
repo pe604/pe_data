@@ -777,3 +777,28 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .nb-edit .inv-head{margin-top:8px}
 .tab-gap{height:22px}
 @media (max-width:760px){.nb-cards,.nb-split-grid{grid-template-columns:1fr}.nb-keys{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Events tracker (SPEC §15.14) */
+.ev-search{width:200px;height:34px}
+.ev-check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
+.ev-body{margin:0 28px}
+.ev-group{margin-top:18px}
+.ev-group h3{font-family:var(--serif);font-weight:500;font-size:18px;margin:0 0 6px;color:var(--ink)}
+.ev-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.ev-row{display:grid;grid-template-columns:150px 1fr auto;gap:6px 16px;padding:11px 0;border-bottom:1px solid var(--rule-2);align-items:start}
+.ev-row.off{opacity:.55}
+.ev-date{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums;padding-top:1px}
+.ev-name{font-weight:500;font-size:14.5px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ev-name a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
+.ev-name a:hover{color:var(--green)}
+.ev-top{background:var(--green-soft);color:var(--green);border-radius:5px;padding:1px 6px;font-size:11.5px;font-weight:500}
+.ev-check-tag{color:var(--gold);border:1px solid var(--rule);border-radius:5px;padding:0 6px;font-size:11.5px;font-weight:400}
+.ev-meta{font-size:12.5px;color:var(--muted);margin-top:2px}
+.ev-why{font-size:13px;color:var(--ink-2);margin-top:3px}
+.ev-acts{display:flex;align-items:center;gap:6px}
+.ev-foot{margin-top:14px}
+@media (max-width:760px){
+  .ev-body{margin:0 16px}
+  .ev-search{width:100%}
+  .ev-row{grid-template-columns:1fr}
+  .ev-acts{flex-wrap:wrap}
+}

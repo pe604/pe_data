@@ -435,6 +435,46 @@ test("quarterly tracker: upload MIS and result note from the table, view them in
   await expect(page.locator(".hist")).toContainText("added contact Priya Shah (CFO)");
 });
 
+test("events: add one with a date, mark going, filter, delete", async ({ page }) => {
+  const name = uniq("Test drone expo");
+  const start = addDays(todayISO(), 20);
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Events" }).click();
+  await page.getByRole("button", { name: "Add event" }).click();
+  const form = page.getByRole("form", { name: "Add event" });
+  await form.getByLabel("Event name").fill(name);
+  await form.getByLabel("Type").selectOption({ label: "Sector expo" });
+  // The Type dropdown's "Sector expo" option also matches a "Sector" label.
+  await form.locator("label", { has: page.locator("span", { hasText: /^Sector$/ }) }).locator("select").selectOption("Defence and aerospace");
+  await form.getByLabel("Tier").selectOption({ label: "Top" });
+  await form.getByLabel("Start date").fill(start);
+  await form.getByLabel("Link").fill("javascript:alert(1)");
+  await expect(form.getByText("Enter a link starting with")).toBeVisible();
+  await form.getByLabel("Link").fill("https://example.com/expo");
+  await form.getByRole("button", { name: "Add event" }).click();
+  await expect(page.getByRole("status")).toContainText("Event added.");
+
+  const row = page.locator(".ev-row", { hasText: name });
+  await expect(row.getByRole("link", { name })).toHaveAttribute("href", "https://example.com/expo");
+  await row.getByLabel(`Status of ${name}`).selectOption({ label: "Going" });
+  await page.getByLabel("Filter by status").selectOption({ label: "Going" });
+  await expect(row).toBeVisible();
+  await page.getByLabel("Filter by status").selectOption({ label: "Skipped" });
+  await expect(row).toHaveCount(0);
+  await page.getByLabel("Filter by status").selectOption({ label: "Not skipped" });
+
+  await page.reload();
+  await page.getByRole("tab", { name: "Events" }).click();
+  await expect(row.getByLabel(`Status of ${name}`)).toHaveValue("GOING");
+  page.once("dialog", (d) => d.accept());
+  await row.getByRole("button", { name: `Delete ${name}` }).click();
+  await expect(page.getByRole("status")).toContainText("Event deleted.");
+  await expect(row).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Pipeline" }).click();
+  await expect(page.getByRole("button", { name: "Add event" })).toHaveCount(0);
+});
+
 test("meetings: plan, mark done, listed in the Meetings view and the company file", async ({ page }) => {
   const today = todayISO();
   const yesterday = addDays(today, -1);

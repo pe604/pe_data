@@ -25,6 +25,7 @@ import { Drawer } from "./drawer/Drawer";
 import { Header } from "./shell/Header";
 import { StoreCtx, type DrawerTab, type Store } from "./store";
 import { DealTable } from "./table/DealTable";
+import { EventsView } from "./events/EventsView";
 import { Toolbar } from "./toolbar/Toolbar";
 import { ToastProvider, useToast } from "./ui/toast";
 
@@ -51,6 +52,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings" | "results">("portfolio");
   // The company Results opens on, when opened from a company file (Numbers → Make result).
   const [resultsFor, setResultsFor] = useState<string | null>(null);
+  // The Events tab sits beside the company lists; it has no filters of its own in the URL (SPEC §15.14).
+  const [eventsOpen, setEventsOpen] = useState(false);
 
   const rowsRef = useRef(companies);
   useEffect(() => {
@@ -117,6 +120,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   );
 
   const setTab = useCallback((tab: Tab) => {
+    setEventsOpen(false);
     setView((v) => {
       // Filters and sorts a tab doesn't show must not keep applying there (Invested hides Priority, Stage, Via).
       const shown = filtersForTab(tab);
@@ -212,12 +216,19 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
               ["invested", "Invested"],
             ] as const
           ).map(([k, l]) => (
-            <button key={k} className="tab" role="tab" type="button" aria-selected={view.tab === k} onClick={() => setTab(k)}>
+            <button key={k} className="tab" role="tab" type="button" aria-selected={!eventsOpen && view.tab === k} onClick={() => setTab(k)}>
               {l}
               <span className="n">{counts[k]}</span>
             </button>
           ))}
+          <button className="tab" role="tab" type="button" aria-selected={eventsOpen} onClick={() => setEventsOpen(true)}>
+            Events
+          </button>
         </nav>
+        {eventsOpen ? (
+          <EventsView />
+        ) : (
+          <>
         {showBars && (
           <>
             <StagesBar rows={inTab} view={view} setView={setView} />
@@ -251,6 +262,8 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
             {view.tab === "invested" && counts.invested > 0 && <PortfolioBar rows={inTab} view={view} />}
             <Toolbar rows={inTab} view={view} setView={setView} />
             <DealTable rows={inTab} view={view} setView={setView} openId={openId} />
+          </>
+        )}
           </>
         )}
       </div>
