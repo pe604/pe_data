@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { ListingItem } from "@/lib/domain/eventListings";
-import { EVENT_KINDS, EVENT_SECTORS, EVENT_TIERS } from "@/lib/domain/events";
+import { EVENT_KINDS, EVENT_TIERS } from "@/lib/domain/events";
 import type { RawItem } from "@/lib/domain/news";
 import { aiProvider } from "./provider";
 
@@ -17,7 +17,7 @@ const found = z.object({
   keep: z.boolean(),
   name: z.string(),
   kind: z.enum(EVENT_KINDS),
-  sector: z.enum(EVENT_SECTORS),
+  sector: z.string(),
   tier: z.enum(EVENT_TIERS),
   start_date: z.string().nullable(),
   end_date: z.string().nullable(),
@@ -30,7 +30,7 @@ const found = z.object({
 });
 export type FoundEvent = z.infer<typeof found>;
 
-const schema = {
+const schema = (sectors: string[]) => ({
   type: "object",
   additionalProperties: false,
   required: ["items"],
@@ -46,7 +46,7 @@ const schema = {
           keep: { type: "boolean" },
           name: { type: "string" },
           kind: { type: "string", enum: [...EVENT_KINDS] },
-          sector: { type: "string", enum: [...EVENT_SECTORS] },
+          sector: { type: "string", enum: sectors },
           tier: { type: "string", enum: [...EVENT_TIERS] },
           start_date: { type: ["string", "null"] },
           end_date: { type: ["string", "null"] },
@@ -60,15 +60,15 @@ const schema = {
       },
     },
   },
-};
+});
 
-const system = [
+const system = (sectors: string[]) => [
   "You screen news and LinkedIn posts for a private equity fund in India, looking for events its deal team should attend.",
   "Keep an item only if it announces a specific, named, in-person event that has not happened yet, in India or aimed at Indian investors, and that is one of:",
   "- networking between PE / VC firms, founders and investors, such as a fund showcasing its portfolio companies or a demo day (kind NETWORKING);",
   "- a conference run by an investment bank or for its clients (kind BANKER);",
   "- a family office forum (kind FAMILY_OFFICE);",
-  `- a major trade expo or summit in one of these sectors only: ${EVENT_SECTORS.filter((s) => s !== "Multi-sector").join(", ")} (kind SECTOR_EXPO). Drop shows in any other field, such as agriculture, poultry, food, textiles, real estate or healthcare.`,
+  `- a major trade expo or summit in one of these sectors only: ${sectors.filter((s) => s !== "Multi-sector").join(", ")} (kind SECTOR_EXPO). Drop shows in any other field, such as agriculture, poultry, food, textiles or real estate.`,
   "Drop reports on events already over, webinars, awards, college fests, generic business summits, job fairs, state investor meets with no investor angle, and small local meetups.",
   "tier: TOP only for a flagship event in its field, attended by leading investors or the whole industry. Otherwise WORTH_A_LOOK.",
   "start_date and end_date: YYYY-MM-DD, only if the item states them. Never guess or work out a date; use null.",
@@ -89,7 +89,7 @@ export interface TrackedEvent {
   city: string | null;
 }
 
-export async function judgeEvents(today: string, items: EventCandidate[], tracked: TrackedEvent[], opts: { signal?: AbortSignal } = {}): Promise<FoundEvent[]> {
+export async function judgeEvents(today: string, items: EventCandidate[], tracked: TrackedEvent[], sectors: string[], opts: { signal?: AbortSignal } = {}): Promise<FoundEvent[]> {
   const prompt = [
     `Today: ${today}`,
     "",
@@ -107,7 +107,7 @@ export async function judgeEvents(today: string, items: EventCandidate[], tracke
         .join("\n"),
     ),
   ].join("\n");
-  const raw = await aiProvider().generateJson({ system, prompt, jsonSchema: schema, model: MODEL, signal: opts.signal, maxTokens: 8000 });
+  const raw = await aiProvider().generateJson({ system: system(sectors), prompt, jsonSchema: schema(sectors), model: MODEL, signal: opts.signal, maxTokens: 8000 });
   const parsed = z.object({ items: z.array(found) }).parse(JSON.parse(raw));
   return parsed.items.filter((v) => v.keep && items.some((i) => i.key === v.key));
 }

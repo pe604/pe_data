@@ -796,6 +796,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 .ev-why{font-size:13px;color:var(--ink-2);margin-top:3px}
 .ev-acts{display:flex;align-items:center;gap:6px}
 .ev-foot{margin-top:14px}
+.ev-sectors{margin-top:10px}
+.ev-sector-list{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px}
 @media (max-width:760px){
   .ev-body{margin:0 16px}
   .ev-search{width:100%}

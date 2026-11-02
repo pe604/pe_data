@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteEvent, listEvents, saveEvent, setEventStatus } from "@/actions/events";
+import { deleteEvent, listEvents, saveEvent, setEventStatus, setSectorEnabled } from "@/actions/events";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import {
   EVENT_KIND_LABELS,
   EVENT_KINDS,
-  EVENT_SECTORS,
   EVENT_STATUS_LABELS,
   EVENT_STATUSES,
   EVENT_TIER_LABELS,
@@ -42,7 +41,7 @@ const BLANK: Input = {
   notes: null,
 };
 
-function EventForm({ initial, onDone, onCancel }: { initial: EventItem | null; onDone: (d: Data) => void; onCancel: () => void }) {
+function EventForm({ initial, sectors, onDone, onCancel }: { initial: EventItem | null; sectors: string[]; onDone: (d: Data) => void; onCancel: () => void }) {
   const { pools, toast } = useStore();
   const [f, setF] = useState<Input>(() => (initial ? { ...BLANK, ...initial, sector: initial.sector as Input["sector"] } : BLANK));
   const [saving, setSaving] = useState(false);
@@ -86,7 +85,7 @@ function EventForm({ initial, onDone, onCancel }: { initial: EventItem | null; o
           <span>Sector</span>
           <select className="sel" value={f.sector ?? ""} onChange={(e) => set({ sector: (e.target.value || null) as Input["sector"] })}>
             <option value="">Choose…</option>
-            {EVENT_SECTORS.map((s) => (
+            {sectors.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -232,6 +231,7 @@ export function EventsView() {
   const [status, setStatus] = useState("");
   const [topOnly, setTopOnly] = useState(false);
   const [showPast, setShowPast] = useState(false);
+  const [showSectors, setShowSectors] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -258,12 +258,22 @@ export function EventsView() {
     );
   }, [list, q, kind, sector, status, topOnly]);
   const g = groupEvents(shown, todayISO());
+  const sectorNames = (data?.sectors ?? []).map((s) => s.name);
 
   const changeStatus = async (e: EventItem, next: EventItem["status"]) => {
     const before = data;
     if (!before) return;
     setData({ ...before, list: before.list.map((x) => (x.id === e.id ? { ...x, status: next } : x)) });
     const r = await setEventStatus(e.id, next).catch(() => null);
+    if (r?.ok) return setData(r.data);
+    setData(before);
+    toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
+  };
+  const toggleSector = async (name: string, enabled: boolean) => {
+    const before = data;
+    if (!before) return;
+    setData({ ...before, sectors: before.sectors.map((s) => (s.name === name ? { ...s, enabled } : s)) });
+    const r = await setSectorEnabled(name, enabled).catch(() => null);
     if (r?.ok) return setData(r.data);
     setData(before);
     toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
@@ -297,7 +307,7 @@ export function EventsView() {
         </select>
         <select className="sel" aria-label="Filter by sector" value={sector} onChange={(e) => setSector(e.target.value)}>
           <option value="">All sectors</option>
-          {EVENT_SECTORS.map((s) => (
+          {sectorNames.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -326,6 +336,7 @@ export function EventsView() {
         <EventForm
           key={editing === "new" ? "new" : editing.id}
           initial={editing === "new" ? null : editing}
+          sectors={sectorNames}
           onDone={(d) => {
             setData(d);
             setEditing(null);
@@ -363,9 +374,37 @@ export function EventsView() {
             </section>
           )}
           <p className="hint ev-foot">
-            New events are looked for every Monday.
+            New events are looked for every Monday and Thursday.
             {data.lastScan ? ` Last checked ${fmtDate(data.lastScan.at.slice(0, 10))}: ${data.lastScan.added} added.` : ""}
           </p>
+          <section className="ev-group">
+            <button className="linkbtn" type="button" aria-expanded={showSectors} onClick={() => setShowSectors((v) => !v)}>
+              {showSectors ? "Hide sectors we track" : `Sectors we track (${data.sectors.filter((s) => s.enabled).length})`}
+            </button>
+            {showSectors && (
+              <div className="ev-sectors">
+                {data.funding ? (
+                  <div className="ev-why">
+                    <strong>Where the money went, checked {fmtDate(data.funding.at.slice(0, 10))}:</strong> {data.funding.summary}
+                    {data.funding.top.length > 0 && <div className="ev-meta">{data.funding.top.map((t) => `${t.name}: ${t.deals}`).join(" · ")}</div>}
+                  </div>
+                ) : (
+                  <p className="hint">Funding headlines are checked once a month. New sectors with money behind them are added here.</p>
+                )}
+                <ul className="ev-sector-list">
+                  {data.sectors.map((s) => (
+                    <li key={s.name} title={s.why ?? undefined}>
+                      <label className="ev-check">
+                        <input type="checkbox" checked={s.enabled} onChange={(e) => void toggleSector(s.name, e.target.checked)} />
+                        {s.name}
+                        {s.source === "FUNDING" && <span className="ev-top">Added by funding check</span>}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

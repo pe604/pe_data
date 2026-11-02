@@ -5,7 +5,8 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { dateToISO, isISODate } from "@/lib/domain/dates";
-import { EVENT_KINDS, EVENT_SECTORS, EVENT_STATUSES, EVENT_TIERS, safeEventUrl, type EventItem, type EventsView } from "@/lib/domain/events";
+import { EVENT_KINDS, EVENT_STATUSES, EVENT_TIERS, safeEventUrl, type EventItem, type EventsView } from "@/lib/domain/events";
+import { FUNDING_LAST, STARTER_SECTORS } from "@/lib/domain/eventSectors";
 import { run, UserError } from "@/lib/server/action";
 
 const LAST_SCAN = "events:last-scan";
@@ -18,7 +19,7 @@ const input = z
   .object({
     name: z.string().trim().min(1).max(200),
     kind: z.enum(EVENT_KINDS),
-    sector: z.enum(EVENT_SECTORS).nullable(),
+    sector: text(80),
     organiser: text(150),
     city: text(100),
     venue: text(200),
@@ -38,8 +39,16 @@ const input = z
   .refine((e) => !e.url || !!safeEventUrl(e.url), "Invalid link");
 
 async function view(): Promise<EventsView> {
-  const [rows, scan] = await Promise.all([db.event.findMany({ orderBy: { startDate: "asc" } }), db.appSetting.findUnique({ where: { key: LAST_SCAN } })]);
+  const [rows, scan, sectors, funding] = await Promise.all([
+    db.event.findMany({ orderBy: { startDate: "asc" } }),
+    db.appSetting.findUnique({ where: { key: LAST_SCAN } }),
+    db.eventSector.findMany({ orderBy: { createdAt: "asc" } }),
+    db.appSetting.findUnique({ where: { key: FUNDING_LAST } }),
+  ]);
   return {
+    // Before the first tick has stored the list, show the starting sectors.
+    sectors: sectors.length ? sectors.map((s) => ({ name: s.name, enabled: s.enabled, source: s.source, why: s.why })) : STARTER_SECTORS.map((s) => ({ name: s.name, enabled: true, source: "STARTER", why: null })),
+    funding: funding ? (JSON.parse(funding.value) as EventsView["funding"]) : null,
     list: rows.map(
       (e): EventItem => ({
         id: e.id,
@@ -95,6 +104,16 @@ export async function setEventStatus(eventId: string, status: EventItem["status"
     await requireRole();
     const r = await db.event.updateMany({ where: { id: id.parse(eventId) }, data: { status: z.enum(EVENT_STATUSES).parse(status) } });
     if (!r.count) throw new UserError("That event no longer exists. Reload the page.");
+    return view();
+  });
+}
+
+/** Switched off, not deleted, so the funding check doesn't add it back. */
+export async function setSectorEnabled(name: string, enabled: boolean) {
+  return run<EventsView>(async () => {
+    await requireRole();
+    const r = await db.eventSector.updateMany({ where: { name: z.string().min(1).max(80).parse(name) }, data: { enabled: z.boolean().parse(enabled) } });
+    if (!r.count) throw new UserError("That sector no longer exists. Reload the page.");
     return view();
   });
 }

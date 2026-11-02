@@ -1,5 +1,6 @@
 // Events tracker (SPEC §15.14): pure helpers. Unit-tested in tests/unit/events.test.ts.
 import { fmtDate } from "./dates";
+import { STARTER_SECTORS, type FundingSnapshot } from "./eventSectors";
 import { isDuplicateName } from "./names";
 
 export const EVENT_KINDS = ["NETWORKING", "BANKER", "FAMILY_OFFICE", "SECTOR_EXPO", "OWN"] as const;
@@ -26,23 +27,8 @@ export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
   ATTENDED: "Attended",
 };
 
-/** From the portfolio and where Indian VC and PE capital is moving. */
-export const EVENT_SECTORS = [
-  "Multi-sector",
-  "Space",
-  "Defence and aerospace",
-  "Batteries and storage",
-  "Renewables",
-  "Semiconductors and electronics",
-  "Robotics and deep tech",
-  "Water",
-  "Recycling",
-  "Mobility and auto components",
-  "Industrials and manufacturing",
-  "Logistics",
-  "Fintech",
-  "Consumer",
-] as const;
+/** The starting sectors. The live list is in the database and grows with the funding check (SPEC §15.15). */
+export const EVENT_SECTORS = STARTER_SECTORS.map((s) => s.name);
 
 export interface EventItem {
   id: string;
@@ -70,6 +56,9 @@ export interface EventsView {
   list: EventItem[];
   /** When the weekly scan last ran (ISO), and what it did */
   lastScan: { at: string; items: number; judged: number; added: number } | null;
+  sectors: { name: string; enabled: boolean; source: string; why: string | null }[];
+  /** The latest monthly funding check */
+  funding: FundingSnapshot | null;
 }
 
 /** Only http(s) links are stored or rendered. */
@@ -163,20 +152,15 @@ export function eventDigestText(added: Pick<EventItem, "name" | "tier" | "city" 
 
 // ─── Weekly scan ─────────────────────────────────────────────────────────────
 
-/** Targeted Google News searches: free, but what they return is what the AI step has to pay for. */
-export const EVENT_QUERIES = [
+/**
+ * Targeted Google News searches: free, but what they return is what the AI step has to pay for.
+ * These are the investor ones. Each tracked sector adds its own.
+ */
+export const INVESTOR_QUERIES = [
   "India private equity venture capital conclave OR summit founders investors",
   "India family office summit OR forum OR conclave",
   "investment bank conference India founders investors Equirus OR Avendus OR Motilal",
   "India startup investor summit OR conclave deep tech",
-  "India space expo OR conclave OR summit",
-  "India defence aerospace expo OR show OR conclave drone",
-  "India battery energy storage expo OR show OR summit",
-  "India renewable energy solar expo OR summit",
-  "India semiconductor electronics expo OR summit",
-  "India robotics automation expo OR summit",
-  "India water recycling circular economy expo OR summit",
-  "India mobility EV logistics expo OR show",
 ] as const;
 
 /** Organisers whose LinkedIn pages are worth a look each week. Each slug was checked against a live page. */
@@ -217,5 +201,5 @@ export function roundRobin<T>(lists: T[][]): T[] {
   return out;
 }
 
-/** The Monday scan is due from 09:00 IST. */
-export const isScanDue = (weekday: string, hour: number) => weekday === "Mon" && hour >= 9;
+/** The scan is due on Mondays and Thursdays from 09:00 IST. */
+export const isScanDue = (weekday: string, hour: number) => (weekday === "Mon" || weekday === "Thu") && hour >= 9;

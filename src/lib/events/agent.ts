@@ -3,12 +3,14 @@ import { db } from "@/lib/db";
 import { judgeEvents, type EventCandidate } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
 import { usableListings, type ListingItem } from "@/lib/domain/eventListings";
-import { EVENT_LINKEDIN_PAGES, EVENT_QUERIES, eventDigestText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
+import { LISTINGS_READ, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
+import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, eventDigestText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
 import { fetchLinkedinPosts } from "@/lib/news/agent";
 import { sendText } from "@/lib/whatsapp/evolution";
+import { fundingTick } from "./funding";
 import { fetchListings } from "./listings";
 
 // Events tracker (SPEC §15.14). Built to stay cheap: Google News and the listing sites are free, Apify is capped per
@@ -16,16 +18,15 @@ import { fetchListings } from "./listings";
 
 const SEEDED = "events:seeded:v1";
 export const LAST_SCAN = "events:last-scan";
-const LISTINGS_READ = "events:listings-read:v1";
 const FIRST_LISTINGS = 250;
-const WEEKLY_LISTINGS = 40;
+const SCAN_LISTINGS = 40;
 type Added = { name: string; tier: EventTier; city: string | null; startDate: string | null; endDate: string | null };
-const NEWS_DAYS = 7;
+const NEWS_DAYS = 4; // scans run twice a week, so a longer window only fetches the same items again
 const LINKEDIN_POSTS = 5;
 const MAX_ITEMS = 40;
 const BATCH = 8;
 const MAX_BATCHES = 6;
-const WEEK_MS = 7 * 86_400_000;
+const WINDOW_MS = NEWS_DAYS * 86_400_000;
 const errCode = (e: unknown) => (e as { status?: number }).status ?? (e as Error).message?.slice(0, 40);
 const day = (iso: string) => new Date(iso + "T00:00:00Z");
 const isoOrNull = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null);
@@ -51,10 +52,12 @@ export async function seedEvents(): Promise<void> {
   });
 }
 
+const liveSectors = () => db.eventSector.findMany({ where: { enabled: true } });
+
 /** One list per search, plus one for LinkedIn. */
-async function gather(): Promise<EventCandidate[][]> {
+async function gather(queries: string[]): Promise<EventCandidate[][]> {
   const out: EventCandidate[][] = [];
-  for (const q of EVENT_QUERIES) {
+  for (const q of queries) {
     try {
       const res = await fetch(eventNewsUrl(q, NEWS_DAYS), {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; NiveshaayPipeline/1.0)", Accept: "application/rss+xml, application/xml" },
@@ -68,7 +71,7 @@ async function gather(): Promise<EventCandidate[][]> {
   }
   if (apifyConfigured && EVENT_LINKEDIN_PAGES.length) {
     try {
-      const posts = await fetchLinkedinPosts(EVENT_LINKEDIN_PAGES, Date.now() - WEEK_MS, LINKEDIN_POSTS);
+      const posts = await fetchLinkedinPosts(EVENT_LINKEDIN_PAGES, Date.now() - WINDOW_MS, LINKEDIN_POSTS);
       const all: RawItem[] = [...posts.values()].flat();
       out.push(all.map((r) => ({ ...r, source: "LINKEDIN" as const, key: "" })));
     } catch (e) {
@@ -83,7 +86,8 @@ const loadKnown = () => db.event.findMany({ select: { id: true, name: true, star
 
 /** One scan of news and LinkedIn: gather, drop what isn't worth paying for, judge, add what's new. */
 export async function scanEvents(): Promise<{ items: number; judged: number; added: number }> {
-  const all = roundRobin(await gather());
+  const sectors = await liveSectors();
+  const all = roundRobin(await gather([...INVESTOR_QUERIES, ...sectors.flatMap((s) => (s.query ? [s.query] : []))]));
   const unique = all.filter((r, i) => all.findIndex((x) => x.url === r.url) === i);
   const seen = new Set((await db.eventSeen.findMany({ where: { url: { in: unique.map((u) => u.url) } }, select: { url: true } })).map((s) => s.url));
   const fresh = unique.filter((u) => !seen.has(u.url));
@@ -97,7 +101,7 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
     .slice(0, MAX_ITEMS)
     .map((f, i) => ({ ...f, key: `E${i + 1}` }));
   if (skip.length) await db.eventSeen.createMany({ data: skip.map((s) => ({ url: s.url })), skipDuplicates: true });
-  const r = await judgeAndAdd(todo, known, { quiet: false, maxBatches: MAX_BATCHES });
+  const r = await judgeAndAdd(todo, known, sectors.map((s) => s.name), { quiet: false, maxBatches: MAX_BATCHES });
   return { items: fresh.length, judged: r.judged, added: r.added.length };
 }
 
@@ -105,7 +109,8 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
 export async function scanListings(opts: { quiet: boolean; cap: number }): Promise<{ listed: number; items: number; judged: number; added: Added[] }> {
   const listed = await fetchListings();
   const same = (a: { name: string; startDate: string | null }, b: { name: string; startDate: string | null }) => sameEvent({ name: a.name, startDate: a.startDate }, { name: b.name, startDate: b.startDate });
-  const usable = usableListings(listed, todayISO(), same);
+  const sectors = await liveSectors();
+  const usable = usableListings(listed, todayISO(), sectorRegex(sectors), same);
   const seen = new Set((await db.eventSeen.findMany({ where: { url: { in: usable.map((u) => u.url) } }, select: { url: true } })).map((s) => s.url));
   const fresh = usable.filter((u) => !seen.has(u.url));
   const known = await loadKnown();
@@ -127,12 +132,12 @@ export async function scanListings(opts: { quiet: boolean; cap: number }): Promi
         outlet: l.site,
       }),
     );
-  const r = await judgeAndAdd(todo, known, { quiet: opts.quiet, maxBatches: Math.ceil(opts.cap / BATCH) });
+  const r = await judgeAndAdd(todo, known, sectors.map((s) => s.name), { quiet: opts.quiet, maxBatches: Math.ceil(opts.cap / BATCH) });
   return { listed: listed.length, items: fresh.length, judged: r.judged, added: r.added };
 }
 
 /** Judges in batches and adds what's new. `quiet` adds without a message each. */
-async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typeof loadKnown>>, opts: { quiet: boolean; maxBatches: number }): Promise<{ judged: number; added: Added[] }> {
+async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typeof loadKnown>>, sectors: string[], opts: { quiet: boolean; maxBatches: number }): Promise<{ judged: number; added: Added[] }> {
   const today = todayISO();
   let judged = 0;
   const added: Added[] = [];
@@ -146,7 +151,7 @@ async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typ
       .filter(([, k]) => (asISO(k.endDate) ?? asISO(k.startDate) ?? today) >= today)
       .map(([key, k]) => ({ key, name: k.name, date: asISO(k.startDate), city: k.city }));
     try {
-      verdicts = await judgeEvents(today, batch, list);
+      verdicts = await judgeEvents(today, batch, list, sectors);
     } catch (e) {
       console.error("[events] judge failed", errCode(e)); // not marked seen, so the next scan retries these
       continue;
@@ -249,7 +254,7 @@ async function weeklyScan(now: Date): Promise<void> {
   if (!isScanDue(weekday, hour)) return;
   if (!(await claim(`events:scan:${todayISO(now)}`))) return;
   const r = await scanEvents();
-  const l = await scanListings({ quiet: false, cap: WEEKLY_LISTINGS });
+  const l = await scanListings({ quiet: false, cap: SCAN_LISTINGS });
   const sum = { items: r.items + l.items, judged: r.judged + l.judged, added: r.added + l.added.length };
   await saveLastScan(now, sum);
   console.log(`[events] scan: ${r.items} new links, ${l.items} new listings, ${sum.judged} judged, ${sum.added} added`);
@@ -277,6 +282,8 @@ async function firstListingRead(now: Date): Promise<void> {
 
 export async function eventsTick(now = new Date()): Promise<void> {
   await seedEvents();
+  await db.eventSector.createMany({ data: STARTER_SECTORS, skipDuplicates: true }); // a switched-off sector stays off
+  await fundingTick(now, claim);
   await firstListingRead(now);
   await weeklyScan(now);
   const sent = await sendEventAlerts();

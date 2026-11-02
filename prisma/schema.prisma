@@ -421,6 +421,18 @@ model Event {
 }
 
 /// Every link the weekly scan has judged, so none is paid for twice.
+/// A sector the events tracker follows. Switched off, not deleted, so the funding check doesn't add it back
+model EventSector {
+  name      String   @id
+  keywords  String[]
+  query     String?
+  enabled   Boolean  @default(true)
+  /// STARTER or FUNDING (added by the monthly funding check)
+  source    String   @default("STARTER")
+  why       String?
+  createdAt DateTime @default(now())
+}
+
 model EventSeen {
   url       String   @id
   createdAt DateTime @default(now())

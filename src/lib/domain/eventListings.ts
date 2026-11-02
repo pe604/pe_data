@@ -176,17 +176,14 @@ export function parseEventbrite(html: string): ListingItem[] {
   return out;
 }
 
-const RELEVANT =
-  /\b(space|satellite|defen[cs]e|aero|aviation|drone|uav|batter|energy storage|solar|renewable|wind energy|hydrogen|energy transition|power|semiconductor|electronic|pcb|ems\b|robot|automation|artificial intelligence|ai\b|deep ?tech|water|wastewater|recycl|waste|circular|electric vehicle|ev\b|mobility|auto|logistic|warehous|supply chain|fintech|machine tool|engineering|manufactur|capital goods|industrial|retail|d2c|franchise|venture|investor|private equity|family office|founder|startup)/i;
-
-/** Free check before any AI: is this in a sector we care about? */
-export const listingRelevant = (i: Pick<ListingItem, "name" | "description">) => RELEVANT.test(`${i.name} ${i.description}`);
-
-/** Upcoming, within the next 15 months, soonest first. The same event from two sites is kept once. */
-export function usableListings(items: ListingItem[], today: string, same: (a: ListingItem, b: ListingItem) => boolean): ListingItem[] {
+/**
+ * Upcoming, within the next 15 months, soonest first. `relevant` is the free check before any AI (sectorRegex).
+ * The same event from two sites is kept once.
+ */
+export function usableListings(items: ListingItem[], today: string, relevant: RegExp, same: (a: ListingItem, b: ListingItem) => boolean): ListingItem[] {
   const until = addDays(today, 456);
   const out: ListingItem[] = [];
-  const sorted = items.filter((i) => i.startDate >= today && i.startDate <= until && listingRelevant(i)).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const sorted = items.filter((i) => i.startDate >= today && i.startDate <= until && relevant.test(`${i.name} ${i.description}`)).sort((a, b) => a.startDate.localeCompare(b.startDate));
   for (const i of sorted) if (!out.some((o) => o.url === i.url || (o.startDate.slice(0, 7) === i.startDate.slice(0, 7) && same(o, i)))) out.push(i);
   return out;
 }

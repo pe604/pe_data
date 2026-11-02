@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseEventbrite, parseEventsEye, parseTradeIndia, usableListings, type ListingItem } from "@/lib/domain/eventListings";
+import { fundingText, rankSectors, sectorRegex, STARTER_SECTORS, vetProposals } from "@/lib/domain/eventSectors";
 import { eventDateLabel, eventDigestText, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 
@@ -161,14 +162,47 @@ describe("events (SPEC §15.14)", () => {
         item("Far Solar Fair", "2030-01-01", "https://a.example/6"),
       ],
       "2026-11-02",
+      sectorRegex(STARTER_SECTORS),
       (a, b) => sameEvent(a, b),
     );
     expect(got.map((g) => g.name)).toEqual(["Battery Show", "Solar Expo 2027"]);
   });
 
-  it("scans once a week from Monday 9 am", () => {
+  it("matches sector keywords, and short ones only as whole words", () => {
+    const re = sectorRegex([{ keywords: ["ev", "batter"] }]);
+    expect(re.test("India EV Show")).toBe(true);
+    expect(re.test("Battery Expo")).toBe(true);
+    expect(re.test("Every Wedding Fair")).toBe(false);
+    expect(sectorRegex([]).test("anything")).toBe(false);
+  });
+
+  it("only adds a sector with real headlines behind it that the fund could back and we don't already cover", () => {
+    const keys = new Set(["H1", "H2", "H3", "H4", "H5"]);
+    const p = (name: string, evidence_keys = ["H1", "H2", "H3", "H4"], keywords = ["kw " + name.toLowerCase().slice(0, 6)]) => ({ name, keywords, query: "India show expo", why: "Money is moving.", evidence_keys });
+    const existing = [{ name: "Space", keywords: ["space"] }, { name: "Switched off sector", keywords: ["other"] }];
+    expect(vetProposals([p("Agri lending")], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Real estate tech")], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Biofuels", ["H1", "H2", "H3"])], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Biofuels", ["H1", "H1", "H1", "H1"])], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Biofuels", ["H1", "H2", "H3", "H99"])], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Sector for switched things")], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Biofuels", undefined, ["space"])], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Biofuels", undefined, ["bio.*("])], existing, keys)).toEqual([]);
+    expect(vetProposals([p("Biofuels"), p("Quantum sensing"), p("Critical minerals")], existing, keys).map((s) => s.name)).toEqual(["Biofuels", "Quantum sensing"]);
+  });
+
+  it("ranks sectors by deals with real headlines, and writes the monthly message", () => {
+    const top = rankSectors([{ name: "A", keys: ["H1", "H1"] }, { name: "B", keys: ["H1", "H2"] }, { name: "Made up", keys: ["H9"] }], new Set(["H1", "H2"]));
+    expect(top).toEqual([{ name: "B", deals: 2 }, { name: "A", deals: 1 }]);
+    expect(fundingText({ summary: "AI led.", top, added: ["Biofuels"] })).toBe(
+      "📈 *WHERE THE MONEY WENT*\nLast 30 days of funding headlines\n\nAI led.\n\n• B: 2 deals\n• A: 1 deal\n\n🆕 Now tracking events for: Biofuels. Switch off in the Events tab if not useful.",
+    );
+  });
+
+  it("scans twice a week, Monday and Thursday from 9 am", () => {
     expect(isScanDue("Mon", 8)).toBe(false);
     expect(isScanDue("Mon", 9)).toBe(true);
+    expect(isScanDue("Thu", 9)).toBe(true);
     expect(isScanDue("Tue", 12)).toBe(false);
   });
 
