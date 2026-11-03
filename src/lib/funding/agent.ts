@@ -256,9 +256,7 @@ const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday
 export async function fundingTick(now = new Date()): Promise<void> {
   if (!aiConfigured) return;
   const today = todayISO(now);
-  const parts = fmt.formatToParts(now);
-  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24;
+  const hour = Number(fmt.formatToParts(now).find((p) => p.type === "hour")?.value ?? 0) % 24;
   const month = monthOf(today);
   const last = addMonths(month, -1);
 
@@ -287,9 +285,9 @@ export async function fundingTick(now = new Date()): Promise<void> {
     }
   }
 
-  // The weekly note for last week, Mondays from 10.
+  // The weekly note for last week: Mondays from 10, or the first day after that it is still missing (e.g. after a deploy).
   const week = lastFullWeek(today);
-  if (weekday === "Mon" && hour >= 10 && !(await db.fundingNote.findUnique({ where: { period: week } })) && (await claim(`funding:week-try:${today}`))) {
+  if (hour >= 10 && !(await db.fundingNote.findUnique({ where: { period: week } })) && (await claim(`funding:week-try:${today}`))) {
     try {
       await writeWeek(week);
     } catch (e) {

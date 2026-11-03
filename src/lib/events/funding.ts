@@ -3,10 +3,9 @@ import { readFunding } from "@/lib/ai/funding";
 import { db } from "@/lib/db";
 import { todayISO } from "@/lib/domain/dates";
 import { eventNewsUrl, roundRobin } from "@/lib/domain/events";
-import { FUNDING_LAST, FUNDING_QUERIES, fundingText, isFundingCheckDue, LISTINGS_READ, MAX_HEADLINES, rankSectors, vetProposals, type FundingSnapshot } from "@/lib/domain/eventSectors";
+import { FUNDING_LAST, FUNDING_QUERIES, isFundingCheckDue, LISTINGS_READ, MAX_HEADLINES, rankSectors, vetProposals, type FundingSnapshot } from "@/lib/domain/eventSectors";
 import { parseGoogleNewsRss } from "@/lib/domain/news";
-import { aiConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
-import { sendText } from "@/lib/whatsapp/evolution";
+import { aiConfigured } from "@/lib/env";
 
 // Monthly funding check (SPEC §15.15): where money went, and whether a new sector should be tracked.
 // Headlines are free and one cheap AI call reads them. Logs counts and error codes only.
@@ -62,17 +61,14 @@ export async function runFundingCheck(now = new Date()): Promise<FundingSnapshot
 
 const hourFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: false });
 
-/** Once a month, and one try a day until it works. The month's key is what stops a second message. */
+/**
+ * Once a month, and one try a day until it works. Silent: it only keeps the tracked sectors current (shown under
+ * Sectors we track). The team hears about funding through the weekly and monthly letters (SPEC §15.16) instead.
+ */
 export async function fundingTick(now: Date, claim: (key: string) => Promise<boolean>): Promise<void> {
   if (!aiConfigured || !isFundingCheckDue(Number(hourFmt.format(now)) % 24)) return;
   const today = todayISO(now);
   const month = `events:funding:${today.slice(0, 7)}`;
   if ((await db.appSetting.findUnique({ where: { key: month } })) || !(await claim(`events:funding-try:${today}`))) return;
-  const snapshot = await runFundingCheck(now);
-  if (!snapshot || !(await claim(month)) || !whatsappConfigured || !eventsWhatsappTo) return;
-  try {
-    await sendText(eventsWhatsappTo, fundingText(snapshot));
-  } catch (e) {
-    console.error("[funding] send failed", (e as { status?: number }).status ?? (e as Error).name);
-  }
+  if (await runFundingCheck(now)) await claim(month);
 }
