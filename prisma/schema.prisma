@@ -497,6 +497,9 @@ model FundingNote {
   model     String
   /// Figures the check couldn't match to the deal list after one retry
   unchecked String[]
+  /// The shareable version for the funding-only deployment: written without our pipeline, decks or portfolio
+  publicData      Json?
+  publicUnchecked String[]
   sentAt    DateTime?
   createdAt DateTime  @default(now())
 }

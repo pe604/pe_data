@@ -2,6 +2,7 @@ import "server-only";
 import { writeColumn, writeWeekNote } from "@/lib/ai/fundingColumn";
 import { extractDeals } from "@/lib/ai/fundingDeals";
 import { db } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { todayISO } from "@/lib/domain/dates";
 import {
   addMonths,
@@ -186,32 +187,56 @@ async function findBenchmark(month: string): Promise<Benchmark | null> {
   return null;
 }
 
-/** Writes the column for a finished month. */
-export async function writeMonth(month: string): Promise<boolean> {
+/** Writes the column for a finished month; `shared` writes the shareable version into the existing note. */
+export async function writeMonth(month: string, shared = false): Promise<boolean> {
   const [from, to] = monthRange(month);
   const [deals, prev, counts, bench] = await Promise.all([dealsBetween(from, to), dealsBetween(...monthRange(addMonths(month, -1))), ourSectorCounts(), findBenchmark(month)]);
   const stats = periodStats(deals);
   if (stats.count < 10) return false; // too little read to write about
   const ps = periodStats(prev);
-  const r = await writeColumn({ label: monthLabel(month), nextMonth: monthName(addMonths(month, 1)), deals, stats, prevTotal: ps.count >= 10 ? ps.total : null, prevCount: ps.count >= 10 ? ps.count : null, bench, ...counts });
+  const r = await writeColumn({ label: monthLabel(month), nextMonth: monthName(addMonths(month, 1)), deals, stats, prevTotal: ps.count >= 10 ? ps.total : null, prevCount: ps.count >= 10 ? ps.count : null, bench, ...counts, shared });
   const sectors = new Set(stats.sectors.map((s) => s.name));
   const data: FundingColumn = { ...r.data, sectors: r.data.sectors.filter((s) => sectors.has(s.name as never)) };
+  if (shared) return savePublic(month, data, r.unchecked);
   await db.fundingNote.upsert({ where: { period: month }, create: { period: month, kind: "MONTH", data: data as object, model: fundingModel, unchecked: r.unchecked }, update: { data: data as object, model: fundingModel, unchecked: r.unchecked, sentAt: null } });
   console.log(`[funding] column ${month} written, ${r.unchecked.length} unchecked figures`);
   return true;
 }
 
-/** Writes the note for a finished week. */
-export async function writeWeek(week: string): Promise<boolean> {
+/** Writes the note for a finished week; `shared` writes the shareable version into the existing note. */
+export async function writeWeek(week: string, shared = false): Promise<boolean> {
   const [from, to] = weekRange(week);
   const [deals, prev, counts] = await Promise.all([dealsBetween(from, to), dealsBetween(addDaysISO(from, -7), from), ourSectorCounts()]);
   const stats = periodStats(deals);
   if (stats.count < 3) return false;
   const ps = periodStats(prev);
-  const r = await writeWeekNote({ label: weekLabel(week), deals, stats, prevTotal: ps.count >= 3 ? ps.total : null, prevCount: ps.count >= 3 ? ps.count : null, ...counts });
+  const r = await writeWeekNote({ label: weekLabel(week), deals, stats, prevTotal: ps.count >= 3 ? ps.total : null, prevCount: ps.count >= 3 ? ps.count : null, ...counts, shared });
+  if (shared) return savePublic(week, r.data, r.unchecked);
   await db.fundingNote.upsert({ where: { period: week }, create: { period: week, kind: "WEEK", data: r.data as object, model: fundingModel, unchecked: r.unchecked }, update: { data: r.data as object, model: fundingModel, unchecked: r.unchecked, sentAt: null } });
   console.log(`[funding] week ${week} written, ${r.unchecked.length} unchecked figures`);
   return true;
+}
+
+async function savePublic(period: string, data: object, unchecked: string[]): Promise<boolean> {
+  const r = await db.fundingNote.updateMany({ where: { period }, data: { publicData: data, publicUnchecked: unchecked } });
+  console.log(`[funding] shareable ${period} written, ${unchecked.length} unchecked figures`);
+  return r.count > 0;
+}
+
+/**
+ * The shareable version of each recent note (SPEC §15.16), for the funding-only deployment: one try a day per note.
+ * Written separately with none of our own data, never by editing the team version.
+ */
+async function writePublicVersions(today: string): Promise<void> {
+  const missing = await db.fundingNote.findMany({ where: { publicData: { equals: Prisma.DbNull }, createdAt: { gte: new Date(Date.now() - 30 * 86_400_000) } }, select: { period: true, kind: true } });
+  for (const n of missing) {
+    if (!(await claim(`funding:public-try:${n.period}:${today}`))) continue;
+    try {
+      await (n.kind === "MONTH" ? writeMonth(n.period, true) : writeWeek(n.period, true));
+    } catch (e) {
+      console.error("[funding] shareable failed", n.period, errCode(e));
+    }
+  }
 }
 
 /**
@@ -297,6 +322,7 @@ export async function fundingTick(now = new Date()): Promise<void> {
 
   const sent = await sendFundingNotes();
   if (sent) console.log(`[funding] ${sent} sent`);
+  await writePublicVersions(today);
 }
 
 const g = globalThis as unknown as { __funding?: { timer: NodeJS.Timeout; running: boolean } };

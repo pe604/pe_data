@@ -1,5 +1,8 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // The funding-only deployment shares the database: the main app runs every job, so it runs none.
+    const { fundingOnly } = await import("@/lib/env");
+    if (fundingOnly) return;
     const { ensureSectors } = await import("@/lib/server/bootstrap");
     await ensureSectors().catch((e) => console.error("[bootstrap] sectors failed", (e as { code?: string }).code));
     const { startWorker } = await import("@/lib/ai/jobs");

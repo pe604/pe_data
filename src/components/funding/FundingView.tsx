@@ -17,7 +17,7 @@ import {
   type PeriodStats,
   type SectorStat,
 } from "@/lib/domain/funding";
-import { useStore } from "../store";
+import { useToast } from "../ui/toast";
 
 /** A share of the money: "<1%" rather than "0%" for a small one. */
 const pct = (share: number) => (share > 0 && share < 1 ? "<1%" : `${Math.round(share)}%`);
@@ -140,7 +140,7 @@ function Column({ data, count, urlFor }: { data: Data; count: number; urlFor: (n
           ))}
         </article>
         <aside className="fd-side">
-          <h3>What it means for us</h3>
+          <h3>{data.readOnly ? "What it means for growth investors" : "What it means for us"}</h3>
           {c.takeaways.map((t, i) => (
             <div key={i} className="fd-tk">
               <span>{i + 1}</span>
@@ -396,7 +396,7 @@ function DealEdit({ d, onSave, onCancel }: { d: FundingDealItem; onSave: (p: Par
   );
 }
 
-function DealTable({ rows, onPatch }: { rows: FundingDealItem[]; onPatch: (id: string, p: Parameters<typeof updateFundingDeal>[1]) => Promise<boolean> }) {
+function DealTable({ rows, onPatch, readOnly }: { rows: FundingDealItem[]; onPatch: (id: string, p: Parameters<typeof updateFundingDeal>[1]) => Promise<boolean>; readOnly: boolean }) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
     <div className="fd-box">
@@ -411,9 +411,11 @@ function DealTable({ rows, onPatch }: { rows: FundingDealItem[]; onPatch: (id: s
             <th scope="col">Lead investor</th>
             <th scope="col">Reported</th>
             <th scope="col">Sources</th>
-            <th scope="col">
-              <span className="sr">Actions</span>
-            </th>
+            {!readOnly && (
+              <th scope="col">
+                <span className="sr">Actions</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -439,6 +441,7 @@ function DealTable({ rows, onPatch }: { rows: FundingDealItem[]; onPatch: (id: s
                     </a>
                   ))}
                 </td>
+                {!readOnly && (
                 <td className="fd-acts">
                   <button className="btn-ghost sm" type="button" onClick={() => setEditing(editing === d.id ? null : d.id)}>
                     Edit
@@ -447,6 +450,7 @@ function DealTable({ rows, onPatch }: { rows: FundingDealItem[]; onPatch: (id: s
                     {d.hidden ? "Count it" : "Leave out"}
                   </button>
                 </td>
+                )}
               </tr>
               {editing === d.id && (
                 <tr className="fd-edit-row">
@@ -497,6 +501,7 @@ function Tiles({ s, open, onPick }: { s: PeriodStats; open: string | null; onPic
 }
 
 function SectorPanel({ x, data, rows, urlFor, onClose, onPatch }: { x: SectorStat; data: Data; rows: FundingDealItem[]; urlFor: (n: string) => string | null; onClose: () => void; onPatch: (id: string, p: Parameters<typeof updateFundingDeal>[1]) => Promise<boolean> }) {
+  // (read-only in the funding-only deployment: no Edit or Leave out)
   const take = data.column?.sectors.find((t) => t.name === x.name);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -539,14 +544,14 @@ function SectorPanel({ x, data, rows, urlFor, onClose, onPatch }: { x: SectorSta
           Close
         </button>
       </div>
-      <DealTable rows={rows} onPatch={onPatch} />
+      <DealTable rows={rows} onPatch={onPatch} readOnly={data.readOnly} />
     </section>
   );
 }
 
 /** Funding tab (SPEC §15.16): the month or week in figures, the editor's column, charts and sector tiles. */
 export function FundingView() {
-  const { toast } = useStore();
+  const toast = useToast();
   const [data, setData] = useState<Data | null>(null);
   const [period, setPeriod] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -702,7 +707,7 @@ export function FundingView() {
       )}
 
       <p className="fd-foot">
-        Equity rounds reported by Entrackr, Inc42, VCCircle, Mint, YourStory and Economic Times, read from Google News and checked against our rules: talks, plans, IPOs and listed-share trades are left out. Acquisitions and debt are kept out of every figure and chart. Amounts in US$ at ₹{INR_PER_USD} to the dollar; investor totals credit each round in full to its lead, because reports rarely give each investor&apos;s share. Use Edit or Leave out to correct a round; figures update at once.
+        Equity rounds reported by Entrackr, Inc42, VCCircle, Mint, YourStory and Economic Times, read from Google News and checked against our rules: talks, plans, IPOs and listed-share trades are left out. Acquisitions and debt are kept out of every figure and chart. Amounts in US$ at ₹{INR_PER_USD} to the dollar; investor totals credit each round in full to its lead, because reports rarely give each investor&apos;s share.{data.readOnly ? "" : " Use Edit or Leave out to correct a round; figures update at once."}
       </p>
     </div>
   );

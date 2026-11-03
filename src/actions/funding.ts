@@ -2,7 +2,7 @@
 
 // Funding tracker. SPEC §15.16.
 import { z } from "zod";
-import { requireRole } from "@/lib/auth/session";
+import { requireFundingViewer, requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { todayISO } from "@/lib/domain/dates";
 import {
@@ -49,11 +49,13 @@ export interface FundingView {
   bench: Benchmark | null;
   /** First month with deals; nothing before it has been read */
   since: string | null;
+  /** The funding-only deployment: no edits, nothing from our own pipeline */
+  readOnly: boolean;
 }
 
 const PERIOD = z.string().regex(/^\d{4}-(\d{2}|W\d{2})$/);
 
-async function view(want: string | null): Promise<FundingView> {
+async function view(want: string | null, shareable = false): Promise<FundingView> {
   const today = todayISO();
   const month = monthOf(today);
   const first = await db.fundingDeal.findFirst({ orderBy: { date: "asc" }, select: { date: true } });
@@ -76,17 +78,22 @@ async function view(want: string | null): Promise<FundingView> {
   ]);
   // A month still in progress has no column yet: show its latest weekly note instead.
   const weekNote = !note && period.kind === "MONTH" ? await db.fundingNote.findFirst({ where: { kind: "WEEK", createdAt: { gte: new Date(from + "T00:00:00Z") } }, orderBy: { period: "desc" } }) : null;
-  const shown = note ?? weekNote;
+  const found = note ?? weekNote;
+  // Shared outside the team: only the version written without our own data, never the team version.
+  const text = found ? (shareable ? found.publicData : found.data) : null;
+  const shown = found && text ? found : null;
   const ps = periodStats(prevDeals);
   const prevEnough = ps.count >= (period.kind === "MONTH" ? 10 : 3) && (!since || prevKey.slice(0, 7) >= since);
   return {
     periods,
     period,
-    deals,
-    column: shown?.kind === "MONTH" ? (shown.data as unknown as FundingColumn) : null,
-    week: shown?.kind === "WEEK" ? (shown.data as unknown as FundingWeekNote) : null,
-    weekOf: weekNote ? weekLabel(weekNote.period) : null,
-    unchecked: shown?.unchecked ?? [],
+    // Shared outside the team: which companies we have seen stays private.
+    deals: shareable ? deals.filter((d) => !d.hidden).map((d) => ({ ...d, ours: null })) : deals,
+    readOnly: shareable,
+    column: shown?.kind === "MONTH" ? (text as unknown as FundingColumn) : null,
+    week: shown?.kind === "WEEK" ? (text as unknown as FundingWeekNote) : null,
+    weekOf: shown && weekNote ? weekLabel(weekNote.period) : null,
+    unchecked: (shareable ? shown?.publicUnchecked : shown?.unchecked) ?? [],
     writtenAt: shown ? shown.createdAt.toISOString() : null,
     writer: shown?.model ?? null,
     prev: prevEnough ? { label: period.kind === "MONTH" ? monthLabel(prevKey) : "the week before", total: ps.total, count: ps.count } : null,
@@ -97,8 +104,8 @@ async function view(want: string | null): Promise<FundingView> {
 
 export async function getFunding(period: string | null) {
   return run<FundingView>(async () => {
-    await requireRole();
-    return view(period === null ? null : PERIOD.parse(period));
+    const { shareable } = await requireFundingViewer();
+    return view(period === null ? null : PERIOD.parse(period), shareable);
   });
 }
 

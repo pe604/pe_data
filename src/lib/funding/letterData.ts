@@ -33,14 +33,18 @@ export interface LetterData {
   prev: { label: string; total: number; count: number } | null;
   bench: Benchmark | null;
   unchecked: string[];
+  /** The shareable version (funding-only deployment): no "us", no team-only wording */
+  shared: boolean;
 }
 
 const dayBefore = (iso: string) => new Date(Date.parse(iso + "T00:00:00Z") - 86_400_000).toISOString().slice(0, 10);
 
 /** The letter for a written note, or null when that period has no note yet. */
-export async function loadLetter(period: string): Promise<LetterData | null> {
+export async function loadLetter(period: string, opts: { shareable?: boolean } = {}): Promise<LetterData | null> {
   const note = await db.fundingNote.findUnique({ where: { period } });
-  if (!note) return null;
+  // Shared outside the team: only the version written without our own data.
+  const text = opts.shareable ? note?.publicData : note?.data;
+  if (!note || !text) return null;
   const month = note.kind === "MONTH";
   const range = month ? monthRange(period) : weekRange(period);
   const prevKey = month ? addMonths(period, -1) : weekOf(dayBefore(range[0]));
@@ -55,14 +59,16 @@ export async function loadLetter(period: string): Promise<LetterData | null> {
     kind: month ? "MONTH" : "WEEK",
     period,
     label: month ? monthLabel(period) : weekLabel(period),
-    column: month ? (note.data as unknown as FundingColumn) : null,
-    week: month ? null : (note.data as unknown as FundingWeekNote),
+    column: month ? (text as unknown as FundingColumn) : null,
+    week: month ? null : (text as unknown as FundingWeekNote),
     writer: note.model,
     writtenAt: note.createdAt.toISOString().slice(0, 10),
     stats: periodStats(all),
-    deals: all.filter((d) => d.kind === "EQUITY" && !d.hidden),
+    // Shared outside the team: which companies we have seen stays private.
+    deals: all.filter((d) => d.kind === "EQUITY" && !d.hidden).map((d) => (opts.shareable ? { ...d, ours: null } : d)),
     prev: ps.count >= min ? { label: month ? monthLabel(prevKey) : "the week before", total: ps.total, count: ps.count } : null,
     bench: bench ? (JSON.parse(bench.value) as Benchmark) : null,
-    unchecked: note.unchecked,
+    unchecked: opts.shareable ? note.publicUnchecked : note.unchecked,
+    shared: !!opts.shareable,
   };
 }

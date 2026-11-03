@@ -49,6 +49,9 @@ const schema = z.object({
   FUNDING_WHATSAPP_GROUP: z.string().optional().default(""),
   // The dashboard's public address (e.g. https://pe.example.com), for short news links in WhatsApp (APP_URL/n/<code>)
   APP_URL: z.string().url().optional(),
+  // "funding" = a separate, read-only deployment showing only the Funding tab (SPEC §15.16): every other page, action
+  // and file route is refused and no background jobs run. Default "full" = the whole dashboard.
+  APP_MODE: z.enum(["full", "funding"]).optional().default("full"),
   NODE_ENV: z.string().optional().default("development"),
 });
 
@@ -78,6 +81,8 @@ export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP;
 export const eventsWhatsappTo = env.EVENTS_WHATSAPP_GROUP;
 /** The WhatsApp group for funding notes: the portfolio updates group unless FUNDING_WHATSAPP_GROUP names another. */
 export const fundingWhatsappTo = env.FUNDING_WHATSAPP_GROUP || env.NEWS_WHATSAPP_GROUP;
+/** True in the funding-only deployment (APP_MODE=funding). */
+export const fundingOnly = env.APP_MODE === "funding";
 /** The dashboard's address without a trailing slash, or null. */
 export const appUrl = env.APP_URL ? env.APP_URL.replace(/\/+$/, "") : null;
 

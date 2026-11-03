@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { fundingOnly } from "@/lib/env";
 import type { Me } from "@/lib/domain/types";
 
 export type AppRole = "ADMIN" | "EDITOR";
@@ -37,10 +38,21 @@ export async function currentUser(): Promise<Me | null> {
   return teamUser;
 }
 
-/** Every route handler and server action calls this first. */
+/** Every route handler and server action calls this first. Refused outright in the funding-only deployment. */
 export async function requireRole(min: AppRole = "EDITOR"): Promise<Me> {
+  if (fundingOnly) throw new AuthError(403, "This page only shows the funding tracker.");
   const me = await currentUser();
   if (!me) throw new AuthError(401, "Your session has ended. Reload the page.");
   if (min === "ADMIN" && me.role !== "ADMIN") throw new AuthError(403, "Only an admin can do that.");
   return me;
+}
+
+/**
+ * Reading the funding tracker (SPEC §15.16): allowed in both deployments. `shareable` is true in the funding-only one:
+ * the caller must then leave out anything private (our own pipeline) and allow no changes.
+ */
+export async function requireFundingViewer(): Promise<{ shareable: boolean }> {
+  if (fundingOnly) return { shareable: true };
+  await requireRole();
+  return { shareable: false };
 }

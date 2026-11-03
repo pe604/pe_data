@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import { connection } from "next/server";
+import { fundingOnly } from "@/lib/env";
 import "./globals.css";
 
 const plex = IBM_Plex_Sans({
@@ -19,8 +20,8 @@ const serif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Niveshaay Deal Pipeline",
-  description: "Internal deal pipeline for the Niveshaay private equity team",
+  title: fundingOnly ? "Niveshaay Funding Tracker" : "Niveshaay Deal Pipeline",
+  description: fundingOnly ? "Indian startup and growth equity rounds, with a monthly letter" : "Internal deal pipeline for the Niveshaay private equity team",
   robots: { index: false, follow: false },
 };
 

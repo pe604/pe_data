@@ -183,7 +183,7 @@ function Kpis({ d }: { d: LetterData }) {
       </Kpi>
       <Kpi label="Growth and late stage" value={money(st.growth.amount)}>
         <Text style={s.kd}>
-          {st.growth.count} rounds, {Math.round(st.growth.share)}% of the money
+          {st.growth.count} {st.growth.count === 1 ? "round" : "rounds"}, {Math.round(st.growth.share)}% of the money
         </Text>
       </Kpi>
       {d.bench ? (
@@ -436,7 +436,7 @@ function Frame({ d }: { d: LetterData }) {
         <Text style={s.headMeta}>{title}</Text>
       </View>
       <View style={s.foot} fixed>
-        <Text>Confidential. Prepared for the Niveshaay team; not investment advice.</Text>
+        <Text>{d.shared ? "Prepared by Niveshaay from public news reports. Not investment advice." : "Confidential. Prepared for the Niveshaay team; not investment advice."}</Text>
         <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
       </View>
     </>
@@ -473,7 +473,7 @@ function Letter({ d }: { d: LetterData }) {
           <Text style={s.kicker}>{month ? "The month in numbers" : "The week in numbers"}</Text>
           <Kpis d={d} />
           <View style={s.box}>
-            <Text style={[s.kicker, { marginBottom: 8 }]}>{month ? "What it means for us" : "Worth noting"}</Text>
+            <Text style={[s.kicker, { marginBottom: 8 }]}>{month ? (d.shared ? "What it means for growth investors" : "What it means for us") : "Worth noting"}</Text>
             {points.map((t, i) => (
               <View key={i} style={s.tk}>
                 <Text style={s.tkN}>{i + 1}</Text>
@@ -513,7 +513,7 @@ function Letter({ d }: { d: LetterData }) {
           )}
         </View>
         <View style={s.foot} fixed>
-          <Text>Confidential. Prepared for the Niveshaay team; not investment advice.</Text>
+          <Text>{d.shared ? "Prepared by Niveshaay from public news reports. Not investment advice." : "Confidential. Prepared for the Niveshaay team; not investment advice."}</Text>
           <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
       </Page>
