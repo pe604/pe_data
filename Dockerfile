@@ -47,6 +47,8 @@ RUN apt-get update \
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
+# Fonts for the funding letter PDF (SPEC §15.16).
+COPY --chown=app:app assets ./assets
 # Public AWS RDS CA bundle for DB_SSL=verify-full.
 COPY --chown=app:app certs ./certs
 COPY --from=migrator --chown=app:app /migrate /migrate

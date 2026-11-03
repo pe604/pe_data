@@ -127,12 +127,35 @@ export function sameEvent(a: Pick<EventItem, "name" | "startDate">, b: Pick<Even
 }
 
 /** The message for the PE Events group: a new event, or dates found for one already on the list. */
-export function eventText(
-  e: Pick<EventItem, "name" | "kind" | "sector" | "tier" | "city" | "venue" | "description" | "startDate" | "endDate" | "why" | "url">,
-  isNew: boolean,
-): string {
-  const head = isNew ? (e.tier === "TOP" ? "⭐ *NEW TOP EVENT*" : "🆕 *NEW EVENT*") : "🔄 *UPDATED EVENT*";
-  const place = [`📅 ${eventDateLabel(e)}${e.startDate ? " (check dates)" : ""}`, e.city ? `🏙️ ${e.city}` : "", e.venue ? `📍 ${e.venue}` : ""];
+/** Days from today to an event's start, or null without a date. */
+export const daysUntil = (startDate: string | null, today: string) => (startDate ? Math.round((Date.parse(startDate + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86_400_000) : null);
+/** The PE Events group hears again this many days before an event. */
+export const SOON_DAYS = 10;
+export const isSoon = (startDate: string | null, today: string) => {
+  const d = daysUntil(startDate, today);
+  return d !== null && d >= 0 && d <= SOON_DAYS;
+};
+const soonHead = (days: number) => (days === 0 ? "⏳ *HAPPENING TODAY*" : days === 1 ? "⏳ *COMING UP TOMORROW*" : `⏳ *COMING UP IN ${days} DAYS*`);
+
+type TextEvent = Pick<EventItem, "name" | "kind" | "sector" | "tier" | "city" | "venue" | "description" | "startDate" | "endDate" | "why" | "url"> & {
+  datesConfirmed?: boolean;
+  assignee?: string | null;
+};
+
+/**
+ * The PE Events group message. `today` given and the event within 10 days: it leads with the countdown, and a new
+ * event found that late carries both ("⏳ COMING UP IN 6 DAYS · NEW EVENT").
+ */
+export function eventText(e: TextEvent, isNew: boolean, today?: string): string {
+  const base = isNew ? (e.tier === "TOP" ? "⭐ *NEW TOP EVENT*" : "🆕 *NEW EVENT*") : "🔄 *UPDATED EVENT*";
+  const days = today && isSoon(e.startDate, today) ? daysUntil(e.startDate, today) : null;
+  const head = days === null ? base : isNew ? `${soonHead(days)} · ${base.replace(/^\S+ /, "")}` : soonHead(days);
+  const place = [
+    `📅 ${eventDateLabel(e)}${e.startDate && e.datesConfirmed === false ? " (check dates)" : ""}`,
+    e.city ? `🏙️ ${e.city}` : "",
+    e.venue ? `📍 ${e.venue}` : "",
+    e.assignee ? `👤 ${e.assignee}` : "",
+  ];
   const blocks = [
     `${head}\n*${e.name}*`,
     place.filter(Boolean).join("\n"),

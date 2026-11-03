@@ -609,6 +609,14 @@ export function FundingView() {
           <p className="fd-sub">Indian startup and growth equity rounds, read from the news twice a day.</p>
         </div>
         <div className="fd-chips" role="group" aria-label="Period">
+          {((data.period.kind === "MONTH" && data.column) || (data.period.kind === "WEEK" && data.week)) && (
+            <a className="btn fd-pdf" href={`/api/funding/letter/${data.period.key}`} target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+              </svg>
+              {data.period.kind === "MONTH" ? "Letter (PDF)" : "Note (PDF)"}
+            </a>
+          )}
           {months.slice(0, 4).map((p) => (
             <button
               key={p.key}

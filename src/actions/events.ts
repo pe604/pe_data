@@ -97,8 +97,10 @@ export async function saveEvent(eventId: string | null, data: z.input<typeof inp
       const before = await db.event.findUnique({ where: { id: eid }, select: { assignee: true, startDate: true } });
       if (!before) throw new UserError("That event no longer exists. Reload the page.");
       // A new owner or a new date gets its reminders afresh.
-      const moved = (p.assignee !== undefined && (p.assignee ?? null) !== before.assignee) || (before.startDate?.getTime() ?? null) !== (row.startDate?.getTime() ?? null);
-      const r = await db.event.updateMany({ where: { id: eid }, data: { ...row, ...(moved ? { remind7At: null, remind2At: null } : {}) } });
+      const redated = (before.startDate?.getTime() ?? null) !== (row.startDate?.getTime() ?? null);
+      const moved = redated || (p.assignee !== undefined && (p.assignee ?? null) !== before.assignee);
+      // A new date: the group hears again 10 days before it.
+      const r = await db.event.updateMany({ where: { id: eid }, data: { ...row, ...(moved ? { remind7At: null, remind2At: null } : {}), ...(redated ? { soonAlertedAt: null } : {}) } });
       if (!r.count) throw new UserError("That event no longer exists. Reload the page.");
     } else {
       await db.event.create({ data: { ...row, source: "MANUAL" } });

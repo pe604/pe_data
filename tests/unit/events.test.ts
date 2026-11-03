@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseEventbrite, parseEventsEye, parseTradeIndia, usableListings, type ListingItem } from "@/lib/domain/eventListings";
 import { fundingText, rankSectors, sectorRegex, STARTER_SECTORS, vetProposals } from "@/lib/domain/eventSectors";
-import { eventDateLabel, eventDigestText, eventReminderDue, eventReminderText, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
+import { eventDateLabel, eventDigestText, eventReminderDue, eventReminderText, isSoon, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 
 const ev = (p: Partial<EventItem>): EventItem => ({
@@ -26,6 +26,26 @@ const ev = (p: Partial<EventItem>): EventItem => ({
   source: "SEED",
   assignee: null,
   ...p,
+});
+
+describe("coming-up messages to the PE Events group (SPEC §15.14)", () => {
+  const e = { name: "Test expo", kind: "SECTOR_EXPO" as const, sector: null, tier: "TOP" as const, city: "Pune", venue: null, description: null, startDate: "2026-11-20", endDate: null, why: null, url: null };
+  it("is due within 10 days, not before", () => {
+    expect(isSoon("2026-11-20", "2026-11-09")).toBe(false);
+    expect(isSoon("2026-11-20", "2026-11-10")).toBe(true);
+    expect(isSoon("2026-11-20", "2026-11-20")).toBe(true);
+    expect(isSoon("2026-11-20", "2026-11-21")).toBe(false);
+    expect(isSoon(null, "2026-11-21")).toBe(false);
+  });
+  it("leads with the countdown, and a late find says both", () => {
+    expect(eventText(e, false, "2026-11-12")).toMatch(/^⏳ \*COMING UP IN 8 DAYS\*\n\*Test expo\*/);
+    expect(eventText(e, true, "2026-11-14")).toMatch(/^⏳ \*COMING UP IN 6 DAYS\* · \*NEW TOP EVENT\*/);
+    expect(eventText(e, false, "2026-11-19")).toContain("COMING UP TOMORROW");
+    expect(eventText(e, true, "2026-10-01")).toMatch(/^⭐ \*NEW TOP EVENT\*/);
+    expect(eventText({ ...e, datesConfirmed: false }, true)).toContain("(check dates)");
+    expect(eventText({ ...e, datesConfirmed: true, assignee: "Keyur" }, true)).not.toContain("(check dates)");
+    expect(eventText({ ...e, assignee: "Keyur" }, true)).toContain("👤 Keyur");
+  });
 });
 
 describe("event reminders to the owner (SPEC §15.14)", () => {

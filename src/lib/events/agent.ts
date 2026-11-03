@@ -4,7 +4,7 @@ import { judgeEvents, type EventCandidate } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
 import { usableListings, type ListingItem } from "@/lib/domain/eventListings";
 import { LISTINGS_READ, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
-import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, eventDigestText, eventReminderDue, eventReminderText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
+import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, eventDigestText, eventReminderDue, eventReminderText, isSoon, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
@@ -183,6 +183,8 @@ async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typ
             organiser: match.organiser ?? v.organiser,
             url: match.url ?? safeEventUrl(item.url),
           };
+          // Dates found: the group hears again 10 days before them.
+          await db.event.update({ where: { id: match.id }, data: { soonAlertedAt: null } });
           await db.event.update({ where: { id: match.id }, data: { ...data, alertPending: !opts.quiet } });
           Object.assign(match, data);
         }
@@ -227,18 +229,49 @@ export async function sendEventAlerts(): Promise<number> {
     const startDate = asISO(e.startDate);
     const endDate = asISO(e.endDate);
     const over = (endDate ?? startDate ?? today) < today;
-    const taken = await db.event.updateMany({ where: { id: e.id, alertPending: true }, data: { alertPending: false, ...(over ? {} : { alertedAt: new Date() }) } });
+    // Within 10 days, this message is also the "coming up" one.
+    const soon = !over && isSoon(startDate, today);
+    const taken = await db.event.updateMany({ where: { id: e.id, alertPending: true }, data: { alertPending: false, ...(over ? {} : { alertedAt: new Date() }), ...(soon ? { soonAlertedAt: new Date() } : {}) } });
     if (!taken.count || over) continue;
     // Found by the scan and never posted: new. Anything else (a starting-list event, or one already posted): dates found.
     const isNew = !e.alertedAt && e.source !== "SEED" && e.source !== "MANUAL";
     try {
-      await sendText(eventsWhatsappTo, eventText({ ...e, kind: e.kind as EventKind, tier: e.tier as "TOP" | "WORTH_A_LOOK", startDate, endDate }, isNew));
+      await sendText(eventsWhatsappTo, eventText({ ...e, kind: e.kind as EventKind, tier: e.tier as "TOP" | "WORTH_A_LOOK", startDate, endDate }, isNew, today));
       sent++;
       await new Promise((r) => setTimeout(r, 2000)); // spaced out so WhatsApp doesn't flag the number
     } catch (err) {
       console.error("[events] send failed", e.id, errCode(err));
       // A timeout may still have been delivered, so it isn't retried.
-      if ((err as Error).name !== "TimeoutError") await db.event.updateMany({ where: { id: e.id }, data: { alertPending: true, alertedAt: e.alertedAt } });
+      if ((err as Error).name !== "TimeoutError") await db.event.updateMany({ where: { id: e.id }, data: { alertPending: true, alertedAt: e.alertedAt, soonAlertedAt: e.soonAlertedAt } });
+    }
+  }
+  return sent;
+}
+
+/**
+ * Tells the PE Events group again 10 days before each event (SPEC §15.14), from 09:00 IST: once per event and date.
+ * An event found inside the window was already told by its first message. Skipped events are left out.
+ */
+export async function sendSoonAlerts(now = new Date()): Promise<number> {
+  if (!whatsappConfigured || !eventsWhatsappTo) return 0;
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: false }).format(now)) % 24;
+  if (hour < 9) return 0;
+  const today = todayISO(now);
+  const due = await db.event.findMany({
+    where: { soonAlertedAt: null, alertPending: false, status: { not: "SKIPPED" }, startDate: { gte: day(today), lte: day(addDaysISO(today, 10)) } },
+    orderBy: { startDate: "asc" },
+  });
+  let sent = 0;
+  for (const e of due) {
+    const taken = await db.event.updateMany({ where: { id: e.id, soonAlertedAt: null }, data: { soonAlertedAt: now } });
+    if (!taken.count) continue;
+    try {
+      await sendText(eventsWhatsappTo, eventText({ ...e, kind: e.kind as EventKind, tier: e.tier as "TOP" | "WORTH_A_LOOK", startDate: asISO(e.startDate), endDate: asISO(e.endDate), url: safeEventUrl(e.url) }, false, today));
+      sent++;
+      await new Promise((r) => setTimeout(r, 2000));
+    } catch (err) {
+      console.error("[events] soon failed", e.id, errCode(err));
+      if ((err as Error).name !== "TimeoutError") await db.event.updateMany({ where: { id: e.id }, data: { soonAlertedAt: null } });
     }
   }
   return sent;
@@ -324,6 +357,8 @@ export async function eventsTick(now = new Date()): Promise<void> {
   await weeklyScan(now);
   const sent = await sendEventAlerts();
   if (sent) console.log(`[events] ${sent} sent`);
+  const soon = await sendSoonAlerts(now);
+  if (soon) console.log(`[events] ${soon} coming-up messages sent`);
   const reminded = await sendEventReminders(now);
   if (reminded) console.log(`[events] ${reminded} reminders sent`);
 }

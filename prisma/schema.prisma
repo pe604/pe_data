@@ -419,6 +419,8 @@ model Event {
   /// When the 7-day and 2-day reminders went (cleared when the assignee or start date changes)
   remind7At      DateTime?
   remind2At      DateTime?
+  /// When the PE Events group got the "coming up" message (10 days before; cleared when the start date changes)
+  soonAlertedAt  DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

@@ -30,8 +30,10 @@ import {
 } from "@/lib/domain/funding";
 import { parseGoogleNewsRss } from "@/lib/domain/news";
 import { aiConfigured, appUrl, fundingModel, fundingWhatsappTo, whatsappConfigured } from "@/lib/env";
-import { sendText } from "@/lib/whatsapp/evolution";
+import { sendDocument, sendText } from "@/lib/whatsapp/evolution";
 import { dealsBetween, ourSectorCounts } from "./data";
+import { letterCaption, letterFileName, renderLetter } from "./letter";
+import { loadLetter } from "./letterData";
 
 // Funding tracker (SPEC §15.16). Google News is free; one cheap AI call reads 60 headlines; the column costs about
 // $0.20 a month and the weekly note about $0.05. Logs counts, ids and error codes only: never headlines or AI output.
@@ -225,7 +227,12 @@ export async function sendFundingNotes(): Promise<number> {
     if (!taken.count) continue;
     const link = appUrl ? `${appUrl}/?view=funding` : null;
     try {
-      if (n.kind === "MONTH") {
+      // The letter as a PDF, with a short caption; the plain text message only if the PDF can't be made.
+      const letter = await loadLetter(n.period);
+      const pdf = letter ? await renderLetter(letter).catch((e) => (console.error("[funding] pdf failed", n.period, errCode(e)), null)) : null;
+      if (letter && pdf) {
+        await sendDocument(fundingWhatsappTo, { data: pdf, fileName: letterFileName(letter), mime: "application/pdf", caption: letterCaption(letter) + (link ? `\n\n🔗 ${link}` : "") });
+      } else if (n.kind === "MONTH") {
         const [deals, prev] = await Promise.all([dealsBetween(...monthRange(n.period)), dealsBetween(...monthRange(addMonths(n.period, -1)))]);
         const ps = periodStats(prev);
         await sendText(fundingWhatsappTo, monthWhatsapp(monthLabel(n.period), n.data as unknown as FundingColumn, periodStats(deals), ps.count >= 10 ? ps.total : null, link));
