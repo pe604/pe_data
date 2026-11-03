@@ -457,6 +457,9 @@ test("events: add one with a date, mark going, filter, delete", async ({ page })
   const row = page.locator(".ev-row", { hasText: name });
   await expect(row.getByRole("link", { name })).toHaveAttribute("href", "https://example.com/expo");
   await row.getByLabel(`Status of ${name}`).selectOption({ label: "Going" });
+  await row.getByLabel(`Assigned to, ${name}`).selectOption("Keyur");
+  await expect(page.getByRole("status")).toContainText("Keyur will be reminded 7 days and 2 days before.");
+  await expect(row).toContainText("Owner: Keyur");
   await page.getByLabel("Filter by status").selectOption({ label: "Going" });
   await expect(row).toBeVisible();
   await page.getByLabel("Filter by status").selectOption({ label: "Skipped" });

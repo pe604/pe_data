@@ -34,18 +34,21 @@ const input = z
     status: z.enum(EVENT_STATUSES),
     attendees: z.array(z.string().trim().min(1).max(80)).max(30),
     notes: text(2000),
+    assignee: text(80).optional(),
   })
   .refine((e) => !e.endDate || (!!e.startDate && e.endDate >= e.startDate), "End before start")
   .refine((e) => !e.url || !!safeEventUrl(e.url), "Invalid link");
 
 async function view(): Promise<EventsView> {
-  const [rows, scan, sectors, funding] = await Promise.all([
+  const [rows, scan, sectors, funding, pe] = await Promise.all([
     db.event.findMany({ orderBy: { startDate: "asc" } }),
     db.appSetting.findUnique({ where: { key: LAST_SCAN } }),
     db.eventSector.findMany({ orderBy: { createdAt: "asc" } }),
     db.appSetting.findUnique({ where: { key: FUNDING_LAST } }),
+    db.teamMember.findMany({ where: { inPe: true }, orderBy: [{ peRank: { sort: "asc", nulls: "last" } }, { name: "asc" }], select: { name: true, whatsappNumber: true } }),
   ]);
   return {
+    pe: pe.map((m) => ({ name: m.name, hasNumber: !!m.whatsappNumber })),
     // Before the first tick has stored the list, show the starting sectors.
     sectors: sectors.length ? sectors.map((s) => ({ name: s.name, enabled: s.enabled, source: s.source, why: s.why })) : STARTER_SECTORS.map((s) => ({ name: s.name, enabled: true, source: "STARTER", why: null })),
     funding: funding ? (JSON.parse(funding.value) as EventsView["funding"]) : null,
@@ -70,6 +73,7 @@ async function view(): Promise<EventsView> {
         attendees: e.attendees,
         notes: e.notes,
         source: e.source,
+        assignee: e.assignee,
       }),
     ),
     lastScan: scan ? (JSON.parse(scan.value) as EventsView["lastScan"]) : null,
@@ -90,7 +94,11 @@ export async function saveEvent(eventId: string | null, data: z.input<typeof inp
     const p = input.parse(data);
     const row = { ...p, url: safeEventUrl(p.url), startDate: p.startDate ? day(p.startDate) : null, endDate: p.endDate ? day(p.endDate) : null };
     if (eid) {
-      const r = await db.event.updateMany({ where: { id: eid }, data: row });
+      const before = await db.event.findUnique({ where: { id: eid }, select: { assignee: true, startDate: true } });
+      if (!before) throw new UserError("That event no longer exists. Reload the page.");
+      // A new owner or a new date gets its reminders afresh.
+      const moved = (p.assignee !== undefined && (p.assignee ?? null) !== before.assignee) || (before.startDate?.getTime() ?? null) !== (row.startDate?.getTime() ?? null);
+      const r = await db.event.updateMany({ where: { id: eid }, data: { ...row, ...(moved ? { remind7At: null, remind2At: null } : {}) } });
       if (!r.count) throw new UserError("That event no longer exists. Reload the page.");
     } else {
       await db.event.create({ data: { ...row, source: "MANUAL" } });
@@ -103,6 +111,18 @@ export async function setEventStatus(eventId: string, status: EventItem["status"
   return run<EventsView>(async () => {
     await requireRole();
     const r = await db.event.updateMany({ where: { id: id.parse(eventId) }, data: { status: z.enum(EVENT_STATUSES).parse(status) } });
+    if (!r.count) throw new UserError("That event no longer exists. Reload the page.");
+    return view();
+  });
+}
+
+/** Assigns the event to someone in the PE team (null = nobody). Their reminders start afresh. */
+export async function setEventAssignee(eventId: string, name: string | null) {
+  return run<EventsView>(async () => {
+    await requireRole();
+    const who = name === null ? null : z.string().trim().min(1).max(80).parse(name);
+    if (who && !(await db.teamMember.findFirst({ where: { name: who, inPe: true }, select: { id: true } }))) throw new UserError("Choose someone from the PE team.");
+    const r = await db.event.updateMany({ where: { id: id.parse(eventId) }, data: { assignee: who, remind7At: null, remind2At: null } });
     if (!r.count) throw new UserError("That event no longer exists. Reload the page.");
     return view();
   });

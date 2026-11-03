@@ -4,7 +4,7 @@ import { judgeEvents, type EventCandidate } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
 import { usableListings, type ListingItem } from "@/lib/domain/eventListings";
 import { LISTINGS_READ, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
-import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, eventDigestText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
+import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, eventDigestText, eventReminderDue, eventReminderText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
@@ -244,6 +244,42 @@ export async function sendEventAlerts(): Promise<number> {
   return sent;
 }
 
+/**
+ * Reminds each event's owner on WhatsApp 7 days and 2 days before it starts (SPEC §15.14), from 09:00 IST. Marked sent
+ * before the message goes; only a send that clearly failed is put back, so nobody is reminded twice.
+ */
+export async function sendEventReminders(now = new Date()): Promise<number> {
+  if (!whatsappConfigured) return 0;
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", hour12: false }).format(now)) % 24;
+  if (hour < 9) return 0;
+  const today = todayISO(now);
+  const events = await db.event.findMany({ where: { assignee: { not: null }, startDate: { gte: day(today), lte: day(addDaysISO(today, 7)) }, status: { not: "SKIPPED" } } });
+  if (!events.length) return 0;
+  const team = await db.teamMember.findMany({ where: { whatsappNumber: { not: null } }, select: { name: true, whatsappNumber: true } });
+  let sent = 0;
+  for (const e of events) {
+    const startDate = asISO(e.startDate);
+    const due = eventReminderDue(startDate, today, !!e.remind7At, !!e.remind2At);
+    const to = team.find((m) => m.name === e.assignee)?.whatsappNumber;
+    if (!due || !to || !e.assignee) continue;
+    const field = due === "7" ? "remind7At" : "remind2At";
+    // The 2-day reminder also stands in for a missed 7-day one.
+    const taken = await db.event.updateMany({ where: { id: e.id, [field]: null }, data: due === "2" ? { remind2At: now, remind7At: e.remind7At ?? now } : { remind7At: now } });
+    if (!taken.count) continue;
+    try {
+      await sendText(to, eventReminderText(e.assignee, { ...e, startDate, endDate: asISO(e.endDate), url: safeEventUrl(e.url) }, today));
+      sent++;
+      await new Promise((r) => setTimeout(r, 2000));
+    } catch (err) {
+      console.error("[events] reminder failed", e.id, errCode(err));
+      if ((err as Error).name !== "TimeoutError") await db.event.updateMany({ where: { id: e.id }, data: { [field]: null, ...(due === "2" ? { remind7At: e.remind7At } : {}) } });
+    }
+  }
+  return sent;
+}
+
+const addDaysISO = (iso: string, n: number) => new Date(day(iso).getTime() + n * 86_400_000).toISOString().slice(0, 10);
+
 const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", hour12: false });
 
 async function weeklyScan(now: Date): Promise<void> {
@@ -288,6 +324,8 @@ export async function eventsTick(now = new Date()): Promise<void> {
   await weeklyScan(now);
   const sent = await sendEventAlerts();
   if (sent) console.log(`[events] ${sent} sent`);
+  const reminded = await sendEventReminders(now);
+  if (reminded) console.log(`[events] ${reminded} reminders sent`);
 }
 
 const g = globalThis as unknown as { __events?: { timer: NodeJS.Timeout; running: boolean } };

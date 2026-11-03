@@ -976,4 +976,7 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;min-width:1500px
 @media (max-width:720px){.fd{padding:18px 16px 36px}.fd-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fd-art{padding:22px 18px}.fd-art h2{font-size:26px}.fd-side{padding:22px 18px}.fd-charts{grid-template-columns:1fr}.fd-wide{grid-column:auto}.fd-hb{grid-template-columns:112px minmax(0,1fr) 62px}.fd-tiles{grid-template-columns:1fr 1fr}.fd-pband{padding:18px;flex-direction:column}.fd-box{padding:4px 16px 12px}.fd-edit{grid-template-columns:1fr}}
 @media (max-width:460px){.fd-tiles{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.fd-tile,.fd,.fd-chip{transition:none}.fd-tile:hover{transform:none}.fd-track i,.fd-bar{animation:none}}/* Five tabs no longer fit a phone: the tab row scrolls on its own instead of widening the page */
-@media (max-width:720px){.tabs{flex-shrink:0;overflow-x:auto;scrollbar-width:none;padding:14px 16px 0;gap:20px}.tabs::-webkit-scrollbar{display:none}.tab{white-space:nowrap;flex:none}}
+@media (max-width:720px){.tabs{flex-shrink:0;overflow-x:auto;scrollbar-width:none;padding:14px 16px 0;gap:20px}.tabs::-webkit-scrollbar{display:none}.tab{white-space:nowrap;flex:none}}/* Event owner (SPEC §15.14) */
+.ev-owner{max-width:140px}
+.ev-owner.set{border-color:var(--green);color:var(--green);font-weight:500}
+.ev-warn{color:var(--amber)}

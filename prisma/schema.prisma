@@ -414,6 +414,11 @@ model Event {
   alertPending   Boolean   @default(false)
   /// Last message to the PE Events group
   alertedAt      DateTime?
+  /// The PE team member who owns this event (a TeamMember name); reminded on WhatsApp 7 and 2 days before
+  assignee       String?
+  /// When the 7-day and 2-day reminders went (cleared when the assignee or start date changes)
+  remind7At      DateTime?
+  remind2At      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

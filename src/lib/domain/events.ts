@@ -50,10 +50,14 @@ export interface EventItem {
   attendees: string[];
   notes: string | null;
   source: string;
+  /** The PE team member who owns it; reminded on WhatsApp 7 and 2 days before */
+  assignee: string | null;
 }
 
 export interface EventsView {
   list: EventItem[];
+  /** The PE team, for assigning; `hasNumber` false = no WhatsApp number, so no reminders */
+  pe: { name: string; hasNumber: boolean }[];
   /** When the weekly scan last ran (ISO), and what it did */
   lastScan: { at: string; items: number; judged: number; added: number } | null;
   sectors: { name: string; enabled: boolean; source: string; why: string | null }[];
@@ -138,6 +142,39 @@ export function eventText(
     e.url ? `🔗 ${e.url}` : "",
   ];
   return blocks.filter(Boolean).join("\n\n");
+}
+
+// ─── Reminders to the assignee (SPEC §15.14) ────────────────────────────────
+
+const dayNo = (iso: string) => Date.parse(iso + "T00:00:00Z") / 86_400_000;
+
+/**
+ * Which reminder is due: "7" from 7 days out, "2" from 2 days out (to the day itself). A reminder missed (the event was
+ * assigned late, or the app was down) is sent at the next check; one assigned within 2 days gets only the 2-day one.
+ */
+export function eventReminderDue(startDate: string | null, today: string, sent7: boolean, sent2: boolean): "7" | "2" | null {
+  if (!startDate) return null;
+  const days = dayNo(startDate) - dayNo(today);
+  if (days < 0) return null;
+  if (days <= 2) return sent2 ? null : "2";
+  if (days <= 7) return sent7 ? null : "7";
+  return null;
+}
+
+export function eventReminderText(
+  person: string,
+  e: Pick<EventItem, "name" | "city" | "venue" | "startDate" | "endDate" | "url">,
+  today: string,
+): string {
+  const days = e.startDate ? dayNo(e.startDate) - dayNo(today) : null;
+  const when = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+  const lines = [
+    `⏰ *Event reminder*`,
+    `Hi ${person.split(" ")[0]}, *${e.name}* is ${when}.`,
+    [`📅 ${eventDateLabel(e)}`, e.city ? `🏙️ ${e.city}` : "", e.venue ? `📍 ${e.venue}` : ""].filter(Boolean).join("\n"),
+    e.url ? `🔗 ${e.url}` : "",
+  ];
+  return lines.filter(Boolean).join("\n\n");
 }
 
 /** One message for the first read of the listing sites, instead of one message per event. */

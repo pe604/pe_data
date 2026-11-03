@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteEvent, listEvents, saveEvent, setEventStatus, setSectorEnabled } from "@/actions/events";
+import { deleteEvent, listEvents, saveEvent, setEventAssignee, setEventStatus, setSectorEnabled } from "@/actions/events";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import {
   EVENT_KIND_LABELS,
@@ -39,9 +39,10 @@ const BLANK: Input = {
   status: "INTERESTED",
   attendees: [],
   notes: null,
+  assignee: null,
 };
 
-function EventForm({ initial, sectors, onDone, onCancel }: { initial: EventItem | null; sectors: string[]; onDone: (d: Data) => void; onCancel: () => void }) {
+function EventForm({ initial, sectors, pe, onDone, onCancel }: { initial: EventItem | null; sectors: string[]; pe: Data["pe"]; onDone: (d: Data) => void; onCancel: () => void }) {
   const { pools, toast } = useStore();
   const [f, setF] = useState<Input>(() => (initial ? { ...BLANK, ...initial, sector: initial.sector as Input["sector"] } : BLANK));
   const [saving, setSaving] = useState(false);
@@ -127,6 +128,17 @@ function EventForm({ initial, sectors, onDone, onCancel }: { initial: EventItem 
           <input className="inp" value={f.url ?? ""} onChange={(e) => set({ url: str(e.target.value) })} placeholder="https://" />
         </label>
         <label className="field">
+          <span>Assigned to</span>
+          <select className="sel" value={f.assignee ?? ""} onChange={(e) => set({ assignee: e.target.value || null })}>
+            <option value="">Nobody</option>
+            {pe.map((m) => (
+              <option key={m.name} value={m.name}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
           <span>Status</span>
           <select className="sel" value={f.status} onChange={(e) => set({ status: e.target.value as Input["status"] })}>
             {EVENT_STATUSES.map((s) => (
@@ -177,8 +189,9 @@ function EventForm({ initial, sectors, onDone, onCancel }: { initial: EventItem 
   );
 }
 
-function EventRow({ e, onStatus, onEdit, onDelete }: { e: EventItem; onStatus: (s: EventItem["status"]) => void; onEdit: () => void; onDelete: () => void }) {
+function EventRow({ e, pe, onStatus, onAssign, onEdit, onDelete }: { e: EventItem; pe: Data["pe"]; onStatus: (s: EventItem["status"]) => void; onAssign: (name: string | null) => void; onEdit: () => void; onDelete: () => void }) {
   const url = safeEventUrl(e.url);
+  const owner = e.assignee ? pe.find((m) => m.name === e.assignee) : null;
   return (
     <li className={`ev-row${e.status === "SKIPPED" ? " off" : ""}`}>
       <div className="ev-date">{eventDateLabel(e)}</div>
@@ -199,9 +212,19 @@ function EventRow({ e, onStatus, onEdit, onDelete }: { e: EventItem; onStatus: (
         {e.description && <div className="ev-why">{e.description}</div>}
         {e.why && <div className="ev-why">{e.why}</div>}
         {e.attendees.length > 0 && <div className="ev-meta">Going: {e.attendees.join(", ")}</div>}
+        {e.assignee && <div className="ev-meta">Owner: {e.assignee}</div>}
         {e.notes && <div className="ev-why">{e.notes}</div>}
+        {e.assignee && owner && !owner.hasNumber && <div className="ev-meta ev-warn">No WhatsApp number for {e.assignee}, so no reminders. Add it in Manage team.</div>}
       </div>
       <div className="ev-acts">
+        <select className={`sel sm ev-owner${e.assignee ? " set" : ""}`} aria-label={`Assigned to, ${e.name}`} title="Reminded on WhatsApp 7 days and 2 days before" value={e.assignee ?? ""} onChange={(x) => onAssign(x.target.value || null)}>
+          <option value="">Assign…</option>
+          {pe.map((m) => (
+            <option key={m.name} value={m.name}>
+              {m.name}
+            </option>
+          ))}
+        </select>
         <select className="sel sm" aria-label={`Status of ${e.name}`} value={e.status} onChange={(x) => onStatus(x.target.value as EventItem["status"])}>
           {EVENT_STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -278,6 +301,18 @@ export function EventsView() {
     setData(before);
     toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
   };
+  const assign = async (e: EventItem, name: string | null) => {
+    const before = data;
+    if (!before) return;
+    setData({ ...before, list: before.list.map((x) => (x.id === e.id ? { ...x, assignee: name } : x)) });
+    const r = await setEventAssignee(e.id, name).catch(() => null);
+    if (r?.ok) {
+      if (name) toast(`${name} will be reminded 7 days and 2 days before.`);
+      return setData(r.data);
+    }
+    setData(before);
+    toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
+  };
   const remove = async (e: EventItem) => {
     if (!window.confirm(`Delete ${e.name}? This can't be undone.`)) return;
     const r = await deleteEvent(e.id);
@@ -288,7 +323,7 @@ export function EventsView() {
   const rows = (items: EventItem[]) => (
     <ul className="ev-list">
       {items.map((e) => (
-        <EventRow key={e.id} e={e} onStatus={(s) => void changeStatus(e, s)} onEdit={() => setEditing(e)} onDelete={() => void remove(e)} />
+        <EventRow key={e.id} e={e} pe={data?.pe ?? []} onStatus={(s) => void changeStatus(e, s)} onAssign={(n) => void assign(e, n)} onEdit={() => setEditing(e)} onDelete={() => void remove(e)} />
       ))}
     </ul>
   );
@@ -337,6 +372,7 @@ export function EventsView() {
           key={editing === "new" ? "new" : editing.id}
           initial={editing === "new" ? null : editing}
           sectors={sectorNames}
+          pe={data?.pe ?? []}
           onDone={(d) => {
             setData(d);
             setEditing(null);

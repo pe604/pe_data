@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseEventbrite, parseEventsEye, parseTradeIndia, usableListings, type ListingItem } from "@/lib/domain/eventListings";
 import { fundingText, rankSectors, sectorRegex, STARTER_SECTORS, vetProposals } from "@/lib/domain/eventSectors";
-import { eventDateLabel, eventDigestText, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
+import { eventDateLabel, eventDigestText, eventReminderDue, eventReminderText, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 
 const ev = (p: Partial<EventItem>): EventItem => ({
@@ -24,7 +24,29 @@ const ev = (p: Partial<EventItem>): EventItem => ({
   attendees: [],
   notes: null,
   source: "SEED",
+  assignee: null,
   ...p,
+});
+
+describe("event reminders to the owner (SPEC §15.14)", () => {
+  it("reminds 7 days and 2 days before, catching up a missed one", () => {
+    expect(eventReminderDue("2026-11-20", "2026-11-12", false, false)).toBeNull();
+    expect(eventReminderDue("2026-11-20", "2026-11-13", false, false)).toBe("7");
+    expect(eventReminderDue("2026-11-20", "2026-11-15", true, false)).toBeNull();
+    expect(eventReminderDue("2026-11-20", "2026-11-15", false, false)).toBe("7"); // assigned late: sent now
+    expect(eventReminderDue("2026-11-20", "2026-11-18", true, false)).toBe("2");
+    expect(eventReminderDue("2026-11-20", "2026-11-20", true, false)).toBe("2");
+    expect(eventReminderDue("2026-11-20", "2026-11-19", false, false)).toBe("2"); // within 2 days: only the 2-day one
+    expect(eventReminderDue("2026-11-20", "2026-11-19", true, true)).toBeNull();
+    expect(eventReminderDue("2026-11-20", "2026-11-21", false, false)).toBeNull();
+    expect(eventReminderDue(null, "2026-11-21", false, false)).toBeNull();
+  });
+  it("writes the reminder", () => {
+    const t = eventReminderText("Keyur Shah", { name: "Test expo", city: "Pune", venue: null, startDate: "2026-11-20", endDate: null, url: "https://example.com" }, "2026-11-18");
+    expect(t).toContain("Hi Keyur, *Test expo* is in 2 days.");
+    expect(t).toContain("🏙️ Pune");
+    expect(eventReminderText("A", { name: "X", city: null, venue: null, startDate: "2026-11-20", endDate: null, url: null }, "2026-11-19")).toContain("is tomorrow");
+  });
 });
 
 describe("events (SPEC §15.14)", () => {

@@ -76,8 +76,8 @@ export const apifyConfigured = Boolean(env.APIFY_TOKEN);
 export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP;
 /** The WhatsApp group for new events. Unset = no event messages: they wait until it is set. */
 export const eventsWhatsappTo = env.EVENTS_WHATSAPP_GROUP;
-/** The WhatsApp group for funding notes. Unset = no funding messages (the notes are still written and shown). */
-export const fundingWhatsappTo = env.FUNDING_WHATSAPP_GROUP;
+/** The WhatsApp group for funding notes: the portfolio updates group unless FUNDING_WHATSAPP_GROUP names another. */
+export const fundingWhatsappTo = env.FUNDING_WHATSAPP_GROUP || env.NEWS_WHATSAPP_GROUP;
 /** The dashboard's address without a trailing slash, or null. */
 export const appUrl = env.APP_URL ? env.APP_URL.replace(/\/+$/, "") : null;
 
