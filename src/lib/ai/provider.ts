@@ -20,7 +20,12 @@ export interface GenerateRequest {
   model?: string;
   /** Room for the answer; without it some providers cut long JSON answers off. */
   maxTokens?: number;
+  /** Defaults to 0.2. Claude Opus models on OpenRouter reject the setting, so it is left out for them. */
+  temperature?: number;
 }
+
+/** Models whose OpenRouter endpoints refuse `temperature` (with require_parameters they return "No endpoints found"). */
+export const rejectsTemperature = (model: string) => /^anthropic\/claude-opus-5/.test(model);
 
 /** Swappable model backend (SPEC §2). Returns the raw JSON text. */
 export interface AiProvider {
@@ -47,7 +52,8 @@ type ContentPart =
 
 /** OpenRouter chat completions (SPEC §2, §9, §13). Never logs deck content. */
 class OpenRouterProvider implements AiProvider {
-  async generateJson({ system, prompt, deck, jsonSchema, signal, model, maxTokens }: GenerateRequest): Promise<string> {
+  async generateJson({ system, prompt, deck, jsonSchema, signal, model, maxTokens, temperature = 0.2 }: GenerateRequest): Promise<string> {
+    const useModel = model ?? aiModel;
     const content: ContentPart[] = [];
     if (deck?.kind === "pdf") {
       content.push({
@@ -69,8 +75,8 @@ class OpenRouterProvider implements AiProvider {
           "X-Title": "Niveshaay Deal Pipeline",
         },
         body: JSON.stringify({
-          model: model ?? aiModel,
-          temperature: 0.2,
+          model: useModel,
+          ...(rejectsTemperature(useModel) ? {} : { temperature }),
           ...(maxTokens ? { max_tokens: maxTokens } : {}),
           messages: [
             { role: "system", content: system },

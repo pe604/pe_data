@@ -475,6 +475,31 @@ test("events: add one with a date, mark going, filter, delete", async ({ page })
   await expect(page.getByRole("button", { name: "Add event" })).toHaveCount(0);
 });
 
+test("funding: figures, column, sector tile with its rounds, leave a round out", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Funding" }).click();
+  const kpis = page.getByRole("region", { name: "Key figures" });
+  await expect(kpis).toContainText("$60M"); // 40 + 12 + 8 (the undisclosed seed counts as a round, not money)
+  await expect(kpis).toContainText("4");
+  await expect(page.getByRole("heading", { name: "Robots lead a quiet month" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Zentrix Robotics" }).first()).toHaveAttribute("href", "https://example.com/zentrixrobotics");
+  await expect(page.getByRole("region", { name: "Companies we have seen" })).toContainText("Voltaris Grid Systems");
+  await expect(page.getByRole("region", { name: "Investors by money deployed" })).toContainText("Fund Alpha");
+
+  await page.getByRole("button", { name: /^Consumer/ }).click();
+  const panel = page.getByRole("region", { name: "Consumer" });
+  await expect(panel.getByRole("heading", { name: "Food leads consumer" })).toBeVisible();
+  await expect(panel.getByRole("row")).toHaveCount(3); // header and two rounds
+  await panel.getByRole("row", { name: /Kiran Foods/ }).getByRole("button", { name: "Leave out" }).click();
+  await expect(kpis).toContainText("$48M");
+  await page.reload();
+  await page.getByRole("tab", { name: "Funding" }).click();
+  await expect(page.getByRole("region", { name: "Key figures" })).toContainText("$48M");
+  await page.getByRole("button", { name: /^Consumer/ }).click();
+  await page.getByRole("region", { name: "Consumer" }).getByRole("row", { name: /Kiran Foods/ }).getByRole("button", { name: "Count it" }).click();
+  await expect(page.getByRole("region", { name: "Key figures" })).toContainText("$60M");
+});
+
 test("meetings: plan, mark done, listed in the Meetings view and the company file", async ({ page }) => {
   const today = todayISO();
   const yesterday = addDays(today, -1);

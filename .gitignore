@@ -52,3 +52,4 @@ Thumbs.db
 
 # E2E dev server build output
 .next-e2e/
+.next-preview/

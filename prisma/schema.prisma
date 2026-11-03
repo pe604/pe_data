@@ -438,6 +438,62 @@ model EventSeen {
   createdAt DateTime @default(now())
 }
 
+// ─── Funding tracker (SPEC §15.16) ──────────────────────────────────────────
+
+/// One round reported in the news. Only EQUITY counts in figures and charts; DEBT and ACQUISITION are kept so the
+/// column can mention them for contrast. Hidden deals stay, so a later read can't add them back.
+model FundingDeal {
+  id         String   @id @default(cuid())
+  company    String
+  /// fundingKey(company): what merges the same round reported by several outlets
+  key        String
+  /// US$ millions, null when undisclosed
+  amountUsdM Float?
+  /// As reported: Seed, Series A, Pre-IPO, Undisclosed round
+  round      String
+  /// SEED, EARLY, GROWTH, LATE, OTHER (from the round)
+  stage      String
+  /// EQUITY, DEBT or ACQUISITION
+  kind       String
+  /// A FUNDING_SECTORS name
+  sector     String
+  what       String?
+  lead       String?
+  investors  String[]
+  /// Date first reported (IST calendar date)
+  date       DateTime @db.Date
+  /// [{ outlet, url, title }]
+  sources    Json
+  hidden     Boolean  @default(false)
+  /// True once someone on the team has changed it; later reads then only add sources
+  edited     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([date])
+  @@index([key])
+}
+
+/// Every headline already read, so none is paid for twice.
+model FundingSeen {
+  url       String   @id
+  createdAt DateTime @default(now())
+}
+
+/// The monthly column (period "2026-10") or weekly note (period "2026-W44"), written by the AI from the deal list.
+model FundingNote {
+  period    String    @id
+  /// MONTH or WEEK
+  kind      String
+  /// The JSON the model wrote (see domain/funding.ts FundingColumn / FundingWeekNote)
+  data      Json
+  model     String
+  /// Figures the check couldn't match to the deal list after one retry
+  unchecked String[]
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
 /// Written before a hard delete; survives the delete.
 model DeletionLog {
   id          String   @id @default(cuid())

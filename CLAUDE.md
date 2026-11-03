@@ -78,6 +78,7 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │       ├── whatsapp/               # Evolution API client + intake poller (SPEC §14); idle reminders, assignment and team-head messages (§15.7–15.9)
 │       ├── news/                   # portfolio news agent (§15.10): Google News + LinkedIn via Apify, AI filter (ai/news.ts), WhatsApp alerts; pure helpers in domain/news.ts
 │       ├── events/                 # events tracker (§15.14): starting list, weekly scan (Google News, LinkedIn via Apify, listing sites; keyword check before AI); pure helpers in domain/events.ts and domain/eventListings.ts
+│       ├── funding/                # funding tab (§15.16): news read twice a day, deals merged, Opus column and weekly note, WhatsApp; pure helpers in domain/funding.ts
 │       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types
 │       ├── server/                 # row loading/serialising, audit(), action wrapper, upload sniffing, HTTP errors
 │       └── excel/                  # export workbook builder

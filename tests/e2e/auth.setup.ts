@@ -48,6 +48,33 @@ async function resetTestDb() {
   await db.query(
     `insert into "NewsItem"(id, "companyId", source, url, title, verdict, code) values ('e2e-news', 'e2e-mokobara', 'NEWS', 'http://127.0.0.1:3100/robots.txt', 'Test', 'MATERIAL', 'E2eTst1')`,
   );
+  // Funding tab (SPEC §15.16): made-up rounds last month, one by a company in our pipeline, and a written column.
+  const last = new Date();
+  last.setUTCDate(1);
+  last.setUTCMonth(last.getUTCMonth() - 1);
+  const month = last.toISOString().slice(0, 7);
+  const deals: [string, string, number | null, string, string, string, string][] = [
+    ["Zentrix Robotics", "zentrixrobotics", 40, "Series B", "GROWTH", "Deep tech and space", "Fund Alpha"],
+    ["Kiran Foods", "kiranfoods", 12, "Series A", "EARLY", "Consumer", "Fund Beta"],
+    ["Voltaris Grid Systems", "voltarisgridsystems", 8, "Series A", "EARLY", "Energy transition", "Fund Alpha"],
+    ["Hush Labs", "hush", null, "Seed", "SEED", "Consumer", ""],
+  ];
+  for (const [i, [company, key, amt, round, stage, sector, lead]] of deals.entries()) {
+    await db.query(
+      `insert into "FundingDeal"(id, company, key, "amountUsdM", round, stage, kind, sector, lead, investors, date, sources, "updatedAt")
+       values ($1, $2, $3, $4, $5, $6, 'EQUITY', $7, $8, '{}', $9::date, $10, now())`,
+      [`e2e-fd-${i}`, company, key, amt, round, stage, sector, lead || null, `${month}-1${i}`, JSON.stringify([{ outlet: "Inc42", url: "https://example.com/" + key }])],
+    );
+  }
+  const column = {
+    headline: "Robots lead a quiet month",
+    standfirst: "Fewer rounds, but [[Zentrix Robotics]] raised the largest.",
+    body: ["[[Zentrix Robotics]] raised $40M.", "[[Kiran Foods]] raised $12M."],
+    takeaways: ["Watch robotics.", "Consumer is cheap.", "Energy is quiet."],
+    watch: ["More robots.", "Fewer seeds."],
+    sectors: [{ name: "Consumer", headline: "Food leads consumer", text: "[[Kiran Foods]] took $12M." }],
+  };
+  await db.query(`insert into "FundingNote"(period, kind, data, model, unchecked) values ($1, 'MONTH', $2, 'anthropic/claude-opus-5.5', '{}')`, [month, JSON.stringify(column)]);
   await db.end();
 }
 

@@ -14,5 +14,7 @@ export async function register() {
     startNewsScheduler();
     const { startEventsScheduler } = await import("@/lib/events/agent");
     startEventsScheduler();
+    const { startFundingScheduler } = await import("@/lib/funding/agent");
+    startFundingScheduler();
   }
 }

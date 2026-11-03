@@ -19,6 +19,8 @@ const schema = z.object({
   // Reading MIS figures (SPEC §15.11): cheaper models; PDFs need one that reads PDFs
   OPENROUTER_MIS_MODEL: z.string().optional().default(""),
   OPENROUTER_MIS_PDF_MODEL: z.string().optional().default(""),
+  // The model that writes the funding column and weekly note (SPEC §15.16)
+  OPENROUTER_FUNDING_MODEL: z.string().optional().default(""),
   // S3-compatible file storage (SPEC §2). All files are encrypted before upload.
   AWS_S3_ENDPOINT_URL: z.string().url(),
   AWS_S3_BUCKET_NAME: z.string().min(1),
@@ -43,6 +45,8 @@ const schema = z.object({
   NEWS_WHATSAPP_GROUP: z.string().optional().default(""),
   // The WhatsApp group for new events (SPEC §15.14). Unset = no event messages
   EVENTS_WHATSAPP_GROUP: z.string().optional().default(""),
+  // The WhatsApp group for the weekly and monthly funding notes (SPEC §15.16). Unset = no funding messages
+  FUNDING_WHATSAPP_GROUP: z.string().optional().default(""),
   // The dashboard's public address (e.g. https://pe.example.com), for short news links in WhatsApp (APP_URL/n/<code>)
   APP_URL: z.string().url().optional(),
   NODE_ENV: z.string().optional().default("development"),
@@ -72,6 +76,10 @@ export const apifyConfigured = Boolean(env.APIFY_TOKEN);
 export const newsWhatsappTo = env.NEWS_WHATSAPP_GROUP;
 /** The WhatsApp group for new events. Unset = no event messages: they wait until it is set. */
 export const eventsWhatsappTo = env.EVENTS_WHATSAPP_GROUP;
+/** The WhatsApp group for funding notes. Unset = no funding messages (the notes are still written and shown). */
+export const fundingWhatsappTo = env.FUNDING_WHATSAPP_GROUP;
+/** The dashboard's address without a trailing slash, or null. */
+export const appUrl = env.APP_URL ? env.APP_URL.replace(/\/+$/, "") : null;
 
 /** Short link for a news item (SPEC §15.10), or the original link when APP_URL isn't set. */
 export const newsLink = (code: string | null, url: string) => (env.APP_URL && code ? `${env.APP_URL.replace(/\/+$/, "")}/n/${code}` : url);
@@ -92,3 +100,5 @@ export const aiModel = env.OPENROUTER_MODEL || "google/gemini-2.5-pro";
 export const misModel = env.OPENROUTER_MIS_MODEL || "deepseek/deepseek-v4.1-flash";
 // Flash, not Flash-Lite: in testing Lite read only the first summary table and missed the operating metrics.
 export const misPdfModel = env.OPENROUTER_MIS_PDF_MODEL || "google/gemini-3-flash-preview";
+/** The funding column and weekly note (SPEC §15.16): the strongest writer; about $0.20 a month plus $0.05 a week. */
+export const fundingModel = env.OPENROUTER_FUNDING_MODEL || "anthropic/claude-opus-5.5";

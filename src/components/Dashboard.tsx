@@ -26,6 +26,7 @@ import { Header } from "./shell/Header";
 import { StoreCtx, type DrawerTab, type Store } from "./store";
 import { DealTable } from "./table/DealTable";
 import { EventsView } from "./events/EventsView";
+import { FundingView } from "./funding/FundingView";
 import { Toolbar } from "./toolbar/Toolbar";
 import { ToastProvider, useToast } from "./ui/toast";
 
@@ -52,8 +53,9 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings" | "results">("portfolio");
   // The company Results opens on, when opened from a company file (Numbers → Make result).
   const [resultsFor, setResultsFor] = useState<string | null>(null);
-  // The Events tab sits beside the company lists; it has no filters of its own in the URL (SPEC §15.14).
-  const [eventsOpen, setEventsOpen] = useState(false);
+  // The Events and Funding tabs sit beside the company lists; they have no filters of their own in the URL
+  // (SPEC §15.14, §15.16). "?view=funding" (the link in the WhatsApp funding notes) opens Funding.
+  const [side, setSide] = useState<"events" | "funding" | null>(() => (new URLSearchParams(query).get("view") === "funding" ? "funding" : null));
 
   const rowsRef = useRef(companies);
   useEffect(() => {
@@ -120,7 +122,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   );
 
   const setTab = useCallback((tab: Tab) => {
-    setEventsOpen(false);
+    setSide(null);
     setView((v) => {
       // Filters and sorts a tab doesn't show must not keep applying there (Invested hides Priority, Stage, Via).
       const shown = filtersForTab(tab);
@@ -216,17 +218,22 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
               ["invested", "Invested"],
             ] as const
           ).map(([k, l]) => (
-            <button key={k} className="tab" role="tab" type="button" aria-selected={!eventsOpen && view.tab === k} onClick={() => setTab(k)}>
+            <button key={k} className="tab" role="tab" type="button" aria-selected={!side && view.tab === k} onClick={() => setTab(k)}>
               {l}
               <span className="n">{counts[k]}</span>
             </button>
           ))}
-          <button className="tab" role="tab" type="button" aria-selected={eventsOpen} onClick={() => setEventsOpen(true)}>
+          <button className="tab" role="tab" type="button" aria-selected={side === "events"} onClick={() => setSide("events")}>
             Events
           </button>
+          <button className="tab" role="tab" type="button" aria-selected={side === "funding"} onClick={() => setSide("funding")}>
+            Funding
+          </button>
         </nav>
-        {eventsOpen ? (
+        {side === "events" ? (
           <EventsView />
+        ) : side === "funding" ? (
+          <FundingView />
         ) : (
           <>
         {showBars && (

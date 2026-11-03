@@ -546,6 +546,17 @@ The goal (phases B–D): generate each portfolio company's quarterly result (ima
 - **WhatsApp:** one Where the money went message a month to the PE Events group.
 - Target: about 1 US cent a month. Never log headlines or AI output.
 
+### 15.16 Funding tab (2026-11-02)
+- **Purpose:** an Entrackr / Inc42 style view of where Indian startup and growth equity went, for a month or a week, with an editor's column on what it means for us.
+- **Deals:** read from Google News (Entrackr, Inc42, VCCircle, Mint, YourStory, Economic Times) twice a day (08:00 and 18:00 IST, last 3 days). A cheap model reads the headlines in batches of 60; code then decides what counts. Left out: talks and plans, IPOs, QIPs, block deals and other listed-share trades, non-Indian companies, roundups. Rounds reported by several outlets merge into one deal (same company key and kind within 30 days), keeping every source (up to 6). Rupees convert at ₹90 to the dollar. On first start the app reads last month, the month before and this month so far, one per tick.
+- **Only equity counts.** Debt and acquisitions (including PE buyouts) are stored so the column can mention them for contrast, but appear in no figure, chart, tile or table.
+- **Team corrections:** Edit (company, sector, type, amount, round, lead) or Leave out on any round. An edited deal keeps its fields; later reads only add sources. Left-out deals stay stored so they are not added back.
+- **The tab:** month chips (this month so far and earlier months) and a week picker. Key figures: equity raised and rounds (with change on the previous period), median round, largest round, growth and late-stage money, and the Entrackr monthly total when its report headline is found (else the top sector). The editor's column. A "Companies we have seen" strip for rounds raised by companies in our own deal list. Charts: money by sector, rounds by stage, round sizes, biggest investors by money (each round credited in full to its lead, since reports rarely give shares) and most active lead investors. Colourful sector tiles ranked by money, each with an icon, amount, rounds and share; selecting one opens the editor's take on that sector and every round with its sources.
+- **The column:** written by `OPENROUTER_FUNDING_MODEL` (default Claude Opus 5.5, about $0.20 a month) from the deal list, our deck counts by sector for 90 days and our portfolio by sector (counts only). Monthly from the 3rd of the next month (or once Entrackr's report is found): headline, standfirst, 4 to 5 paragraphs, 3 takeaways for us, 2 things to watch, and a take per sector. Weekly every Monday from 10:00 for the week before: headline, 2 paragraphs, 2 to 3 highlights (about $0.05). A month still in progress shows its latest weekly note.
+- **Fact check:** every dollar figure and percentage in the text must match a deal, a sector or kind total, a sum of two deals in one sector, the period totals, the previous period or the benchmark, or a round threshold. One corrective retry; any figure still unmatched is listed under the byline.
+- **WhatsApp:** both notes go to `FUNDING_WHATSAPP_GROUP` (unset = none), once each, with a link to the tab (`APP_URL/?view=funding`). Notes more than 10 days old are never posted.
+- Never log headlines or AI output; counts, ids and costs only.
+
 ## 16. Non-goals (for now)
 
 - Email ingestion
