@@ -434,6 +434,8 @@ model EventSector {
   keywords  String[]
   query     String?
   enabled   Boolean  @default(true)
+  /// Top priority: every major show, summit or convention. Otherwise only the flagship (TOP) event is kept
+  priority  Boolean  @default(false)
   /// STARTER or FUNDING (added by the monthly funding check)
   source    String   @default("STARTER")
   why       String?

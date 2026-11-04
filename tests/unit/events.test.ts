@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseEventbrite, parseEventsEye, parseTradeIndia, usableListings, type ListingItem } from "@/lib/domain/eventListings";
-import { fundingText, rankSectors, sectorRegex, STARTER_SECTORS, vetProposals } from "@/lib/domain/eventSectors";
+import { fundingText, keepFound, PRIORITY_SECTORS, rankSectors, sectorRegex, STARTER_SECTORS, vetProposals } from "@/lib/domain/eventSectors";
 import { eventDateLabel, eventDigestText, eventReminderDue, eventReminderText, isSoon, eventNewsUrl, eventText, EVENT_KINDS, EVENT_SECTORS, groupEvents, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventItem } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 
@@ -112,6 +112,19 @@ describe("events (SPEC §15.14)", () => {
     expect(looksLikeEvent("Family office conclave in Mumbai on 12 March")).toBe(true);
     expect(looksLikeEvent("Solar stocks rally as tender wins rise")).toBe(false);
     expect(looksLikeEvent("Summit reached on the trek")).toBe(false);
+    // Conventions and W.Media's CDC series (2026-11-04)
+    expect(looksLikeEvent("Mumbai Cloud and Datacenter Convention & Awards 2026, 27th November 2026")).toBe(true);
+    expect(looksLikeEvent("Coming soon! Chennai CDC and Interconnect World 2026")).toBe(true);
+  });
+
+  it("keeps every expo in a priority sector, but only flagship ones elsewhere", () => {
+    const prio = new Set(["Space"]);
+    expect(keepFound({ kind: "SECTOR_EXPO", sector: "Space", tier: "WORTH_A_LOOK" }, prio)).toBe(true);
+    expect(keepFound({ kind: "SECTOR_EXPO", sector: "Water", tier: "WORTH_A_LOOK" }, prio)).toBe(false);
+    expect(keepFound({ kind: "SECTOR_EXPO", sector: "Water", tier: "TOP" }, prio)).toBe(true);
+    expect(keepFound({ kind: "NETWORKING", sector: "Multi-sector", tier: "WORTH_A_LOOK" }, prio)).toBe(true);
+    // Every starting priority sector exists, so a typo can't silently demote one
+    for (const p of PRIORITY_SECTORS) expect(STARTER_SECTORS.some((s) => s.name === p)).toBe(true);
   });
 
   it("spends nothing on events already tracked with a date, and gives every search a turn", () => {

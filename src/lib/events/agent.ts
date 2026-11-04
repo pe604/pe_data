@@ -1,10 +1,10 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { judgeEvents, type EventCandidate } from "@/lib/ai/events";
+import { judgeEvents, type EventCandidate, type JudgeSector } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
 import { usableListings, type ListingItem } from "@/lib/domain/eventListings";
-import { LISTINGS_READ, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
-import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, eventDigestText, eventReminderDue, eventReminderText, isSoon, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
+import { LISTINGS_READ, PRIORITY_SECTORS, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
+import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, PRIORITY_QUERIES, eventDigestText, eventReminderDue, eventReminderText, isSoon, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
@@ -87,7 +87,7 @@ const loadKnown = () => db.event.findMany({ select: { id: true, name: true, star
 /** One scan of news and LinkedIn: gather, drop what isn't worth paying for, judge, add what's new. */
 export async function scanEvents(): Promise<{ items: number; judged: number; added: number }> {
   const sectors = await liveSectors();
-  const all = roundRobin(await gather([...INVESTOR_QUERIES, ...sectors.flatMap((s) => (s.query ? [s.query] : []))]));
+  const all = roundRobin(await gather([...INVESTOR_QUERIES, ...PRIORITY_QUERIES, ...sectors.flatMap((s) => (s.query ? [s.query] : []))]));
   const unique = all.filter((r, i) => all.findIndex((x) => x.url === r.url) === i);
   const seen = new Set((await db.eventSeen.findMany({ where: { url: { in: unique.map((u) => u.url) } }, select: { url: true } })).map((s) => s.url));
   const fresh = unique.filter((u) => !seen.has(u.url));
@@ -101,7 +101,7 @@ export async function scanEvents(): Promise<{ items: number; judged: number; add
     .slice(0, MAX_ITEMS)
     .map((f, i) => ({ ...f, key: `E${i + 1}` }));
   if (skip.length) await db.eventSeen.createMany({ data: skip.map((s) => ({ url: s.url })), skipDuplicates: true });
-  const r = await judgeAndAdd(todo, known, sectors.map((s) => s.name), { quiet: false, maxBatches: MAX_BATCHES });
+  const r = await judgeAndAdd(todo, known, sectors, { quiet: false, maxBatches: MAX_BATCHES });
   return { items: fresh.length, judged: r.judged, added: r.added.length };
 }
 
@@ -132,12 +132,12 @@ export async function scanListings(opts: { quiet: boolean; cap: number }): Promi
         outlet: l.site,
       }),
     );
-  const r = await judgeAndAdd(todo, known, sectors.map((s) => s.name), { quiet: opts.quiet, maxBatches: Math.ceil(opts.cap / BATCH) });
+  const r = await judgeAndAdd(todo, known, sectors, { quiet: opts.quiet, maxBatches: Math.ceil(opts.cap / BATCH) });
   return { listed: listed.length, items: fresh.length, judged: r.judged, added: r.added };
 }
 
 /** Judges in batches and adds what's new. `quiet` adds without a message each. */
-async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typeof loadKnown>>, sectors: string[], opts: { quiet: boolean; maxBatches: number }): Promise<{ judged: number; added: Added[] }> {
+async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typeof loadKnown>>, sectors: JudgeSector[], opts: { quiet: boolean; maxBatches: number }): Promise<{ judged: number; added: Added[] }> {
   const today = todayISO();
   let judged = 0;
   const added: Added[] = [];
@@ -351,7 +351,7 @@ async function firstListingRead(now: Date): Promise<void> {
 
 export async function eventsTick(now = new Date()): Promise<void> {
   await seedEvents();
-  await db.eventSector.createMany({ data: STARTER_SECTORS, skipDuplicates: true }); // a switched-off sector stays off
+  await db.eventSector.createMany({ data: STARTER_SECTORS.map((s) => ({ ...s, priority: PRIORITY_SECTORS.has(s.name) })), skipDuplicates: true }); // a switched-off sector stays off
   await fundingTick(now, claim);
   await firstListingRead(now);
   await weeklyScan(now);

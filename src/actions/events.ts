@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { dateToISO, isISODate } from "@/lib/domain/dates";
 import { EVENT_KINDS, EVENT_STATUSES, EVENT_TIERS, safeEventUrl, type EventItem, type EventsView } from "@/lib/domain/events";
-import { FUNDING_LAST, STARTER_SECTORS } from "@/lib/domain/eventSectors";
+import { FUNDING_LAST, PRIORITY_SECTORS, STARTER_SECTORS } from "@/lib/domain/eventSectors";
 import { run, UserError } from "@/lib/server/action";
 
 const LAST_SCAN = "events:last-scan";
@@ -50,7 +50,9 @@ async function view(): Promise<EventsView> {
   return {
     pe: pe.map((m) => ({ name: m.name, hasNumber: !!m.whatsappNumber })),
     // Before the first tick has stored the list, show the starting sectors.
-    sectors: sectors.length ? sectors.map((s) => ({ name: s.name, enabled: s.enabled, source: s.source, why: s.why })) : STARTER_SECTORS.map((s) => ({ name: s.name, enabled: true, source: "STARTER", why: null })),
+    sectors: sectors.length
+      ? sectors.map((s) => ({ name: s.name, enabled: s.enabled, priority: s.priority, source: s.source, why: s.why }))
+      : STARTER_SECTORS.map((s) => ({ name: s.name, enabled: true, priority: PRIORITY_SECTORS.has(s.name), source: "STARTER", why: null })),
     funding: funding ? (JSON.parse(funding.value) as EventsView["funding"]) : null,
     list: rows.map(
       (e): EventItem => ({
@@ -135,6 +137,16 @@ export async function setSectorEnabled(name: string, enabled: boolean) {
   return run<EventsView>(async () => {
     await requireRole();
     const r = await db.eventSector.updateMany({ where: { name: z.string().min(1).max(80).parse(name) }, data: { enabled: z.boolean().parse(enabled) } });
+    if (!r.count) throw new UserError("That sector no longer exists. Reload the page.");
+    return view();
+  });
+}
+
+/** Top priority: every major show in the sector is looked for. Otherwise only its flagship event. */
+export async function setSectorPriority(name: string, priority: boolean) {
+  return run<EventsView>(async () => {
+    await requireRole();
+    const r = await db.eventSector.updateMany({ where: { name: z.string().min(1).max(80).parse(name) }, data: { priority: z.boolean().parse(priority) } });
     if (!r.count) throw new UserError("That sector no longer exists. Reload the page.");
     return view();
   });

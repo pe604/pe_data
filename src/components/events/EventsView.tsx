@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteEvent, listEvents, saveEvent, setEventAssignee, setEventStatus, setSectorEnabled } from "@/actions/events";
+import { deleteEvent, listEvents, saveEvent, setEventAssignee, setEventStatus, setSectorEnabled, setSectorPriority } from "@/actions/events";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import {
   EVENT_KIND_LABELS,
@@ -292,11 +292,11 @@ export function EventsView() {
     setData(before);
     toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
   };
-  const toggleSector = async (name: string, enabled: boolean) => {
+  const toggleSector = async (name: string, field: "enabled" | "priority", on: boolean) => {
     const before = data;
     if (!before) return;
-    setData({ ...before, sectors: before.sectors.map((s) => (s.name === name ? { ...s, enabled } : s)) });
-    const r = await setSectorEnabled(name, enabled).catch(() => null);
+    setData({ ...before, sectors: before.sectors.map((s) => (s.name === name ? { ...s, [field]: on } : s)) });
+    const r = await (field === "enabled" ? setSectorEnabled(name, on) : setSectorPriority(name, on)).catch(() => null);
     if (r?.ok) return setData(r.data);
     setData(before);
     toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
@@ -427,14 +427,21 @@ export function EventsView() {
                 ) : (
                   <p className="hint">Funding headlines are checked once a month. New sectors with money behind them are added here.</p>
                 )}
+                <p className="hint">Top priority sectors: every major show, summit and convention. Other sectors: only their flagship event.</p>
                 <ul className="ev-sector-list">
                   {data.sectors.map((s) => (
                     <li key={s.name} title={s.why ?? undefined}>
                       <label className="ev-check">
-                        <input type="checkbox" checked={s.enabled} onChange={(e) => void toggleSector(s.name, e.target.checked)} />
+                        <input type="checkbox" checked={s.enabled} onChange={(e) => void toggleSector(s.name, "enabled", e.target.checked)} />
                         {s.name}
                         {s.source === "FUNDING" && <span className="ev-top">Added by funding check</span>}
                       </label>
+                      {s.enabled && s.name !== "Multi-sector" && (
+                        <label className="ev-check ev-prio">
+                          <input type="checkbox" checked={s.priority} aria-label={`${s.name}: top priority`} onChange={(e) => void toggleSector(s.name, "priority", e.target.checked)} />
+                          Top priority
+                        </label>
+                      )}
                     </li>
                   ))}
                 </ul>

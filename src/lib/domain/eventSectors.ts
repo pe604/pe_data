@@ -14,8 +14,8 @@ export interface SectorSetup {
 export const STARTER_SECTORS: SectorSetup[] = [
   { name: "Multi-sector", keywords: ["venture", "investor", "private equity", "family office", "founder", "startup", "start-up", "angel"], query: null },
   { name: "AI and software", keywords: ["artificial intelligence", "ai", "saas", "software", "machine learning", "generative", "cyber"], query: "India AI summit OR expo OR conclave startups" },
-  { name: "Data centres and digital infrastructure", keywords: ["data centre", "data center", "datacenter", "cloud", "colocation", "telecom", "5g"], query: "India data centre summit OR expo OR conference" },
-  { name: "Healthcare and life sciences", keywords: ["health", "medical", "medtech", "hospital", "pharma", "biotech", "bio", "diagnostic", "life science", "genom"], query: "India healthcare medtech biotech summit OR expo" },
+  { name: "Data centres and digital infrastructure", keywords: ["data centre", "data center", "datacenter", "cloud", "colocation", "telecom", "5g", "gpu", "hyperscale"], query: 'India data centre OR datacenter OR "AI infrastructure" summit OR convention OR expo' },
+  { name: "Healthcare and life sciences", keywords: ["health", "medical", "medtech", "hospital", "pharma", "biotech", "bio", "diagnostic", "life science", "genom", "cdmo", "crdmo", "cphi", "api", "drug"], query: 'India pharma CDMO OR CRDMO OR biotech OR "drug discovery" summit OR conference OR expo' },
   { name: "Space", keywords: ["space", "satellite", "rocket"], query: "India space expo OR conclave OR summit" },
   { name: "Defence and aerospace", keywords: ["defence", "defense", "aero", "aviation", "drone", "uav"], query: "India defence aerospace expo OR show OR conclave drone" },
   { name: "Batteries and storage", keywords: ["batter", "energy storage", "lithium"], query: "India battery energy storage expo OR show OR summit" },
@@ -30,6 +30,33 @@ export const STARTER_SECTORS: SectorSetup[] = [
   { name: "Fintech", keywords: ["fintech", "banking", "payments"], query: "India fintech summit OR festival OR conclave" },
   { name: "Consumer", keywords: ["retail", "d2c", "franchise", "consumer"], query: "India D2C retail consumer brands expo OR summit" },
 ];
+
+/** Top priority to start with (SPEC §15.14, 2026-11-04). The team changes this per sector in the Events tab. */
+export const PRIORITY_SECTORS: ReadonlySet<string> = new Set([
+  "Data centres and digital infrastructure",
+  "AI and software",
+  "Semiconductors and electronics",
+  "Defence and aerospace",
+  "Space",
+  "Healthcare and life sciences",
+]);
+
+/** What counts in each sector, for the AI filter. A sector without one is judged on its name. */
+export const SECTOR_FOCUS: Record<string, string> = {
+  "Data centres and digital infrastructure": "AI infrastructure: data centres, cloud, GPU compute, colocation, interconnect, and power and cooling for data centres. Not telecom retail or handsets.",
+  "AI and software": "AI and enterprise software that companies build and sell. Not ERP, IoT or IT vendor and dealer fairs.",
+  "Semiconductors and electronics": "Chip design, fabs and packaging, electronics manufacturing (EMS) and components. Not consumer electronics or appliance fairs.",
+  "Defence and aerospace": "Defence manufacturing, aerospace, drones and defence tech. Not aircraft interiors or airline services.",
+  Space: "Launch, satellites and space tech.",
+  "Healthcare and life sciences": "Pharma innovation (drug discovery, biotech, complex generics), CDMO / CRDMO and contract research, APIs, and medtech innovation. Not ayurveda, wellness, health tourism, nutraceuticals, hospital supply or medical equipment dealer fairs, or pharma packaging.",
+  "Industrials and manufacturing": "Only the national flagship shows, such as IMTEX. Not city or regional machinery fairs.",
+  Consumer: "Consumer brands and D2C. Not consumer electronics or mobile handset fairs.",
+};
+
+/** The code's check after the AI: outside the priority sectors, only flagship (TOP) expos are kept. */
+export function keepFound(v: { kind: string; sector: string; tier: string }, priority: ReadonlySet<string>): boolean {
+  return v.kind !== "SECTOR_EXPO" || v.tier === "TOP" || priority.has(v.sector);
+}
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

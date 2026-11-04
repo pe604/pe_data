@@ -60,7 +60,7 @@ export interface EventsView {
   pe: { name: string; hasNumber: boolean }[];
   /** When the weekly scan last ran (ISO), and what it did */
   lastScan: { at: string; items: number; judged: number; added: number } | null;
-  sectors: { name: string; enabled: boolean; source: string; why: string | null }[];
+  sectors: { name: string; enabled: boolean; priority: boolean; source: string; why: string | null }[];
   /** The latest monthly funding check */
   funding: FundingSnapshot | null;
 }
@@ -223,6 +223,13 @@ export const INVESTOR_QUERIES = [
   "India startup investor summit OR conclave deep tech",
 ] as const;
 
+/** Extra searches for the priority sectors (2026-11-04): series the sector searches miss. Free. */
+export const PRIORITY_QUERIES = [
+  "W.Media CDC cloud datacenter convention India",
+  "India AI infrastructure GPU data centre summit OR conclave",
+  "CPHI OR CDMO OR CRDMO India pharma conference OR summit",
+] as const;
+
 /** Organisers whose LinkedIn pages are worth a look each week. Each slug was checked against a live page. */
 export const EVENT_LINKEDIN_PAGES = [
   "niveshaay",
@@ -241,7 +248,7 @@ export function eventNewsUrl(query: string, days: number): string {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:${days}d`)}&hl=en-IN&gl=IN&ceid=IN:en`;
 }
 
-const EVENT_WORDS = /\b(expo|exhibition|summit|conclave|conference|forum|show|colloquium|meet|meetup|showcase|demo day|investor day|trade fair|tiecon|roadshow)\b/i;
+const EVENT_WORDS = /\b(expo|exhibition|summit|conclave|conference|convention|congress|forum|show|colloquium|meet|meetup|showcase|demo day|investor day|trade fair|tiecon|roadshow|cdc)\b/i;
 const FORWARD_WORDS = /\b(upcoming|to be held|will be held|will host|to host|scheduled|register|registration|save the date|join us|see you|invite|invited|from \d|on \d|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?|20\d{2})\b/i;
 
 /** Keyword check before any AI: names an event and points at a date. Everything else costs nothing. */
