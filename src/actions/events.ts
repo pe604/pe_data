@@ -120,6 +120,16 @@ export async function setEventStatus(eventId: string, status: EventItem["status"
   });
 }
 
+/** Someone checked the dates with the organiser. Only confirmed events go to the WhatsApp group. */
+export async function confirmEventDates(eventId: string) {
+  return run<EventsView>(async () => {
+    await requireRole();
+    const r = await db.event.updateMany({ where: { id: id.parse(eventId), startDate: { not: null } }, data: { datesConfirmed: true } });
+    if (!r.count) throw new UserError("That event no longer exists or has no date. Reload the page.");
+    return view();
+  });
+}
+
 /** Assigns the event to someone in the PE team (null = nobody). Their reminders start afresh. */
 export async function setEventAssignee(eventId: string, name: string | null) {
   return run<EventsView>(async () => {

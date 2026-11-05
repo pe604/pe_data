@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteEvent, listEvents, saveEvent, setEventAssignee, setEventStatus, setSectorEnabled, setSectorPriority } from "@/actions/events";
+import { confirmEventDates, deleteEvent, listEvents, saveEvent, setEventAssignee, setEventStatus, setSectorEnabled, setSectorPriority } from "@/actions/events";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import {
   EVENT_KIND_LABELS,
@@ -189,7 +189,7 @@ function EventForm({ initial, sectors, pe, onDone, onCancel }: { initial: EventI
   );
 }
 
-function EventRow({ e, pe, onStatus, onAssign, onEdit, onDelete }: { e: EventItem; pe: Data["pe"]; onStatus: (s: EventItem["status"]) => void; onAssign: (name: string | null) => void; onEdit: () => void; onDelete: () => void }) {
+function EventRow({ e, pe, onStatus, onAssign, onConfirm, onEdit, onDelete }: { e: EventItem; pe: Data["pe"]; onStatus: (s: EventItem["status"]) => void; onAssign: (name: string | null) => void; onConfirm: () => void; onEdit: () => void; onDelete: () => void }) {
   const url = safeEventUrl(e.url);
   const owner = e.assignee ? pe.find((m) => m.name === e.assignee) : null;
   return (
@@ -205,7 +205,15 @@ function EventRow({ e, pe, onStatus, onAssign, onEdit, onDelete }: { e: EventIte
             e.name
           )}
           {e.tier === "TOP" && <span className="ev-top">Top</span>}
-          {!e.datesConfirmed && e.kind !== "OWN" && <span className="ev-check-tag">{e.startDate ? "Check dates" : "No date yet"}</span>}
+          {!e.datesConfirmed &&
+            e.kind !== "OWN" &&
+            (e.startDate ? (
+              <button className="ev-check-tag" type="button" title="Only events with confirmed dates go to WhatsApp. Click once you've checked the dates with the organiser." onClick={onConfirm}>
+                Check dates
+              </button>
+            ) : (
+              <span className="ev-check-tag">No date yet</span>
+            ))}
         </div>
         <div className="ev-meta">{[EVENT_KIND_LABELS[e.kind], e.sector, e.city, e.venue, e.organiser].filter(Boolean).join(" · ")}</div>
         {e.dateNote && !e.startDate && <div className="ev-meta">{e.dateNote}</div>}
@@ -313,6 +321,16 @@ export function EventsView() {
     setData(before);
     toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
   };
+  const confirmDates = async (e: EventItem) => {
+    if (!window.confirm(`Are the dates for ${e.name} (${eventDateLabel(e)}) right? Confirmed events are posted to the events group on WhatsApp.`)) return;
+    const before = data;
+    if (!before) return;
+    setData({ ...before, list: before.list.map((x) => (x.id === e.id ? { ...x, datesConfirmed: true } : x)) });
+    const r = await confirmEventDates(e.id).catch(() => null);
+    if (r?.ok) return setData(r.data);
+    setData(before);
+    toast(r && !r.ok ? r.error : "Could not save that change. Check your connection and try again.");
+  };
   const remove = async (e: EventItem) => {
     if (!window.confirm(`Delete ${e.name}? This can't be undone.`)) return;
     const r = await deleteEvent(e.id);
@@ -323,7 +341,7 @@ export function EventsView() {
   const rows = (items: EventItem[]) => (
     <ul className="ev-list">
       {items.map((e) => (
-        <EventRow key={e.id} e={e} pe={data?.pe ?? []} onStatus={(s) => void changeStatus(e, s)} onAssign={(n) => void assign(e, n)} onEdit={() => setEditing(e)} onDelete={() => void remove(e)} />
+        <EventRow key={e.id} e={e} pe={data?.pe ?? []} onStatus={(s) => void changeStatus(e, s)} onAssign={(n) => void assign(e, n)} onConfirm={() => void confirmDates(e)} onEdit={() => setEditing(e)} onDelete={() => void remove(e)} />
       ))}
     </ul>
   );

@@ -218,11 +218,12 @@ async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typ
 /**
  * Tells the PE Events group, one message each. An event is marked as told before its message goes, and only a send
  * that clearly failed is put back, so a restart or a retry can never post it twice. Events already over are dropped.
+ * Only events with confirmed dates are posted (2026-11-05): the others wait, and go once someone confirms them.
  */
 export async function sendEventAlerts(): Promise<number> {
   if (!whatsappConfigured || !eventsWhatsappTo) return 0;
   const today = todayISO();
-  const pending = await db.event.findMany({ where: { alertPending: true }, orderBy: [{ tier: "asc" }, { startDate: "asc" }] }); // "TOP" sorts first
+  const pending = await db.event.findMany({ where: { alertPending: true, datesConfirmed: true }, orderBy: [{ tier: "asc" }, { startDate: "asc" }] }); // "TOP" sorts first
   let sent = 0;
   for (const e of pending) {
     const asISO = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -258,7 +259,7 @@ export async function sendSoonAlerts(now = new Date()): Promise<number> {
   if (hour < 9) return 0;
   const today = todayISO(now);
   const due = await db.event.findMany({
-    where: { soonAlertedAt: null, alertPending: false, status: { not: "SKIPPED" }, startDate: { gte: day(today), lte: day(addDaysISO(today, 10)) } },
+    where: { soonAlertedAt: null, alertPending: false, datesConfirmed: true, status: { not: "SKIPPED" }, startDate: { gte: day(today), lte: day(addDaysISO(today, 10)) } },
     orderBy: { startDate: "asc" },
   });
   let sent = 0;
