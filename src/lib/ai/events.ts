@@ -77,20 +77,20 @@ const system = (all: JudgeSector[]) => {
   return [
     "You screen news, LinkedIn posts and event listings for a growth-stage private equity fund in India, looking for the few events its deal team should attend. Be strict: the team wants fewer, better events.",
     "Keep an item only if it announces a specific, named, in-person event that has not happened yet, in India or aimed at Indian investors, and that is one of:",
-    "- curated networking between PE / VC firms, founders and investors run by a recognised organiser (an industry body such as IVCA or TiE, a media house such as VCCircle, a fund or a bank), such as a fund showcasing its portfolio companies or a demo day (kind NETWORKING). Drop open ticketed mixers, happy hours, generic founder meetups and pay-to-pitch events;",
-    "- a conference run by an investment bank or for its clients (kind BANKER);",
+    "- a national flagship investor and founder event run by a recognised organiser: an industry body such as IVCA or TiE (its global summit or a major chapter's flagship TiEcon), a leading media house such as VCCircle, or a leading fund or bank (kind NETWORKING). Drop open ticketed mixers, happy hours, founder meetups and clubs, regional startup fairs and pay-to-pitch events;",
+    "- a conference run by a recognised investment bank or broker for its clients, such as Avendus, Equirus, JM Financial, Motilal Oswal or Kotak (kind BANKER);",
     "- a family office forum by a recognised organiser (kind FAMILY_OFFICE);",
-    "- a sector event (kind SECTOR_EXPO), only in these sectors, and only within each sector's focus:",
-    `  TOP PRIORITY sectors: keep every established national or international show, summit or convention where the sector's leaders and buyers gather, including industry conventions with an awards night. Drop city editions of generic trade fairs, dealer and distributor shows, and standalone award ceremonies.`,
+    "- a sector event (kind SECTOR_EXPO), only in these sectors, and only within each sector's focus. Only the events that are truly the top of their category in India count:",
+    `  TOP PRIORITY sectors: the one or two flagship national shows of the sector, plus its leading national convention where the industry's leaders gather (e.g. W.Media's Cloud and Datacenter Convention for data centres).`,
     ...top.map(sectorLine),
-    `  OTHER sectors: keep only the one flagship national event of the sector, and mark it TOP. Drop everything else in these sectors, including regional and city shows.`,
+    `  OTHER sectors: only the one flagship national event of the sector.`,
     ...rest.map(sectorLine),
-    "  Drop shows in any other field, such as agriculture, poultry, food, textiles or real estate.",
-    "Drop reports on events already over, webinars, standalone awards, college fests, generic business summits, job fairs, state investor meets with no investor angle, and small local meetups.",
-    "tier: TOP only for a flagship event in its field, attended by leading investors or the whole industry. Otherwise WORTH_A_LOOK.",
+    "  Drop everything else: regional and city shows (Pune, Kolhapur, Vadodara, Ludhiana and so on), second-tier or new trade fairs, dealer and distributor shows, standalone award ceremonies, and shows in any other field such as agriculture, food, textiles, homeware or real estate.",
+    "Drop reports on events already over, webinars, college fests, generic business summits, job fairs, state investor meets with no investor angle, and small local meetups.",
+    "tier: TOP only for the events above that are the flagship of their category: what the leading investors and the whole industry attend, such as Aero India, CPHI India, SEMICON India, IMTEX, The smarter E India, The Battery Show India, Global Fintech Fest, the IVCA Conclave or the TiE Global Summit. At most two or three events a year in any one sector are TOP. Investment bank and family office events may be WORTH_A_LOOK. Everything else you keep is WORTH_A_LOOK, and the code then drops sector expos and networking events that are not TOP.",
   "start_date and end_date: YYYY-MM-DD, only if the item states them. Never guess or work out a date; use null.",
   "city, organiser: as stated, else null. name: the event's proper name with its year if stated.",
-  "Items from a listing site are scheduled events: judge whether they fit, not whether they are announced. Keep regional shows only if they are established in a sector above.",
+  "Items from a listing site are scheduled events: judge whether they fit, not whether they are announced.",
   "venue: as stated, else null.",
   "description: one or two plain sentences on what the event is, only from the item (max 220 characters). Empty for dropped items.",
   "why: one plain sentence on why it matters to a PE investor (max 160 characters). For dropped items use an empty string.",
@@ -110,7 +110,7 @@ export interface TrackedEvent {
 const flat = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /**
- * The AI's verdicts, then the code's own check: outside the priority sectors only flagship expos are kept. Now and
+ * The AI's verdicts, then the code's own check: only the top expos and networking events are kept. Now and
  * then the model runs away on one item and its answer is cut off; that batch is split in half and judged again, so
  * one bad item can't hold up the rest. A single item that still gets a broken answer is dropped.
  */
@@ -126,7 +126,6 @@ export async function judgeEvents(today: string, items: EventCandidate[], tracke
 }
 
 async function judgeOnce(today: string, items: EventCandidate[], tracked: TrackedEvent[], sectors: JudgeSector[], opts: { signal?: AbortSignal }): Promise<FoundEvent[]> {
-  const priority = new Set(sectors.filter((s) => s.priority).map((s) => s.name));
   const prompt = [
     `Today: ${today}`,
     "",
@@ -147,5 +146,5 @@ async function judgeOnce(today: string, items: EventCandidate[], tracked: Tracke
   ].join("\n");
   const raw = await aiProvider().generateJson({ system: system(sectors), prompt, jsonSchema: schema(sectors.map((s) => s.name)), model: MODEL, signal: opts.signal, maxTokens: 8000 });
   const parsed = z.object({ items: z.array(found) }).parse(JSON.parse(raw));
-  return parsed.items.filter((v) => v.keep && items.some((i) => i.key === v.key) && keepFound(v, priority));
+  return parsed.items.filter((v) => v.keep && items.some((i) => i.key === v.key) && keepFound(v));
 }

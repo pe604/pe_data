@@ -117,12 +117,12 @@ describe("events (SPEC §15.14)", () => {
     expect(looksLikeEvent("Coming soon! Chennai CDC and Interconnect World 2026")).toBe(true);
   });
 
-  it("keeps every expo in a priority sector, but only flagship ones elsewhere", () => {
-    const prio = new Set(["Space"]);
-    expect(keepFound({ kind: "SECTOR_EXPO", sector: "Space", tier: "WORTH_A_LOOK" }, prio)).toBe(true);
-    expect(keepFound({ kind: "SECTOR_EXPO", sector: "Water", tier: "WORTH_A_LOOK" }, prio)).toBe(false);
-    expect(keepFound({ kind: "SECTOR_EXPO", sector: "Water", tier: "TOP" }, prio)).toBe(true);
-    expect(keepFound({ kind: "NETWORKING", sector: "Multi-sector", tier: "WORTH_A_LOOK" }, prio)).toBe(true);
+  it("keeps only the top expos and networking events; bank and family office events are their own category", () => {
+    expect(keepFound({ kind: "SECTOR_EXPO", tier: "WORTH_A_LOOK" })).toBe(false);
+    expect(keepFound({ kind: "SECTOR_EXPO", tier: "TOP" })).toBe(true);
+    expect(keepFound({ kind: "NETWORKING", tier: "WORTH_A_LOOK" })).toBe(false);
+    expect(keepFound({ kind: "BANKER", tier: "WORTH_A_LOOK" })).toBe(true);
+    expect(keepFound({ kind: "FAMILY_OFFICE", tier: "WORTH_A_LOOK" })).toBe(true);
     // Every starting priority sector exists, so a typo can't silently demote one
     for (const p of PRIORITY_SECTORS) expect(STARTER_SECTORS.some((s) => s.name === p)).toBe(true);
   });

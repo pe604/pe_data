@@ -53,10 +53,19 @@ export const SECTOR_FOCUS: Record<string, string> = {
   Consumer: "Consumer brands and D2C. Not consumer electronics or mobile handset fairs.",
 };
 
-/** The code's check after the AI: outside the priority sectors, only flagship (TOP) expos are kept. */
-export function keepFound(v: { kind: string; sector: string; tier: string }, priority: ReadonlySet<string>): boolean {
-  return v.kind !== "SECTOR_EXPO" || v.tier === "TOP" || priority.has(v.sector);
+/**
+ * The code's check after the AI (2026-11-17): sector expos and networking events are kept only when they are the top
+ * events of their category (TOP). Investment bank conferences and family office forums are their own category.
+ */
+export function keepFound(v: { kind: string; tier: string }): boolean {
+  return v.kind === "BANKER" || v.kind === "FAMILY_OFFICE" || v.kind === "OWN" || v.tier === "TOP";
 }
+
+/**
+ * Sectors with little or no VC money behind them (the Funding tab, Sep–Nov 2026): switched off, so they are not
+ * searched. The team can switch them back on in Sectors we track.
+ */
+export const NO_VC_TRACTION = ["Water", "Recycling"] as const;
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

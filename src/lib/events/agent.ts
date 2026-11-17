@@ -3,8 +3,8 @@ import { db } from "@/lib/db";
 import { judgeEvents, type EventCandidate, type JudgeSector } from "@/lib/ai/events";
 import { todayISO } from "@/lib/domain/dates";
 import { usableListings, type ListingItem } from "@/lib/domain/eventListings";
-import { LISTINGS_READ, PRIORITY_SECTORS, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
-import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, PRIORITY_QUERIES, eventDigestText, eventReminderDue, eventReminderText, isSoon, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
+import { LISTINGS_READ, NO_VC_TRACTION, PRIORITY_SECTORS, sectorRegex, STARTER_SECTORS } from "@/lib/domain/eventSectors";
+import { EVENT_LINKEDIN_PAGES, INVESTOR_QUERIES, PRIORITY_QUERIES, eventReminderDue, eventReminderText, eventNewsUrl, eventText, isScanDue, looksLikeEvent, mentionsTracked, roundRobin, safeEventUrl, sameEvent, type EventKind, type EventTier } from "@/lib/domain/events";
 import { EVENT_SEEDS } from "@/lib/domain/eventSeeds";
 import { parseGoogleNewsRss, type RawItem } from "@/lib/domain/news";
 import { aiConfigured, apifyConfigured, eventsWhatsappTo, whatsappConfigured } from "@/lib/env";
@@ -183,9 +183,8 @@ async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typ
             organiser: match.organiser ?? v.organiser,
             url: match.url ?? safeEventUrl(item.url),
           };
-          // Dates found: the group hears again 10 days before them.
-          await db.event.update({ where: { id: match.id }, data: { soonAlertedAt: null } });
-          await db.event.update({ where: { id: match.id }, data: { ...data, alertPending: !opts.quiet } });
+          // Dates found: the group hears 10 days before them, once they are confirmed.
+          await db.event.update({ where: { id: match.id }, data: { ...data, soonAlertedAt: null } });
           Object.assign(match, data);
         }
         continue;
@@ -205,7 +204,6 @@ async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typ
           why: v.why.trim().slice(0, 300) || null,
           url: safeEventUrl(item.url),
           source: item.source,
-          alertPending: !opts.quiet,
         },
       });
       known.push({ id: c.id, name, startDate: c.startDate, endDate: c.endDate, city, venue, description, organiser: c.organiser, url: c.url });
@@ -216,42 +214,8 @@ async function judgeAndAdd(todo: EventCandidate[], known: Awaited<ReturnType<typ
 }
 
 /**
- * Tells the PE Events group, one message each. An event is marked as told before its message goes, and only a send
- * that clearly failed is put back, so a restart or a retry can never post it twice. Events already over are dropped.
- * Only events with confirmed dates are posted (2026-11-05): the others wait, and go once someone confirms them.
- */
-export async function sendEventAlerts(): Promise<number> {
-  if (!whatsappConfigured || !eventsWhatsappTo) return 0;
-  const today = todayISO();
-  const pending = await db.event.findMany({ where: { alertPending: true, datesConfirmed: true }, orderBy: [{ tier: "asc" }, { startDate: "asc" }] }); // "TOP" sorts first
-  let sent = 0;
-  for (const e of pending) {
-    const asISO = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
-    const startDate = asISO(e.startDate);
-    const endDate = asISO(e.endDate);
-    const over = (endDate ?? startDate ?? today) < today;
-    // Within 10 days, this message is also the "coming up" one.
-    const soon = !over && isSoon(startDate, today);
-    const taken = await db.event.updateMany({ where: { id: e.id, alertPending: true }, data: { alertPending: false, ...(over ? {} : { alertedAt: new Date() }), ...(soon ? { soonAlertedAt: new Date() } : {}) } });
-    if (!taken.count || over) continue;
-    // Found by the scan and never posted: new. Anything else (a starting-list event, or one already posted): dates found.
-    const isNew = !e.alertedAt && e.source !== "SEED" && e.source !== "MANUAL";
-    try {
-      await sendText(eventsWhatsappTo, eventText({ ...e, kind: e.kind as EventKind, tier: e.tier as "TOP" | "WORTH_A_LOOK", startDate, endDate }, isNew, today));
-      sent++;
-      await new Promise((r) => setTimeout(r, 2000)); // spaced out so WhatsApp doesn't flag the number
-    } catch (err) {
-      console.error("[events] send failed", e.id, errCode(err));
-      // A timeout may still have been delivered, so it isn't retried.
-      if ((err as Error).name !== "TimeoutError") await db.event.updateMany({ where: { id: e.id }, data: { alertPending: true, alertedAt: e.alertedAt, soonAlertedAt: e.soonAlertedAt } });
-    }
-  }
-  return sent;
-}
-
-/**
- * Tells the PE Events group again 10 days before each event (SPEC §15.14), from 09:00 IST: once per event and date.
- * An event found inside the window was already told by its first message. Skipped events are left out.
+ * The only message the PE Events group gets about an event (SPEC §15.14, 2026-11-17): 10 days before it starts, from
+ * 09:00 IST, once per event and date, and only when its dates are confirmed. Skipped events are left out.
  */
 export async function sendSoonAlerts(now = new Date()): Promise<number> {
   if (!whatsappConfigured || !eventsWhatsappTo) return 0;
@@ -259,7 +223,7 @@ export async function sendSoonAlerts(now = new Date()): Promise<number> {
   if (hour < 9) return 0;
   const today = todayISO(now);
   const due = await db.event.findMany({
-    where: { soonAlertedAt: null, alertPending: false, datesConfirmed: true, status: { not: "SKIPPED" }, startDate: { gte: day(today), lte: day(addDaysISO(today, 10)) } },
+    where: { soonAlertedAt: null, datesConfirmed: true, status: { not: "SKIPPED" }, startDate: { gte: day(today), lte: day(addDaysISO(today, 10)) } },
     orderBy: { startDate: "asc" },
   });
   let sent = 0;
@@ -335,29 +299,23 @@ const saveLastScan = async (now: Date, r: { items: number; judged: number; added
   await db.appSetting.upsert({ where: { key: LAST_SCAN }, create: { key: LAST_SCAN, value }, update: { value } });
 };
 
-/** Once: fills the list from the listing sites straight away, with one summary message instead of one each. */
+/** Once: fills the list from the listing sites straight away. No message: the group hears 10 days before each event. */
 async function firstListingRead(now: Date): Promise<void> {
   if (!aiConfigured || (await db.appSetting.findUnique({ where: { key: LISTINGS_READ } }))) return;
   const r = await scanListings({ quiet: true, cap: FIRST_LISTINGS });
   if (!r.judged || !(await claim(LISTINGS_READ))) return; // read or AI failed: try again at the next tick
   await saveLastScan(now, { items: r.items, judged: r.judged, added: r.added.length });
   console.log(`[events] first listing read: ${r.listed} listed, ${r.judged} judged, ${r.added.length} added`);
-  if (!r.added.length || !whatsappConfigured || !eventsWhatsappTo) return;
-  try {
-    await sendText(eventsWhatsappTo, eventDigestText(r.added));
-  } catch (e) {
-    console.error("[events] digest failed", errCode(e));
-  }
 }
 
 export async function eventsTick(now = new Date()): Promise<void> {
   await seedEvents();
   await db.eventSector.createMany({ data: STARTER_SECTORS.map((s) => ({ ...s, priority: PRIORITY_SECTORS.has(s.name) })), skipDuplicates: true }); // a switched-off sector stays off
+  // Once: sectors with no VC money behind them are switched off. The team can switch them back on.
+  if (await claim("events:no-vc-traction:v1")) await db.eventSector.updateMany({ where: { name: { in: [...NO_VC_TRACTION] } }, data: { enabled: false } });
   await fundingTick(now, claim);
   await firstListingRead(now);
   await weeklyScan(now);
-  const sent = await sendEventAlerts();
-  if (sent) console.log(`[events] ${sent} sent`);
   const soon = await sendSoonAlerts(now);
   if (soon) console.log(`[events] ${soon} coming-up messages sent`);
   const reminded = await sendEventReminders(now);
