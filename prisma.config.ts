@@ -12,5 +12,8 @@ export default defineConfig({
     // DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME (+ DB_SSL, DB_SCHEMA); see src/lib/db-config.ts.
     // Left unset when no database is configured, so `prisma generate` (npm install) works without one.
     url: process.env.DB_HOST?.trim() || process.env.DATABASE_URL?.trim() ? prismaCliUrl(dbConfig(process.env)) : undefined,
+    // `migrate dev` needs a throwaway database to check for drift, and the RDS user can't create one. Point this at a
+    // local, disposable Postgres when creating a migration; never at a database that holds data.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL?.trim() || undefined,
   },
 });

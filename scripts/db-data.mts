@@ -8,11 +8,23 @@ import { readFileSync, writeFileSync } from "node:fs";
 import pg from "pg";
 import { dbConfig, pgSsl } from "../src/lib/db-config";
 
-// Parent tables first. Company.activeSummaryId → Summary is a cycle, so it is set after Summary is loaded.
+// Parent tables first. Company.activeSummaryId → Summary and Company.activeFitId → FitRating are cycles, so they are
+// set after those tables are loaded. Export refuses a table missing from this list, so a new table can't be left out.
 const ORDER = [
   "User", "TeamMember", "Sector", "AppSetting", "Company", "CompanyPerson", "Comment", "File", "Summary",
   "SummaryJob", "Rejection", "AuditLog", "WhatsAppIntake", "DeletionLog",
+  // Portfolio, news and reminders (SPEC §15)
+  "InvestmentRound", "QuarterSetting", "QuarterCheck", "Meeting", "CompanyContact", "CompanyUpdate", "ReminderRun",
+  "ReminderLog", "NewsWatch", "NewsItem", "MisLine", "MisValue", "MisFigure", "MisReadJob", "ResultFormat",
+  // Events and funding (SPEC §15.14–15.16)
+  "EventSector", "Event", "EventSeen", "FundingDeal", "FundingSeen", "FundingNote",
+  // Thesis and fit rating (SPEC §17)
+  "ThesisVersion", "ThesisRow", "FitRating", "FitInput", "FitJob",
 ];
+const ACTIVE = [
+  ["activeSummaryId", "Summary"],
+  ["activeFitId", "FitRating"],
+] as const;
 
 type Dump = { exportedAt: string; tables: Record<string, Record<string, string | null>[]> };
 
@@ -53,13 +65,15 @@ if (mode === "export") {
     await db.query("begin");
     // Sectors are added automatically on app start; the import brings the exact original rows instead.
     await db.query(`delete from "Sector" where not exists (select 1 from "Company" c where c."sectorId" = "Sector".id)`);
-    const active: [string, string][] = [];
+    const active: [string, string, string][] = [];
     for (const t of ORDER) {
       for (const row of dump.tables[t] ?? []) {
         const r = { ...row };
-        if (t === "Company" && r.activeSummaryId) {
-          active.push([r.id as string, r.activeSummaryId]);
-          r.activeSummaryId = null;
+        if (t === "Company") {
+          for (const [col] of ACTIVE) {
+            if (r[col]) active.push([col, r.id as string, r[col]]);
+            if (col in r) r[col] = null;
+          }
         }
         const cols = Object.keys(r);
         await db.query(
@@ -68,7 +82,7 @@ if (mode === "export") {
         );
       }
     }
-    for (const [id, s] of active) await db.query(`update "Company" set "activeSummaryId" = $1 where id = $2`, [s, id]);
+    for (const [col, id, v] of active) await db.query(`update "Company" set "${col}" = $1 where id = $2`, [v, id]);
     await db.query("commit");
     console.log("Imported:", Object.entries(dump.tables).map(([t, r]) => `${t} ${r.length}`).join(", "));
   } catch (err) {

@@ -14,7 +14,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | DB | PostgreSQL on AWS RDS (`DB_*` in `.env`) + Prisma (`prisma/schema.prisma`). Connection settings built in `src/lib/db-config.ts` (shared by the app, `prisma.config.ts` and scripts); TLS verified against `certs/rds-ap-south-1-bundle.pem`. No local database |
 | Auth | **None for now (open access).** `src/lib/auth/session.ts` returns one shared "Team" user (Editor) for every request. A future login replaces only that file. `noindex` header + `robots.txt` keep it out of search engines |
 | Files | `StorageDriver` backed by an S3-compatible bucket (`AWS_S3_*`), every object AES-256-GCM encrypted client-side with `STORAGE_ENCRYPTION_KEY` (the bucket is publicly readable, so it must only ever hold ciphertext). No local file storage |
-| AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-pro`). Every request sets `provider.data_collection = "deny"`. The PDF's text layer (`unpdf`) goes with the PDF; `src/lib/summary/verify.ts` checks every financial figure against it, with one corrective retry (`src/lib/ai/summarise.ts`) |
+| AI | **OpenRouter** chat completions (fetch, no SDK), server-only, behind `AiProvider` (`src/lib/ai/provider.ts`). Model from `OPENROUTER_MODEL` (default `google/gemini-2.5-pro`); the fit scorer (SPEC §17.7) uses `OPENROUTER_FIT_MODEL` (default `anthropic/claude-opus-5.5`). Every request sets `provider.data_collection = "deny"`. The PDF's text layer (`unpdf`) goes with the PDF; `src/lib/summary/verify.ts` checks every financial figure against it, with one corrective retry (`src/lib/ai/summarise.ts`) |
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
 | Excel / zip | `exceljs` / `archiver`, in route handlers |
 | Validation | `zod` on every input |
@@ -50,9 +50,11 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 .
 ├── CLAUDE.md  SPEC.md  BUILD_PROMPTS.md  README.md
 ├── reference/                      # v1.3 prototype (read only)
+├── thesis/                         # git-ignored, confidential: thesis-seed.json (SPEC §17.1); never commit
 ├── prisma/                         # schema.prisma, migrations/, seed.ts  (+ prisma.config.ts at root)
 ├── certs/                          # public AWS RDS CA bundle (DB_SSL=verify-full)
-├── scripts/                        # db-data.mts (export/import rows), check-storage.mts, verify-export.mjs, try-summary.mts
+├── scripts/                        # db-data.mts (export/import rows), check-storage.mts, verify-export.mjs, try-summary.mts,
+│                                   # thesis-import.mts, theme-backfill.mts, fit-backfill.mts, try-fit.mts (SPEC §17)
 ├── src/
 │   ├── instrumentation.ts          # starts the summary job worker
 │   ├── app/
@@ -63,10 +65,11 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │   │       ├── files/              # POST upload (staged or attached); [id] GET view/download
 │   │       ├── companies/[id]/download-all/  # zip grouped Deck/ Model/ Other/
 │   │       └── export/             # Excel
-│   ├── actions/                    # server actions: companies.ts, files.ts (files + summaries), misc.ts (comments, team, sectors), portfolio.ts (rounds, contacts), tracker.ts (quarterly tracker, meetings), mis.ts (MIS reader)
+│   ├── actions/                    # server actions: companies.ts, files.ts (files + summaries), misc.ts (comments, team, sectors), portfolio.ts (rounds, contacts), tracker.ts (quarterly tracker, meetings), mis.ts (MIS reader), thesis.ts, fit.ts (SPEC §17)
 │   ├── components/
 │   │   ├── Dashboard.tsx store.tsx # client state, optimistic mutate() with rollback, URL sync
 │   │   ├── shell/ bars/ toolbar/ table/ cells/ drawer/ add/ ui/
+│   │   ├── thesis/                 # Thesis tab and theme pages (SPEC §17.3–17.4); drawer/FitTab.tsx is the Fit tab
 │   ├── generated/prisma/           # Prisma client (generated, git-ignored)
 │   └── lib/
 │       ├── auth/session.ts         # currentUser(), requireRole()
@@ -79,7 +82,8 @@ On this Windows machine Node and Git are portable installs in `%LOCALAPPDATA%\Pr
 │       ├── news/                   # portfolio news agent (§15.10): Google News + LinkedIn via Apify, AI filter (ai/news.ts), WhatsApp alerts; pure helpers in domain/news.ts
 │       ├── events/                 # events tracker (§15.14): starting list, weekly scan (Google News, LinkedIn via Apify, listing sites; keyword check before AI); pure helpers in domain/events.ts and domain/eventListings.ts
 │       ├── funding/                # funding tab (§15.16): news read twice a day, deals merged, Opus column and weekly note, WhatsApp; pure helpers in domain/funding.ts
-│       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types
+│       ├── fit/                    # fit rating (SPEC §17.6–17.11): deck reader, scorer, FitJob worker
+│       ├── domain/                 # pure, client-safe: constants, dates, names, view (filter/sort/URL), onedrive, types, thesis.ts and fit.ts (SPEC §17)
 │       ├── server/                 # row loading/serialising, audit(), action wrapper, upload sniffing, HTTP errors
 │       └── excel/                  # export workbook builder
 ├── tests/  unit/ e2e/ fixtures/    # fixtures are non-confidential only

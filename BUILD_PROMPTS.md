@@ -166,3 +166,114 @@ Run all tests, fix failures, commit.
 - **Visual mismatches:** screenshot the prototype and the new build side by side and paste both in.
 - **Adding features later:** add them to SPEC.md first, then prompt "Implement the new SPEC.md section X". The spec stays the single source of truth.
 - **Entra ID sign-in** needs an app registration in your Microsoft 365 admin centre. Your IT admin will need 10 minutes for it. DEV_LOGIN lets you build everything before that's ready.
+
+---
+
+# Claude Code prompts: thesis and fit rating (Prompts 9 to 12)
+
+Continues `BUILD_PROMPTS.md`. Same rules: paste one prompt, let it finish, test it, then move on. Each phase ends with a commit.
+
+Before you start:
+1. The folder `thesis/` in the repo root holds three files: `SPEC_17_THESIS_FIT.md`, `BUILD_PROMPTS_THESIS.md` (this file) and `thesis-seed.json`.
+2. `thesis-seed.json` names holdings and rejected companies. It must never be committed. Prompt 9 git-ignores the folder first.
+3. The database holds real deals. Prompt 9 takes a backup before it touches the schema.
+
+What each prompt gives you:
+
+| Prompt | You get | AI cost |
+|---|---|---|
+| 9 | Spec updated, tables created, thesis version 1.2 loaded | None |
+| 10 | Every company has a theme; Thesis tab and theme pages live | A few cents, once |
+| 11 | The rating engine, tested on real decks from the command line | A few deals' worth |
+| 12 | Fit and Promise in the table and the company file; all pipeline deals rated | One run over the pipeline |
+
+---
+
+## Prompt 9: Spec, data model, thesis import (no UI, no AI)
+
+```
+Read thesis/SPEC_17_THESIS_FIT.md end to end. It is a new SPEC section written against this repo.
+
+1. First, add `thesis/` to .gitignore and confirm `git status` does not list anything under thesis/. thesis-seed.json is confidential and must never be committed.
+2. Paste the section into SPEC.md as "## 17. Thesis and fit rating" after §16, and apply every row of its "Edits to existing sections" table to SPEC.md, CLAUDE.md and .env.example. Append thesis/BUILD_PROMPTS_THESIS.md to BUILD_PROMPTS.md. Leave out the "Prisma models" appendix from SPEC.md; it goes into the schema.
+3. Take a backup: `npx tsx scripts/db-data.mts export backup/before-thesis.json`.
+4. Add the Prisma models and the Company and User fields from the appendix to prisma/schema.prisma under a "Thesis and fit rating (SPEC §17)" banner, following the file's conventions.
+5. Create the migration with `npx prisma migrate dev --create-only --name thesis_fit`. If Prisma says it needs to reset the database or reports drift, STOP and tell me; do not accept. Open the SQL and confirm it contains only CREATE TABLE, CREATE INDEX, ALTER TABLE ADD COLUMN and ADD CONSTRAINT. Then `npx prisma migrate deploy`. Never `migrate reset`.
+6. src/lib/domain/thesis.ts (pure, no React or Prisma imports): zod schemas for each row kind (`thesisRowZ` as a discriminated union on kind) and for the seed file; types via z.infer; helpers `currentRows`, `rowsAt(version)`, `themeByCode`, `anchorsFor(param)`, `themeScore(status)` (SPEC §17.5 LOOKUP values), `dealsForTheme`, `eventsForTheme`, `isStale(latestEvidence, today)`.
+7. scripts/thesis-import.mts <file.json>: SPEC §17.1 Import. One transaction. Compare by kind + code + deep-equal data/evidence/decision. Idempotent. Prints counts only (added, changed, closed, unchanged), never row text.
+8. Vitest unit tests for the domain helpers and for the import's diff logic (as a pure function over old rows and new rows).
+
+Run `npx tsx scripts/thesis-import.mts thesis/thesis-seed.json`. Expect version 1 with label "1.2" and 146 rows: 21 principles, 24 themes, 12 parameters, 69 anchors, 18 flags, 2 highlights. Run it a second time and confirm nothing changes. Run lint, typecheck and tests. Commit (the commit must contain nothing from thesis/).
+```
+
+Check by hand: `git log -1 --stat` shows no file under `thesis/`.
+
+---
+
+## Prompt 10: Themes on companies, Thesis tab, theme pages
+
+```
+Build SPEC §17.2, §17.3 and §17.4.
+
+1. Theme on a company: `themeCode` and `themeEdited` in the row loader (src/lib/server/company.ts `toRow`, `CompanyRow`), a server action to set or clear it (requireRole, zod, audit() in the same transaction, sets themeEdited), and a theme picker in the company file header beside sector (themes grouped by status, plus "No theme"). Cross-sector themes are not offered.
+2. scripts/theme-backfill.mts (SPEC §17.2, step 3): first apply `holdingThemes` from thesis/thesis-seed.json to Invested companies by exact name (skip names that do not match and print how many). Then, for every company with no theme and themeEdited false, ask the cheap check model that src/lib/ai/news.ts uses, in batches of 60, sending only name, sector and sub-sector plus the list of theme codes, names and keywords. Strict JSON schema; the answer must be a current non-cross-sector theme code or null. `--dry-run` prints counts per theme without writing. Log counts and cost only.
+3. Thesis tab (SPEC §17.3): a third side view after Funding, URL `?view=thesis`, loaded by a server component or action that reads current rows once. Sub-views as chips. Version picker reads older versions with rowsAt(). Hidden and refused in the funding-only deployment.
+4. Theme page (SPEC §17.4) at `?view=thesis&theme=T06`: the six blocks, all joins on existing data. Company names open the company file. Reuse the Funding tab's "ours" marks and the Events tab's row styling.
+5. Toolbar: a Theme filter on all three tabs (SPEC §17.10), wired through domain/view.ts (Filters, SET_KEYS, filtersForTab, applyFilters, URL sync).
+6. Styling: status badges from existing CSS variables only; add to the "additions" block in globals.css. Sentence case, no em dashes, light and dark.
+7. Unit tests for the view.ts changes and for the theme list sort. One Playwright test: open Thesis, open a theme, see the blocks.
+
+Run the backfill with --dry-run and show me the counts per theme before writing anything. After I confirm, run it for real. Commit.
+```
+
+Check by hand: open Thesis, then the defence theme. Holdings should list the defence holdings named in the seed file; the pipeline block should include the defence deals in the pipeline.
+
+---
+
+## Prompt 11: The fit engine (no UI yet)
+
+```
+Build SPEC §17.5 to §17.8 and §17.11 as server code, with no UI.
+
+1. src/lib/domain/fit.ts (pure): zod for `facts`, score rows, flags and highlights; `checkQuotes(facts, deckText)` and `checkNumbers` (reuse the matching in src/lib/summary/verify.ts); `agree(a, b)` (SPEC §17.7 agreement rule); `hasBannedWord(text)`; `means(scores, inputs, parameters)` with the minimums and coverage from §17.5; every CODE and STAGE flag calculator from §17.8; `highlightsFor(facts, theme)` with SMALL_REVENUE_CR = 100.
+2. src/lib/fit/read.ts (server-only): SPEC §17.6. One call with the deck from prepareDeck(), model aiModel, strict JSON schema built from the current DECK parameters and themes, zod-validate, one retry, then checkQuotes and checkNumbers.
+3. src/lib/fit/score.ts (server-only): SPEC §17.7. Two calls per DECK parameter that has quotes, model fitModel (add OPENROUTER_FIT_MODEL to env.ts, default anthropic/claude-opus-5.5; respect rejectsTemperature). Apply agree() and the banned-word retry.
+4. src/lib/fit/jobs.ts: FitJob worker modelled on src/lib/ai/jobs.ts (claim with FOR UPDATE SKIP LOCKED, heartbeat, 3 attempts, 2 in parallel), started from src/instrumentation.ts after the summary worker and never when fundingOnly. processJob: load company, active summary and deck; read (or reuse stored facts when reason is THESIS); score; flags; highlights; write FitRating and set Company.activeFitId in one transaction with an audit() note "Rated fit, thesis version 1.2". Set Company.themeCode from facts.theme only when themeEdited is false.
+5. Triggers (SPEC §17.11): queue a DECK job where writeSummary() in src/lib/ai/jobs.ts creates a version for a PIPELINE company; a `rateAgain` server action (MANUAL); thesis-import queues THESIS jobs for every Pipeline company with a deck when it writes a new version (by inserting FitJob rows directly, so the script needs no server-only import). One open job per company.
+6. scripts/try-fit.mts <deck> [--theme T06]: runs read and score on a local deck without touching the database and prints, per parameter, the number of quotes kept and dropped, the two scores and the final one, plus flags, highlights and the cost from aiUsage. It may print quotes to the terminal; nothing in src/ may log them.
+7. scripts/fit-backfill.mts [--limit N]: queues Pipeline companies that have a deck and no rating.
+8. Vitest for everything in domain/fit.ts, including: a paraphrased quote is dropped; scores 4 and 3 give 3; 5 and 2 give blank; a null with a 4 gives blank; a `why` with "recommend" is rejected; blank is excluded from the mean and from the coverage numerator; three scored Fit parameters give "Not enough in the deck".
+
+Then stop. I will give you two decks to try in the next message.
+```
+
+After it finishes, send (with one industrial deck and one consumer deck from the Decks folder, for example a defence information memorandum and a consumer brand):
+
+```
+Run scripts/try-fit.mts on both decks and show me the output. Check: every kept quote really is in the deck; no score above 3 rests on a claim with no number, name or date; no banned words; the defence deck gets theme T06, F4 = 5 and the sweet spot highlight; total cost per deck. Fix the prompts until both pass, record the cost per deal in the README, then commit.
+```
+
+---
+
+## Prompt 12: Fit in the table and the company file, then the first run
+
+```
+Build SPEC §17.9 and §17.10.
+
+1. Row data: add fit, promise, coverage, highlights and job state to CompanyRow (src/lib/domain/types.ts, toRow, rowInclude) from Company.activeFit and any open FitJob.
+2. Table (Pipeline and Rejected): Fit and Promise columns after Priority, as SPEC §17.10. Highlight chips under the company name. Sorts "Fit, highest first" and "Promise, highest first" in domain/view.ts (SORTS, sortsForTab, sortRows; unrated last). Highlights filter on Pipeline.
+3. Company file: FitTab.tsx after Summary for Pipeline and Rejected companies (store.tsx DrawerTab, normaliseTab, Drawer.tsx tabs). Layout and copy exactly as SPEC §17.10, including the fixed line "Ranks fit with the thesis. It is not a recommendation." Poll while a job is open, as the Summary tab does.
+4. People's inputs (SPEC §17.9): actions `setFitInput` and `removeFitInput` (requireRole, zod, reason at least 10 characters, audit() in the same transaction), a small form for Change score and for the founder meeting parameters, and "Mark as checked" with a required note on the sweet spot chip. Recompute fit and promise on the active rating when an input changes (pure means(), no AI call). Optimistic through store.mutate() with rollback.
+5. Search the whole UI for the words invest, pass, reject, recommend, buy, avoid inside anything the rating renders, and confirm none appears (the existing Invest and Reject buttons are unrelated and stay).
+6. Playwright: a seeded company with a rating shows Fit in the table; open the Fit tab; change a score with a reason, the mean updates and History shows the change; sort by Fit; filter by Sweet spot. Mobile check at 390px, dark mode, keyboard focus.
+
+Run `npx tsx --conditions=react-server scripts/fit-backfill.mts --limit 5`, wait for the jobs, and show me the five ratings and the total cost. After I confirm, run it without the limit. Commit.
+```
+
+Check by hand: sort the pipeline by Fit, highest first. Then send the top ten and bottom ten to the IC for the calibration in `decisions.md` D7.
+
+---
+
+## Not in these prompts
+
+These wait until the first version has been used for a couple of weeks (SPEC §17.13): the inbox of proposed thesis changes, watchers for new interviews and notes, web research to check claims, the IC calibration view and weights, "waiting on" and round deadline fields.

@@ -77,6 +77,7 @@ Env vars:
 - **AuditLog**: id, companyId (nullable), actorId, field (nullable), fromValue, toValue, note, at
 - **Sector**: id, name, sortOrder. Seed list (section 8).
 - **DeletionLog**: id, companyName, reason, byId, at
+- **Thesis and fit rating** (§17): `ThesisRow`, `ThesisVersion`, `FitRating`, `FitInput`, `FitJob`; on **Company**: `themeCode`, `themeEdited`, `activeFitId`.
 
 Stages enum, in order:
 
@@ -92,7 +93,7 @@ Stages enum, in order:
 1. **Header.**
    - Left: the wordmark "Niveshaay" (serif, green) and "Deal pipeline".
    - Right: **Export to Excel** (secondary) and **Add company** (primary).
-2. **Tabs**: Pipeline · Rejected · Invested, each with a count.
+2. **Tabs**: Pipeline · Rejected · Invested, each with a count, then the side views Events · Funding · **Thesis** (§17.3; Thesis after Funding).
 3. **Stages bar** (Pipeline tab only).
    - Six segments in stage order, each showing its name and count.
    - Colour intensity rises with stage (grey → light green → deep green).
@@ -122,11 +123,12 @@ Stages enum, in order:
 
 | Column | Behaviour |
 |---|---|
-| Company | Serial number in front of the name (**follows the current view**: renumbers 1…n after any sort or filter). Clicking the name opens the Company File drawer. Shows "N files" underneath when files exist. |
+| Company | Serial number in front of the name (**follows the current view**: renumbers 1…n after any sort or filter). Clicking the name opens the Company File drawer. Shows "N files" underneath when files exist, and highlight chips (§17.8). |
 | OneDrive | A **solid green cloud** when a link is saved: click opens it in a new tab (`target=_blank rel=noopener`), and hovering shows ✎ to edit. A **grey outline cloud** when missing: click opens a popover to paste the link. See 6.4. |
 | Sector & sub-sector | Two lines. Click to edit: the sector comes from the master list, with "Add a new sector…" as an option (admin only); the sub-sector is free text. |
 | Stage | A thin 6-segment progress rail above an inline dropdown. Any stage can be chosen (skipping is allowed). The Rejected and Invested tabs show "Stage at exit" read-only, or "Added directly" for direct-invested companies. |
 | Priority | Inline dropdown: Set / P1…P5. P1 is solid gold, P2 gold outline, P3 neutral outline, P4–P5 muted, and unset uses a dashed outline. |
+| Fit, Promise | Pipeline and Rejected tabs only (§17.10): the score with its coverage beneath ("6 of 7"), "–" when unrated, a spinner while a job runs. Clicking opens the company file on the Fit tab. Not editable in the cell. |
 | Assigned PE | People chips. Click to edit with the chip picker. |
 | Assigned Research | Same as Assigned PE, with its own name list (6.3). |
 | Comment | The latest comment (2-line clamp) with author and date, plus "· N comments". Click opens the drawer on Comments. In the Rejected tab this column shows the rejection reason and date instead. |
@@ -150,6 +152,7 @@ Stages enum, in order:
 | Stage | Pipeline order, or reverse |
 | Company | A–Z / Z–A |
 | Sector | A–Z / Z–A |
+| Fit, highest first / Promise, highest first | Pipeline and Rejected (§17.10). Unrated last |
 
 ### 6.3 Name autofill (PE, Research, Via, Manage)
 
@@ -309,6 +312,7 @@ A summary is generated:
   - Edit
   - Regenerate (or a "Generate from…" dropdown when there are several decks)
   - the rendered summary
+- **Fit** (Pipeline and Rejected companies, after Summary): the fit rating, as §17.10.
 - **Materials:**
   - an upload zone with a Deck / Model / Other selector (drag and drop, or pick multiple files)
   - a file list with a type badge, size, uploader and date, and the actions View (PDF or image, inline), Download, Type (change kind) and Remove (with a confirm dialog)
@@ -382,7 +386,8 @@ Institutional and restrained, in Niveshaay's colours. Light and dark themes (`pr
   - store files with random keys; never trust the original filename on disk
   - serve files via an authorised route with `Content-Disposition`
 - The OneDrive URL is rendered only after protocol validation. No `javascript:` URLs.
-- Deck content is sent to the model only for summarising. No logging of deck text.
+- Deck content is sent to the model only for summarising and the fit rating (§17). No logging of deck text.
+- Fit quotes and scores are never logged. `thesis/` (the confidential thesis seed) is git-ignored and never reaches the repository or the Docker image.
 - **Use a paid OpenRouter key with credits, never free (`:free`) models.** Free models and some providers may log or train on prompts, which is incompatible with NDA decks. Every request sets `provider.data_collection = "deny"`, so OpenRouter only routes to providers that don't store or train on data. Also turn off "prompt logging / training" in the OpenRouter account's privacy settings.
 - AuditLog entries for every field change, status change, file upload/remove and summary generate/edit.
 - Optimistic UI updates, with rollback and a toast on failure.
@@ -581,5 +586,173 @@ The goal (phases B–D): generate each portfolio company's quarterly result (ima
 - A banker column
 - Deck page references in summaries
 - Parked status
-- Rejection reason categories
+- Rejection reason categories (still a non-goal after §17: a rejected company's theme comes from the company, not from its reason)
 - Details captured on Invest
+
+## 17. Thesis and fit rating
+
+- **Purpose:** the pipeline holds about 43 deals and no clear order to work them in. Each deal gets two scores, with the reasons shown: **Fit** (how well it matches what Niveshaay buys today) and **Promise** (how strong the company is, whatever the thesis says). A deal with high Promise and low Fit stays visible; it is never filtered out.
+- **The rule that outranks every other rule here:** the tool ranks, it never decides. The words invest, pass, reject, recommend, buy and avoid never appear in a label, tooltip, export or AI text about a rating. No score hides, blocks, auto-rejects or reorders a deal against the user's chosen sort.
+- §9.3 stands: the summary still carries no ratings, risks or red flags. The rating lives in its own tab and its own tables.
+- The thesis is data, not a prompt. It is loaded from `thesis/thesis-seed.json` (built from the team's `thesis.md`), versioned, and shown in a Thesis tab with the evidence behind every line.
+
+### 17.1 The thesis as data
+
+- **Rows.** One `ThesisRow` per line of the thesis. `kind` is one of PRINCIPLE, THEME, PARAMETER, ANCHOR, FLAG, HIGHLIGHT. `code` is stable across versions (PR01, T06, F1, FL08, H01; anchors are `F1:5:1`). `data` holds the row's fields as JSON, validated by `thesisRowZ` in `src/lib/domain/thesis.ts`. `evidence` is the citation string as written in the source. `decision` names an open decision the row waits on (for example "D9"), or null.
+- **Versions.** Rows are never edited in place. A change closes the old row (`toVersion` = the new version) and writes a new one (`fromVersion` = the new version). Current rows have `toVersion` null. `ThesisVersion` records the number, a label ("1.2"), a note and who made it. Any past version can be rebuilt with `fromVersion <= v AND (toVersion IS NULL OR toVersion > v)`.
+- **Import.** `npx tsx scripts/thesis-import.mts thesis/thesis-seed.json` writes a new version from the file: unchanged rows are left alone, changed rows are closed and rewritten, rows missing from the file are closed. Running it twice with the same file changes nothing. It prints counts only.
+- **The seed file is confidential** (it names holdings and rejected companies). `thesis/` is git-ignored. The import runs from a developer machine against the database; production needs no seed step.
+- **Row fields**
+  - PRINCIPLE: `text`.
+  - THEME: `name`, `status` (CORE, EMERGING, CAUTIONARY, NO_VIEW, UNRESOLVED), `priority` (boolean), `crossSector` (boolean: a tag, never a company's theme), `latestEvidence`, `basis`, `exceptions`, and the mapping lists `sectors`, `fundingSectors`, `eventSectors`, `keywords` (§17.2).
+  - PARAMETER: `name`, `question`, `group` (FIT or PROMISE), `source` (DECK, MEETING or LOOKUP), `weight` (default 1).
+  - ANCHOR: `param`, `score` (1 to 5), `label` (the company or companies it is anchored on), `shows`.
+  - FLAG: `name`, `fact`, `why`, `how` (CODE, DECK, STAGE or LATER).
+  - HIGHLIGHT: `name`, `firesWhen`, `shownAs`.
+
+### 17.2 Themes: the shared key
+
+The dashboard has three sector lists that do not share anything: the pipeline's `Sector` table (§8), `FUNDING_SECTORS` and the events tracker's `EventSector`. Themes join them. No list is renamed or merged.
+
+- **Mapping lives on the theme row:** `sectors` (names from §8), `fundingSectors` (names from `FUNDING_SECTORS`), `eventSectors` (names from `EventSector`), `keywords` (lower-case fragments, matched like `EventSector.keywords`). One sector can map to several themes (Energy Transition maps to meters, solar, storage and hydrogen); keywords tell them apart.
+- **A company has at most one theme:** `Company.themeCode` (nullable) and `Company.themeEdited` (true once a person has set it, same pattern as `sectorEdited`). A person can change or clear it from the company file; that writes an `AuditLog` row.
+- **How a company gets its theme**
+  1. A person set it: kept.
+  2. Pipeline deals with a deck: the fit reading picks it (§17.6).
+  3. Invested and Rejected companies, and deals without a deck: `scripts/theme-backfill.mts` asks the cheap check model (the one the news filter uses) in batches of 60, giving only name, sector and sub-sector, and the list of theme codes, names and keywords. The answer must be a current theme code or null. Invested companies listed under `holdingThemes` in the seed file take that value and skip the model.
+- **Code-only joins used by the Thesis tab** (pure helpers in `src/lib/domain/thesis.ts`, unit-tested):
+  - `dealsForTheme(theme, deals)`: a `FundingDeal` belongs to a theme when its sector is in `fundingSectors` and, if the theme has keywords, `company` or `what` matches one.
+  - `eventsForTheme(theme, events)`: `Event.sector` is in `eventSectors`.
+- Cross-sector themes (`crossSector` true) are never assigned to a company. They are listed in the Thesis tab only.
+
+### 17.3 Thesis tab
+
+A **Thesis** tab after Funding (a side view like Events and Funding; URL `?view=thesis`). Not shown in the funding-only deployment.
+
+- **Header:** "Thesis, version 1.2" with the version note and date, and a version picker (read-only for older versions).
+- **Sub-views** (chips): Themes (default), Principles, Parameters, Flags and highlights.
+- **Themes:** one row per theme, sorted Core, Emerging, Unresolved, No view, Cautionary, then by code. Each shows: name, status badge, a "Priority" badge when set, latest evidence (with "Stale" when older than 12 months and parseable), and three counts: holdings (number and ₹ Cr invested), pipeline deals, rejected. Selecting a row opens the theme page (§17.4).
+- **Principles:** the list, each with its evidence line and an "Open: D9" label when `decision` is set.
+- **Parameters:** grouped Fit and Promise. Each shows the question, where it is filled from, and its anchors as a 1 to 5 ladder (score, label, what it shows). Scores with no anchor show "No anchor yet".
+- **Flags and highlights:** the two lists with what each records.
+- Every row shows its evidence string as written. No editing in this version (§17.13).
+- **Status colours:** Core uses the existing positive tone, Emerging the neutral accent, Cautionary the existing warning tone, Unresolved and No view grey. Only CSS variables from §11.
+
+### 17.4 Theme page
+
+`?view=thesis&theme=T06`. Everything here is a join on existing data; no AI.
+
+1. **Header:** name, status, Priority badge, latest evidence, basis, known exceptions, evidence line.
+2. **Holdings:** Invested companies with this theme: name (opens the company file), ₹ Cr invested by fund, first invested.
+3. **In the pipeline:** deals with this theme: name, stage, Fit, Promise, highlight chips, days. Sorted by Fit, highest first, unrated last.
+4. **Rejected:** name, date rejected, reason as written. Newest first, 20 at a time with "Show more".
+5. **Money raised in this theme:** equity `FundingDeal`s from the last 90 days via `dealsForTheme`: company, amount, round, lead, date, with the existing "In our pipeline / Rejected by us / In our portfolio" mark. A total line. Empty state: "No rounds reported in the last 90 days".
+6. **Events coming up:** via `eventsForTheme`, next 6 months, soonest first.
+
+### 17.5 Fit rating: what is scored
+
+- **Parameters** come from the current thesis rows (today: F1 to F7 in Fit, P1 to P5 in Promise). Nothing about them is hard-coded except the handling below.
+- **By source**
+  - DECK: scored by the model from the deck reading (§17.6, §17.7).
+  - LOOKUP (F4, theme status): no model. Core = 5, Emerging = 3, No view or no theme = 3, Unresolved = 3, Cautionary = 1.
+  - MEETING (P4, P5): filled by a person after the founder meeting (§17.9). Blank until then, shown as "Fill in after the founder meeting".
+- **A score is 1 to 5 or blank.** Blank means the deck does not say, or the two readings disagreed. Blank is never treated as low.
+- **Fit** = weighted mean of the scored Fit parameters, one decimal. Shown only when at least 4 Fit parameters are scored; otherwise "Not enough in the deck". **Promise** the same, with a minimum of 2.
+- **Coverage is always shown beside the number:** "Fit 4.2 · 6 of 7". The first thesis version weights every parameter 1.
+- A person's score for a parameter (§17.9) replaces the model's in the mean. The model's score stays visible beneath it.
+
+### 17.6 Step 1: reading the deck
+
+One call per deck to the PDF-reading model (`aiModel`, the same as the summary), with the deck prepared by `prepareDeck` exactly as the summary job does. Strict JSON schema, zod-validated, one retry. It extracts; it does not judge.
+
+```
+theme: a current theme code, or null
+quotes: { <each DECK parameter code>: [{ text, page }] }   up to 4 per parameter, each copied word for word, 40 words at most
+qualification: [{ text, page }]    where the deck says the company is an approved, qualified or certified vendor of a named buyer or regulator
+numbers: { unit ("INR_CR" | "USD_MN" | null), lastActualYear, lastActualRevenue, lastActualEbitda, lastActualPat,
+           nextPlanYear, nextPlanRevenue, orderBook, raise, preMoney, secondaryPct, topCustomerPct,
+           schemeSharePct, receivableDays, capexPlanned, newDebt }    figures as printed, null when not stated
+flagQuotes: { relatedParty: [{ text, page }], subsidyProfit: [{ text, page }] }
+```
+
+- The prompt lists each DECK parameter's question so the model knows what to look for, and the theme list (code, name, keywords).
+- Prompt rules: copy, never paraphrase; null or empty when the deck is silent; no opinions; projected years are not "last actual".
+- **Checked by code** (pure, in `src/lib/domain/fit.ts`): every quote must appear in the deck's text layer after normalising whitespace, case and punctuation, else it is dropped; every number must appear in the text layer using the same matching as `src/lib/summary/verify.ts`, else it is set to null. For scanned decks with no text layer, quotes are kept and the rating is marked "Read from a scanned deck, quotes not checked".
+- Stored on the rating as `facts`.
+
+### 17.7 Step 2: scoring
+
+For each DECK parameter with at least one quote, two separate calls to `fitModel` (`OPENROUTER_FIT_MODEL`, default `anthropic/claude-opus-5.5`), text only, no deck attached. A parameter with no quotes is blank without a call.
+
+- **Input:** the parameter's question; its anchors (score, label, what it shows); its quotes (F1 also gets the `qualification` quotes); the summary's business bullets for context.
+- **Output:** `{ score: 1 to 5 or null, anchor: the anchor code it sits closest to or null, why: 25 words at most }`.
+- **Prompt rules:** score proof, not claims (a claim with no number, name or date behind it cannot score above 3); use only the quotes given; compare with the anchors, do not invent a scale; null when the quotes do not answer the question; never use the words invest, pass, reject, recommend, buy or avoid.
+- **Agreement, decided by code:** equal scores stand. Scores one apart: the lower stands. Two or more apart, or one null: blank, with "Two readings disagreed" shown.
+- **Word check, by code:** a `why` containing a banned word is discarded and that call is retried once; if it fails again the `why` is stored empty.
+
+### 17.8 Flags and highlights
+
+Facts shown beside the scores. **None changes a score.** Each flag has a `how`:
+
+- **CODE** (worked out by code from `numbers`, the summary's financials table or the database): price ask and its multiple of last actual EBITDA or revenue; stage (pre-revenue when last actual revenue is null or zero); holdings in the same theme (names, from `themeCode`); small scale (last actual revenue and raise size); revenue decline (two or more falling years in the financials table); profit status (from last actual EBITDA and PAT); numbers that do not reconcile (count of figures the summary check could not find); seen before (a `Rejection` row exists, or §7.4 duplicate detection matches a rejected company).
+- **DECK** (from `numbers` or `flagQuotes`, shown only when stated): related parties, subsidy as the source of profit, single-scheme share, concentration, cash strain, capex and debt plan, primary and secondary split.
+- **STAGE:** ground work, read from the stage: Not Assigned or Call Pending = "None yet"; Internal Discussion = "Call done"; Scuttlebutt and later = "Outside checks".
+- **LATER:** listed in the Thesis tab, not computed yet (listed alternative, round deadline).
+
+A flag with nothing to show is omitted, as the summary omits empty sections.
+
+**Highlights** are the positive counterpart: patterns the team wants surfaced every time.
+
+- **H01, sweet spot:** fires when `qualification` has at least one quote and last actual revenue is under ₹100 Cr (constant `SMALL_REVENUE_CR`; an assumption to confirm with the IC). In any theme. Shown as "Sweet spot (claimed)". A person can mark it checked with a required note, which shows "Sweet spot (checked)" and writes an `AuditLog` row.
+- **H02, priority theme:** fires when the company's theme has `priority` true.
+- Highlights appear as chips in the Company cell of the table, in the Fit tab and on the theme page. There is a filter for them (§17.10). They do not reorder the table.
+
+### 17.9 People's inputs
+
+One table, `FitInput`, one row per company and parameter: `score` (1 to 5), `reason` (required, 10 characters at least), `kind` (OVERRIDE or MEETING), who and when.
+
+- **Change score** on any DECK or LOOKUP parameter: the person's score replaces the model's in the mean, with the reason shown. **Remove** restores the model's score.
+- **Founder meeting scores** for MEETING parameters: the same form, labelled by the parameter's question.
+- Inputs survive re-rating. Every save and removal writes an `AuditLog` row in the same transaction ("Fit: moat proof set to 4" with the reason as the note).
+- Weights cannot be changed here.
+
+### 17.10 Where it shows
+
+- **Table, Pipeline and Rejected tabs:** two columns after Priority: **Fit** and **Promise**. Each cell: the number (tabular numerals) with coverage beneath in small text ("6 of 7"); "–" when there is no rating; a spinner while a job runs. Clicking opens the company file on the Fit tab. Not editable in the cell.
+- **Sorts** (Pipeline, Rejected): "Fit, highest first", "Promise, highest first". Unrated rows last. The default sort does not change.
+- **Filters:** Theme (theme names plus "No theme") on all three tabs; Highlights (Sweet spot, Priority theme) on Pipeline.
+- **Company cell:** highlight chips under the name.
+- **Company file:** a **Fit** tab after Summary, for Pipeline and Rejected companies.
+  1. Theme, with its status badge. Click to change.
+  2. "Fit 4.2 · 6 of 7" and "Promise 3.5 · 2 of 5", and highlight chips.
+  3. A fixed line: "Ranks fit with the thesis. It is not a recommendation."
+  4. Fit parameters, then Promise parameters. Each: name, score pill, the question, the quotes with page numbers, "Closest to: <anchor label>", the `why`, and **Change score**. Blank ones say why: "Not in the deck", "Two readings disagreed" or "Fill in after the founder meeting".
+  5. Flags, as a key and value list.
+  6. Footer: "Rated from <file>, thesis version 1.2, 22 Nov 2026" and **Rate again**.
+  - Empty state: "No rating yet. Upload a deck to get one." Failed job: the error and **Try again**.
+- **Excel export:** unchanged in this version.
+
+### 17.11 Jobs, triggers and cost
+
+- **`FitJob`**, a DB-backed worker built like the summary worker in `src/lib/ai/jobs.ts`: claim with `FOR UPDATE SKIP LOCKED`, heartbeat, three attempts, stale after 5 minutes, two in parallel. Started from `src/instrumentation.ts`, never in the funding-only deployment.
+- **A job is queued when:** a new `Summary` version is written from a deck for a Pipeline company (reason DECK); **Rate again** is clicked (MANUAL); a new thesis version is imported, for every Pipeline company that has a deck (THESIS). One open job per company: a second request while one is queued or running does nothing.
+- **A THESIS re-rate reuses the stored `facts`** and redoes only §17.5 lookups, §17.7 scoring and §17.8. The deck is read again only for DECK and MANUAL. A parameter added in the new version has no stored quotes, so it stays blank ("Not in the deck") until **Rate again** reads the deck.
+- **Result:** a new `FitRating` row (kept as history) and `Company.activeFitId` pointed at it. Rejected and Invested companies are never re-rated automatically; their last rating stays as it was.
+- **First run:** `npx tsx --conditions=react-server scripts/fit-backfill.mts` queues every Pipeline company with a deck. `--limit 5` rates five first.
+- **Cost:** counted through `aiUsage`. Target under US$0.50 a deal; measure on five deals before the full run and record the figure in the README. Never `:free` models; `data_collection: "deny"` as everywhere.
+
+### 17.12 Security
+
+- Every action and route starts with `requireRole()` and a zod schema, as everywhere. The funding-only deployment refuses all of it.
+- Quotes are deck text. They are stored on the rating like the summary is, served only through the authorised actions, and never logged. Log ids, counts, costs and error codes only.
+- `thesis/` is git-ignored. The seed file never reaches the repository or the Docker image.
+- All AI modules `import "server-only"`.
+
+### 17.13 Not in this version
+
+- Editing the thesis in the app, and an inbox of proposed changes from new sources.
+- Watching for new founder interviews or research notes.
+- Web research to check a deck's claims (the "claimed" and "checked" marks are set by people for now).
+- A calibration view for the IC's own ranking, and parameter weights other than 1.
+- Fit ratings for Invested companies; Fit columns in the Excel export.
+- "Waiting on" and round deadline fields.
