@@ -2,7 +2,8 @@
 //   npx tsx scripts/thesis-import.mts thesis/thesis-seed.json
 // Unchanged rows are left alone, changed rows are closed and rewritten, rows missing from the file are closed, all in
 // one transaction. Running it twice with the same file changes nothing. The file is confidential (it names holdings
-// and rejected companies): this prints counts only, never row text.
+// and rejected companies): this prints counts only, never row text. A new version also queues a THESIS re-rate for
+// every pipeline deal with a deck (SPEC §17.11), run by the app's fit worker.
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -40,7 +41,7 @@ try {
       const current: StoredThesisRow[] = currentRows(stored).map((r) => ({ ...thesisRowZ.parse({ kind: r.kind, code: r.code, data: r.data, evidence: r.evidence, decision: r.decision }), id: r.id, fromVersion: r.fromVersion, toVersion: r.toVersion }));
       const latest = await tx.thesisVersion.findFirst({ orderBy: { version: "desc" } });
       const diff = diffThesis(current, seed.rows);
-      if (latest && diffIsEmpty(diff) && latest.label === seed.label) return { version: latest.version, label: latest.label, diff, wrote: false };
+      if (latest && diffIsEmpty(diff) && latest.label === seed.label) return { version: latest.version, label: latest.label, diff, wrote: false, queued: 0 };
 
       const version = (latest?.version ?? 0) + 1;
       await tx.thesisVersion.create({ data: { version, label: seed.label, note: seed.note, source: "IMPORT" } });
@@ -48,7 +49,14 @@ try {
       if (close.length) await tx.thesisRow.updateMany({ where: { id: { in: close }, toVersion: null }, data: { toVersion: version } });
       const write = [...diff.added, ...diff.changed.map((c) => c.next)];
       if (write.length) await tx.thesisRow.createMany({ data: write.map((r) => ({ ...toData(r), fromVersion: version })) });
-      return { version, label: seed.label, diff, wrote: true };
+      // A new version re-rates every pipeline deal with a deck (SPEC §17.11, reason THESIS), reusing the stored reading.
+      // Rows are inserted directly so this script needs no server code; the app's worker picks them up.
+      const rerate = await tx.company.findMany({
+        where: { status: "PIPELINE", files: { some: { kind: "DECK" } }, fitJobs: { none: { status: { in: ["QUEUED", "RUNNING"] } } } },
+        select: { id: true },
+      });
+      if (rerate.length) await tx.fitJob.createMany({ data: rerate.map((c) => ({ companyId: c.id, reason: "THESIS" })) });
+      return { version, label: seed.label, diff, wrote: true, queued: rerate.length };
     },
     { timeout: 60_000 },
   );
@@ -56,6 +64,7 @@ try {
   console.log(`${result.wrote ? "Wrote" : "Nothing to change, still"} version ${result.version} (label ${result.label})`);
   console.log(`added ${d.added.length}, changed ${d.changed.length}, closed ${d.closed.length}, unchanged ${d.unchanged.length}`);
   console.log(`current rows: ${seed.rows.length} (${counts(seed.rows)})`);
+  if (result.wrote) console.log(`queued ${result.queued} pipeline deals to be rated again`);
 } finally {
   await db.$disconnect();
 }

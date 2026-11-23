@@ -63,6 +63,15 @@ Decks are received under NDA, so:
 - Try the prompt on a local deck without storing anything: `npx tsx --conditions=react-server scripts/try-summary.mts path/to/deck.pdf`.
 - Watch the key's spending limit on openrouter.ai; when credits run out, summaries fail with a "top up" message and decks are still saved.
 
+## Fit rating (SPEC §17)
+
+- **Reading:** one call with the deck to `OPENROUTER_MODEL` (the summary's model). Every quote must be in the deck's text layer word for word and every number must appear in it, or it is dropped.
+- **Scoring:** two text-only calls per deck parameter that has quotes, to `OPENROUTER_FIT_MODEL` (default `anthropic/claude-opus-5.5`). Equal scores stand, one apart the lower stands, otherwise blank.
+- **Cost per deal, measured 23 Nov 2026** with `scripts/try-fit.mts` on two decks (19 calls each): **US$0.21 and US$0.30** for the rating, plus about US$0.06 for the summary the app writes anyway. Budget **about US$0.30 a deal**, under the US$0.50 target. A thesis re-rate (reason THESIS) reuses the stored reading and skips the reading call.
+- Try it on a local deck without writing anything (it may print deck quotes to your terminal): `npx tsx --conditions=react-server scripts/try-fit.mts path/to/deck.pdf [--theme T06]`.
+- First run over the pipeline: `npx tsx --conditions=react-server scripts/fit-backfill.mts --limit 5`, check the five, then without `--limit`.
+- Very large scanned decks (no text layer, about 20 MB) are refused by OpenRouter (HTTP 413), as they are for summaries.
+
 ## Production (Docker)
 
 ```bash

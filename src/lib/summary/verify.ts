@@ -106,7 +106,19 @@ export function pagesWithFigures(j: SummaryJson, deckText: string, max = 6): str
     .map((x) => x.p.trim());
 }
 
-const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.051, Math.abs(b) * 0.002);
+/** Two figures match: within rounding of the last printed digit. Shared with the fit reading's number check (§17.6). */
+export const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.051, Math.abs(b) * 0.002);
+
+/** A figure appears in the deck text, allowing only the rescaling the deck's own units permit (as for the summary). */
+export function figureInDeck(v: number, deckText: string): boolean {
+  const nums = deckNumbers(deckText);
+  const scales = allowedScales(deckText);
+  const a = Math.abs(v);
+  return nums.some((n) => scales.some((s) => close(n * s, a)));
+}
+
+/** Enough text to check anything against (a scanned deck has none). */
+export const hasTextLayer = (deckText: string) => deckText.replace(/\s+/g, "").length >= MIN_TEXT;
 
 /**
  * Financial figures that can't be found in the deck text, as "FY26 Revenue 208.0".

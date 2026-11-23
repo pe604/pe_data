@@ -688,7 +688,7 @@ For each DECK parameter with at least one quote, two separate calls to `fitModel
 - **Output:** `{ score: 1 to 5 or null, anchor: the anchor code it sits closest to or null, why: 25 words at most }`.
 - **Prompt rules:** score proof, not claims (a claim with no number, name or date behind it cannot score above 3); use only the quotes given; compare with the anchors, do not invent a scale; null when the quotes do not answer the question; never use the words invest, pass, reject, recommend, buy or avoid.
 - **Agreement, decided by code:** equal scores stand. Scores one apart: the lower stands. Two or more apart, or one null: blank, with "Two readings disagreed" shown.
-- **Word check, by code:** a `why` containing a banned word is discarded and that call is retried once; if it fails again the `why` is stored empty.
+- **Word check, by code:** a `why` containing a banned word is discarded and that call is retried once; if it fails again the `why` is stored empty. Any form of a banned word counts ("investment", "rejected", "buying"); "investor" and "buyer" name people, not an action, and are allowed (2026-11-23).
 
 ### 17.8 Flags and highlights
 
