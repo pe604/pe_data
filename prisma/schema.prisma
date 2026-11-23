@@ -97,6 +97,7 @@ model User {
   resultFormats     ResultFormat[]
   misReadJobs       MisReadJob[]
   fitInputs         FitInput[]
+  readsLoaded       AnalystRead[]
 }
 
 /// Names used in PE / Research / Via chips. Not necessarily app users.
@@ -165,6 +166,9 @@ model Company {
   themeEdited Boolean    @default(false)
   activeFitId String?    @unique
   activeFit   FitRating? @relation("ActiveFit", fields: [activeFitId], references: [id], onDelete: SetNull)
+  /// The analyst read shown (SPEC §17.11)
+  activeReadId String?      @unique
+  activeRead   AnalystRead? @relation("ActiveRead", fields: [activeReadId], references: [id], onDelete: SetNull)
 
   // Audit
   createdAt   DateTime @default(now())
@@ -194,6 +198,7 @@ model Company {
   fitRatings  FitRating[]     @relation("CompanyFitRatings")
   fitInputs   FitInput[]
   fitJobs     FitJob[]
+  reads       AnalystRead[]   @relation("CompanyReads")
 
   @@index([status])
   @@index([status, priority, dateReceived])
@@ -875,16 +880,17 @@ model FitRating {
   @@index([companyId, createdAt])
 }
 
-/// A person's score for one parameter (SPEC §17.9). Survives re-rating.
+/// A team score for one read key (SPEC §17.9). Survives a new read. Version 1 rows (codes F1 to P5) are ignored.
 model FitInput {
   id        String   @id @default(cuid())
   companyId String
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  /// Parameter code, e.g. F1, P4
+  /// POSITION, MOAT, MARKET, NUMBERS, THESIS or OVERALL (version 1: F1 to P5)
   code      String
-  score     Int
+  /// 0 to 10 in half points (version 1: 1 to 5)
+  score     Decimal  @db.Decimal(3, 1)
   reason    String
-  /// OVERRIDE or MEETING
+  /// TEAM (version 1: OVERRIDE or MEETING)
   kind      String
   byId      String
   by        User     @relation(fields: [byId], references: [id])
@@ -912,4 +918,30 @@ model FitJob {
 
   @@index([status, createdAt])
   @@index([companyId, status])
+}
+
+/// One analyst read for a company (SPEC §17.5). Kept as history; Company.activeReadId is the one shown.
+model AnalystRead {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation("CompanyReads", fields: [companyId], references: [id], onDelete: Cascade)
+  thesisVersion Int
+  /// 0 to 10 in half points
+  overall       Decimal  @db.Decimal(3, 1)
+  /// HIGH, MEDIUM or LOW
+  confidence    String
+  /// The whole validated read (readZ). Holds deck figures: never logged
+  body          Json
+  /// sha256 of the canonical JSON, so the same read is stored once
+  hash          String
+  readAt        DateTime @db.Date
+  author        String
+  loadedById    String
+  loadedBy      User     @relation(fields: [loadedById], references: [id])
+  loadedAt      DateTime @default(now())
+
+  activeFor Company? @relation("ActiveRead")
+
+  @@unique([companyId, hash])
+  @@index([companyId, loadedAt])
 }

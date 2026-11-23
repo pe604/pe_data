@@ -7,7 +7,8 @@ import type { CompanyRow, DashboardData, Me, TeamMemberOption } from "@/lib/doma
 import { safeHref } from "@/lib/domain/onedrive";
 import { FUNDS, holdingOf, type Fund } from "@/lib/domain/portfolio";
 import { themeOptions } from "@/lib/domain/thesis";
-import { highlightRowZ } from "@/lib/domain/fit";
+import { highlightsOf, readStale, storedReadZ, type Confidence } from "@/lib/domain/read";
+import { todayISO } from "@/lib/domain/dates";
 import { currentThesis } from "@/lib/server/thesis";
 
 /** DB text → Fund (null for rounds entered before funds existed). */
@@ -29,20 +30,46 @@ export const rowInclude = {
     select: { date: true, text: true, createdBy: { select: { name: true } } },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   },
-  // Fit rating (SPEC §17.10): the numbers only; quotes and reasons load with the Fit tab.
-  activeFit: { select: { fit: true, promise: true, fitScored: true, fitTotal: true, promiseScored: true, promiseTotal: true, highlights: true } },
-  fitJobs: { where: { status: { in: ["QUEUED", "RUNNING"] } }, select: { status: true }, take: 1 },
+  // Analyst read (SPEC §17.10): the numbers only; the body is read here for its highlights and never sent to the table.
+  activeRead: { select: { overall: true, confidence: true, readAt: true, loadedAt: true, thesisVersion: true, body: true } },
+  // The team's overall score (SPEC §17.9). Version 1 codes (F1 to P5) are ignored.
+  fitInputs: { where: { code: "OVERALL" }, select: { score: true } },
+  // The newest deck, for staleness and the waiting list (SPEC §17.3, §17.7).
+  files: { where: { kind: "DECK" }, select: { uploadedAt: true }, orderBy: { uploadedAt: "desc" }, take: 1 },
 } satisfies Prisma.CompanyInclude;
+
+/** What a row needs beyond the company: the current thesis version and priority themes, and today (Asia/Kolkata). */
+export interface RowContext {
+  thesisVersion: number | null;
+  priorityThemes: Set<string>;
+  today: string;
+}
+
+export async function rowContext(tx: Tx | typeof db = db): Promise<RowContext> {
+  const [latest, themes] = await Promise.all([
+    tx.thesisVersion.findFirst({ orderBy: { version: "desc" }, select: { version: true } }),
+    tx.thesisRow.findMany({ where: { kind: "THEME", toVersion: null }, select: { code: true, data: true } }),
+  ]);
+  return {
+    thesisVersion: latest?.version ?? null,
+    priorityThemes: new Set(themes.filter((t) => (t.data as { priority?: unknown } | null)?.priority === true).map((t) => t.code)),
+    today: todayISO(),
+  };
+}
 
 /** Prisma Decimal | null → number | null. */
 export const num = (d: Prisma.Decimal | null | undefined) => (d === null || d === undefined ? null : Number(d));
 
 type RowSource = Prisma.CompanyGetPayload<{ include: typeof rowInclude }>;
 
-export function toRow(c: RowSource): CompanyRow {
+export function toRow(c: RowSource, ctx: RowContext): CompanyRow {
   const people = (role: PersonRole) =>
     c.people.filter((p) => p.role === role).map((p) => p.teamMember.name);
   const latest = c.comments[0];
+  const r = c.activeRead;
+  const parsed = r ? storedReadZ.safeParse(r.body) : null;
+  const body = parsed?.success ? parsed.data : null;
+  const lastDeck = c.files[0]?.uploadedAt ?? null;
   return {
     id: c.id,
     name: c.name,
@@ -75,28 +102,29 @@ export function toRow(c: RowSource): CompanyRow {
     commentSearch: [...c.comments.map((x) => x.text), ...c.updates.map((u) => u.text)].join("\n").toLowerCase(),
     themeCode: c.themeCode,
     themeEdited: c.themeEdited,
-    fit: c.activeFit
+    read: r
       ? {
-          fit: num(c.activeFit.fit),
-          promise: num(c.activeFit.promise),
-          fitScored: c.activeFit.fitScored,
-          fitTotal: c.activeFit.fitTotal,
-          promiseScored: c.activeFit.promiseScored,
-          promiseTotal: c.activeFit.promiseTotal,
-          highlights: highlightRowZ.array().catch([]).parse(c.activeFit.highlights),
+          overall: Number(r.overall),
+          team: c.fitInputs[0] ? Number(c.fitInputs[0].score) : null,
+          confidence: r.confidence as Confidence,
+          stale: readStale(
+            { readAt: dateToISO(r.readAt) ?? ctx.today, loadedAt: r.loadedAt.toISOString(), thesisVersion: r.thesisVersion },
+            { lastDeckAt: lastDeck?.toISOString() ?? null, thesisVersion: ctx.thesisVersion, today: ctx.today },
+          ),
         }
       : null,
-    fitJob: (c.fitJobs[0]?.status as CompanyRow["fitJob"] | undefined) ?? null,
+    highlights: c.status === "INVESTED" ? [] : highlightsOf(body, !!c.themeCode && ctx.priorityThemes.has(c.themeCode)),
+    hasDeck: !!lastDeck,
   };
 }
 
 export async function getRow(id: string, tx: Tx | typeof db = db): Promise<CompanyRow> {
-  const c = await tx.company.findUniqueOrThrow({ where: { id }, include: rowInclude });
-  return toRow(c);
+  const [c, ctx] = await Promise.all([tx.company.findUniqueOrThrow({ where: { id }, include: rowInclude }), rowContext(tx)]);
+  return toRow(c, ctx);
 }
 
 export async function loadDashboard(me: Me): Promise<DashboardData> {
-  const [companies, sectors, team, peLog, thesis] = await Promise.all([
+  const [companies, sectors, team, peLog, thesis, ctx] = await Promise.all([
     db.company.findMany({ include: rowInclude }),
     db.sector.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     db.teamMember.findMany({ orderBy: { name: "asc" } }),
@@ -106,9 +134,10 @@ export async function loadDashboard(me: Me): Promise<DashboardData> {
       include: { actor: { select: { name: true } } },
     }),
     currentThesis(),
+    rowContext(),
   ]);
   return {
-    companies: companies.map(toRow),
+    companies: companies.map((c) => toRow(c, ctx)),
     sectors: sectors.map((s) => ({ id: s.id, name: s.name })),
     themes: themeOptions(thesis),
     team: team.map(toTeamOption),

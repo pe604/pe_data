@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CompanyRow } from "@/lib/domain/types";
-import { applyFilters, defaultSortFor, emptyFilters, filtersForTab, NO_THEME, queryToView, sortRows, sortsForTab, thesisFromQuery, thesisQuery, viewToQuery } from "@/lib/domain/view";
+import { applyFilters, defaultSortFor, emptyFilters, filtersForTab, NO_THEME, queryToView, readScore, sortRows, sortsForTab, thesisFromQuery, thesisQuery, viewToQuery } from "@/lib/domain/view";
 
 describe("per-tab filters and sorts", () => {
   it("Invested hides Priority, Stage and Via and offers amount sorting", () => {
@@ -45,8 +45,9 @@ const row = (p: Partial<CompanyRow>): CompanyRow => ({
   commentSearch: "",
   themeCode: null,
   themeEdited: false,
-  fit: null,
-  fitJob: null,
+  read: null,
+  highlights: [],
+  hasDeck: false,
   ...p,
 });
 
@@ -152,25 +153,29 @@ describe("theme filter and the Thesis address (SPEC §17.3, §17.10)", () => {
     expect(thesisFromQuery("tab=rejected")).toBeUndefined();
   });
 });
-describe("fit sorts and the highlights filter (SPEC §17.10)", () => {
-  const fs = (fit: number | null, promise: number | null, codes: string[] = []) => ({
-    fit, promise, fitScored: 5, fitTotal: 7, promiseScored: 2, promiseTotal: 5,
-    highlights: codes.map((code) => ({ code, state: "CLAIMED" as const, note: null })),
+describe("the Read sort and the highlights filter (SPEC §17.9, §17.10)", () => {
+  const rs = (overall: number, team: number | null = null) => ({ overall, team, confidence: "MEDIUM" as const, stale: null });
+  const hl = (codes: string[]) => codes.map((code) => ({ code, state: "CLAIMED" as const, note: null }));
+  const read = [
+    row({ name: "A", read: rs(6) }),
+    row({ name: "B" }),
+    row({ name: "C", read: rs(7.5), highlights: hl(["H01"]) }),
+    row({ name: "D", read: rs(5, 8), highlights: hl(["H02"]) }),
+  ];
+  it("sorts by Read, highest first, the team's overall before the read's, unread last", () => {
+    expect(names(sortRows(read, "read-high", "2026-06-01"))).toBe("DCAB");
+    expect(readScore(read[3] as CompanyRow)).toBe(8);
+    expect(readScore(read[1] as CompanyRow)).toBeNull();
   });
-  const rated = [row({ name: "A", fit: fs(3.1, 4) }), row({ name: "B" }), row({ name: "C", fit: fs(4.5, null, ["H01"]) }), row({ name: "D", fit: fs(null, 2.5, ["H02"]) })];
-  it("sorts by Fit or Promise, highest first, unrated last", () => {
-    expect(names(sortRows(rated, "fit-high", "2026-06-01"))).toBe("CABD");
-    expect(names(sortRows(rated, "promise-high", "2026-06-01"))).toBe("ADBC");
-  });
-  it("offers the fit sorts on Pipeline and Rejected, not Invested; the default sort is unchanged", () => {
-    expect(sortsForTab("pipeline").map(([k]) => k)).toEqual(expect.arrayContaining(["fit-high", "promise-high"]));
-    expect(sortsForTab("rejected").map(([k]) => k)).toContain("fit-high");
-    expect(sortsForTab("invested").map(([k]) => k)).not.toContain("fit-high");
+  it("offers the Read sort on Pipeline and Rejected, not Invested; the default sort is unchanged", () => {
+    expect(sortsForTab("pipeline").map(([k]) => k)).toContain("read-high");
+    expect(sortsForTab("rejected").map(([k]) => k)).toContain("read-high");
+    expect(sortsForTab("invested").map(([k]) => k)).not.toContain("read-high");
     expect(defaultSortFor("pipeline")).toBe("priority");
   });
   it("filters by highlight on Pipeline only", () => {
-    expect(names(applyFilters(rated, { ...emptyFilters(), highlight: ["H01"] }))).toBe("C");
-    expect(names(applyFilters(rated, { ...emptyFilters(), highlight: ["H01", "H02"] }))).toBe("CD");
+    expect(names(applyFilters(read, { ...emptyFilters(), highlight: ["H01"] }))).toBe("C");
+    expect(names(applyFilters(read, { ...emptyFilters(), highlight: ["H01", "H02"] }))).toBe("CD");
     expect(filtersForTab("pipeline")).toContain("highlight");
     expect(filtersForTab("rejected")).not.toContain("highlight");
     expect(filtersForTab("invested")).not.toContain("highlight");

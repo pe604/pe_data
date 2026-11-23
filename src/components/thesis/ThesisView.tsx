@@ -5,7 +5,6 @@ import { getThesis, type ThesisData } from "@/actions/thesis";
 import { fmtDate, todayISO } from "@/lib/domain/dates";
 import { fmtCr } from "@/lib/domain/money";
 import {
-  anchorsFor,
   isStale,
   sortThemes,
   THEME_STATUS_LABELS,
@@ -15,19 +14,21 @@ import {
   type ThesisRow,
 } from "@/lib/domain/thesis";
 import type { CompanyRow } from "@/lib/domain/types";
+import { STAGE_LABELS } from "@/lib/domain/constants";
+import { daysFor } from "@/lib/domain/dates";
+import { SCALE, SCORE_KEYS, SCORE_NAMES, SCORE_QUESTIONS, waitingReason, WAITING_LABELS, type WaitingReason } from "@/lib/domain/read";
+import { LoadRead } from "../drawer/ReadTab";
 import { useStore } from "../store";
 import { ThemePage } from "./ThemePage";
 
-type Sub = "themes" | "principles" | "parameters" | "flags";
+type Sub = "themes" | "principles" | "scoring" | "flags" | "waiting";
 const SUBS: [Sub, string][] = [
   ["themes", "Themes"],
   ["principles", "Principles"],
-  ["parameters", "Parameters"],
+  ["scoring", "How deals are scored"],
   ["flags", "Flags and highlights"],
+  ["waiting", "Waiting for a read"],
 ];
-
-const SOURCE_LABELS = { DECK: "Read from the deck", MEETING: "Filled in after the founder meeting", LOOKUP: "From the theme status" } as const;
-const HOW_LABELS = { CODE: "Worked out from the numbers", DECK: "From the deck, when stated", STAGE: "From the stage", LATER: "Not worked out yet" } as const;
 
 export function StatusBadge({ status }: { status: ThemeStatus }) {
   return <span className={`th-badge th-${status.toLowerCase().replace("_", "-")}`}>{THEME_STATUS_LABELS[status]}</span>;
@@ -61,6 +62,7 @@ export function ThesisView({ theme, setTheme }: { theme: string | null; setTheme
   const [version, setVersion] = useState<number | null>(null);
   const [data, setData] = useState<ThesisData | null>(null);
   const [sub, setSub] = useState<Sub>("themes");
+  const waiting = useMemo(() => waitingList(companies), [companies]);
 
   useEffect(() => {
     let live = true;
@@ -115,6 +117,7 @@ export function ThesisView({ theme, setTheme }: { theme: string | null; setTheme
         {SUBS.map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={sub === k} onClick={() => setSub(k)}>
             {l}
+            {k === "waiting" && <span className="th-count"> {waiting.length}</span>}
           </button>
         ))}
       </div>
@@ -123,8 +126,10 @@ export function ThesisView({ theme, setTheme }: { theme: string | null; setTheme
           <ThemeList rows={data.rows} companies={companies} onOpen={setTheme} />
         ) : sub === "principles" ? (
           <Principles rows={data.rows} />
-        ) : sub === "parameters" ? (
-          <Parameters rows={data.rows} />
+        ) : sub === "scoring" ? (
+          <Scoring />
+        ) : sub === "waiting" ? (
+          <Waiting list={waiting} />
         ) : (
           <FlagsAndHighlights rows={data.rows} />
         )}
@@ -193,58 +198,114 @@ function Principles({ rows }: { rows: StoredThesisRow[] }) {
   );
 }
 
-function Parameters({ rows }: { rows: StoredThesisRow[] }) {
-  const params = rows.filter((r): r is StoredThesisRow & Extract<ThesisRow, { kind: "PARAMETER" }> => r.kind === "PARAMETER").sort(byCode);
+/** "How deals are scored" (SPEC §17.3): the five scores, the overall and the scale as in §17.7, and §17.6 in short. */
+function Scoring() {
   return (
     <>
-      {(["FIT", "PROMISE"] as const).map((g) => (
-        <section key={g} className="ev-group">
-          <h3>{g === "FIT" ? "Fit" : "Promise"}</h3>
-          <ul className="ev-list">
-            {params
-              .filter((p) => p.data.group === g)
-              .map((p) => {
-                const anchors = anchorsFor(rows, p.code);
-                return (
-                  <li key={p.code} className="ev-row th-row">
-                    <div className="ev-date">{p.code}</div>
-                    <div className="ev-main">
-                      <div className="ev-name">{p.data.name}</div>
-                      <div className="ev-why">{p.data.question}</div>
-                      <div className="ev-meta">{SOURCE_LABELS[p.data.source]}</div>
-                      {p.data.source !== "LOOKUP" && (
-                        <ol className="th-ladder" aria-label={`Anchors for ${p.data.name}`}>
-                          {[5, 4, 3, 2, 1].map((s) => {
-                            const at = anchors.filter((a) => a.data.score === s);
-                            return (
-                              <li key={s}>
-                                <span className="th-score">{s}</span>
-                                {at.length ? (
-                                  <span>
-                                    {at.map((a) => (
-                                      <span key={a.code} className="th-anchor">
-                                        <b>{a.data.label}</b>: {a.data.shows}
-                                      </span>
-                                    ))}
-                                  </span>
-                                ) : (
-                                  <span className="muted">No anchor yet</span>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ol>
-                      )}
-                      <Evidence row={p} />
-                    </div>
-                    <div />
-                  </li>
-                );
-              })}
-          </ul>
-        </section>
-      ))}
+      <section className="ev-group">
+        <h3>The five scores</h3>
+        <p className="hint">Each is out of 10, in half points, with the sources shown.</p>
+        <ul className="ev-list">
+          {SCORE_KEYS.map((k) => (
+            <li key={k} className="ev-row th-row">
+              <div className="ev-date">{SCORE_NAMES[k]}</div>
+              <div className="ev-main">
+                <div className="ev-why">{SCORE_QUESTIONS[k]}</div>
+              </div>
+              <div />
+            </li>
+          ))}
+          <li className="ev-row th-row">
+            <div className="ev-date">Overall</div>
+            <div className="ev-main">
+              <div className="ev-why">The reader&apos;s judgement, not an average. It lies between the lowest and the highest of the five, and says what drives it and what holds it back.</div>
+              <div className="ev-meta">Shown with a confidence: how much of the read rests on sources outside the company (high, medium or low).</div>
+            </div>
+            <div />
+          </li>
+        </ul>
+      </section>
+      <section className="ev-group">
+        <h3>The scale</h3>
+        <dl className="fit-flags">
+          {SCALE.map(([r, m]) => (
+            <div key={r}>
+              <dt className="th-num">{r}</dt>
+              <dd>{m}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="hint">The full range is meant to be used.</p>
+      </section>
+      <section className="ev-group">
+        <h3>Research rules</h3>
+        <ul className="rd-points">
+          <li>Nothing confidential leaves: searches use the company&apos;s name and facts that are already public.</li>
+          <li>Five questions are always answered: who else does this, how hard it is, where the company ranks, what the market is doing, and what the public record shows.</li>
+          <li>A position, moat, market or numbers score above 6 cites at least one source from outside the company.</li>
+          <li>The deck&apos;s main claims are tested against the public record, not repeated.</li>
+          <li>Every read says what was not checked.</li>
+          <li>Figures are given as the source states them, with the year; figures from the deck are marked.</li>
+          <li>A past deal is never the reason for a score, and judgement text carries no verdict.</li>
+          <li>A read is out of date after a new deck, a new thesis version, or 90 days. Nothing is re-scored automatically.</li>
+          <li>No score hides a deal or changes the order you chose.</li>
+        </ul>
+      </section>
     </>
+  );
+}
+
+/** Pipeline deals with a deck and no read, or an out of date one (SPEC §17.3): by priority, then days waiting. */
+function waitingList(companies: CompanyRow[]): { c: CompanyRow; why: WaitingReason; days: number | null }[] {
+  return companies
+    .flatMap((c) => {
+      const why = waitingReason(c);
+      return why ? [{ c, why, days: daysFor(c) }] : [];
+    })
+    .sort((a, b) => (a.c.priority ?? 9) - (b.c.priority ?? 9) || (b.days ?? -1) - (a.days ?? -1) || a.c.name.localeCompare(b.c.name));
+}
+
+function Waiting({ list }: { list: { c: CompanyRow; why: WaitingReason; days: number | null }[] }) {
+  const { openDrawer } = useStore();
+  return (
+    <section className="ev-group" aria-label="Waiting for a read">
+      <div className="th-wait-head">
+        <p className="hint">Pipeline deals with a deck that have no read, or whose read is out of date.</p>
+        <LoadRead />
+      </div>
+      {list.length ? (
+        <div className="rd-scroll">
+          <table className="th-table">
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Stage</th>
+                <th className="num">Priority</th>
+                <th className="num">Days</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map(({ c, why, days }) => (
+                <tr key={c.id}>
+                  <td>
+                    <button type="button" className="th-link" onClick={() => openDrawer(c.id, "read")}>
+                      {c.name}
+                    </button>
+                  </td>
+                  <td>{STAGE_LABELS[c.stage]}</td>
+                  <td className="num">{c.priority ? `P${c.priority}` : "–"}</td>
+                  <td className="num">{days ?? "–"}</td>
+                  <td>{WAITING_LABELS[why]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="muted">Every pipeline deal with a deck has a current read.</p>
+      )}
+    </section>
   );
 }
 
@@ -255,7 +316,7 @@ function FlagsAndHighlights({ rows }: { rows: StoredThesisRow[] }) {
     <>
       <section className="ev-group">
         <h3>Flags</h3>
-        <p className="hint">Facts shown beside the scores. None changes a score.</p>
+        <p className="hint">What a reader should look for. A read lists what it found under Things to know. None changes a score.</p>
         <ul className="ev-list">
           {flags.map((f) => (
             <li key={f.code} className="ev-row th-row">
@@ -264,7 +325,6 @@ function FlagsAndHighlights({ rows }: { rows: StoredThesisRow[] }) {
                 <div className="ev-name">{f.data.name}</div>
                 <div className="ev-why">{f.data.fact}</div>
                 <div className="ev-meta">Why: {f.data.why}</div>
-                <div className="ev-meta">{HOW_LABELS[f.data.how]}</div>
                 <Evidence row={f} />
               </div>
               <div />

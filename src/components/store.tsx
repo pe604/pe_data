@@ -13,17 +13,17 @@ import type {
 } from "@/lib/domain/types";
 
 /**
- * Company file tabs. Pipeline/Rejected: summary · fit · materials · comments · history (fit: SPEC §17.10).
+ * Company file tabs. Pipeline/Rejected: summary · read · materials · comments · history (read: SPEC §17.10).
  * Invested (SPEC §15.5): overview · numbers · updates · files (MIS files sit in Numbers, meetings in Updates, the deck
  * summary, comments and history in Files). "mis" and "meetings" are kept as aliases for links into those sections.
  * `normaliseTab` maps a tab to the equivalent one for the company's status.
  */
-export type DrawerTab = "summary" | "fit" | "materials" | "comments" | "history" | "overview" | "numbers" | "mis" | "updates" | "meetings" | "files";
+export type DrawerTab = "summary" | "read" | "materials" | "comments" | "history" | "overview" | "numbers" | "mis" | "updates" | "meetings" | "files";
 
 export function normaliseTab(tab: DrawerTab, invested: boolean): DrawerTab {
   if (invested) {
     if (tab === "summary" || tab === "materials" || tab === "comments" || tab === "history") return "files";
-    if (tab === "fit") return "overview";
+    if (tab === "read") return "overview";
     if (tab === "mis") return "numbers";
     if (tab === "meetings") return "updates";
     return tab;

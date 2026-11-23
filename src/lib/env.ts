@@ -21,8 +21,6 @@ const schema = z.object({
   OPENROUTER_MIS_PDF_MODEL: z.string().optional().default(""),
   // The model that writes the funding column and weekly note (SPEC §15.16)
   OPENROUTER_FUNDING_MODEL: z.string().optional().default(""),
-  // The model that scores the fit rating from the deck quotes (SPEC §17.7)
-  OPENROUTER_FIT_MODEL: z.string().optional().default(""),
   // S3-compatible file storage (SPEC §2). All files are encrypted before upload.
   AWS_S3_ENDPOINT_URL: z.string().url(),
   AWS_S3_BUCKET_NAME: z.string().min(1),
@@ -109,5 +107,3 @@ export const misModel = env.OPENROUTER_MIS_MODEL || "deepseek/deepseek-v4.1-flas
 export const misPdfModel = env.OPENROUTER_MIS_PDF_MODEL || "google/gemini-3-flash-preview";
 /** The funding column and weekly note (SPEC §15.16): the strongest writer; about $0.20 a month plus $0.05 a week. */
 export const fundingModel = env.OPENROUTER_FUNDING_MODEL || "anthropic/claude-opus-5.5";
-/** Scores each fit parameter from the checked deck quotes (SPEC §17.7), text only: two calls per parameter. */
-export const fitModel = env.OPENROUTER_FIT_MODEL || "anthropic/claude-opus-5.5";

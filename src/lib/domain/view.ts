@@ -58,8 +58,7 @@ export const SORTS = [
   ["name-za", "Company Z–A"],
   ["sector-az", "Sector A–Z"],
   ["sector-za", "Sector Z–A"],
-  ["fit-high", "Fit, highest first"],
-  ["promise-high", "Promise, highest first"],
+  ["read-high", "Read, highest first"],
   ["amount-high", "Invested, highest first"],
   ["amount-low", "Invested, lowest first"],
   ["first-new", "First invested, newest first"],
@@ -80,7 +79,7 @@ export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
   return SORTS.filter(([k]) => {
     const group = k.split("-")[0];
     if (ONLY[group]) return ONLY[group] === tab;
-    if (tab === "invested") return !["priority", "stage", "date", "days", "fit", "promise"].includes(group);
+    if (tab === "invested") return !["priority", "stage", "date", "days", "read"].includes(group);
     return true;
   });
 }
@@ -136,7 +135,7 @@ export function applyFilters(list: CompanyRow[], f: Filters, skip?: "stage" | "p
   if (skip !== "stage" && f.stage.length) out = out.filter((c) => f.stage.includes(c.stage));
   if (f.sector.length) out = out.filter((c) => f.sector.includes(c.sector ?? ""));
   if (f.theme.length) out = out.filter((c) => f.theme.includes(c.themeCode ?? NO_THEME));
-  if (f.highlight.length) out = out.filter((c) => (c.fit?.highlights ?? []).some((h) => f.highlight.includes(h.code)));
+  if (f.highlight.length) out = out.filter((c) => c.highlights.some((h) => f.highlight.includes(h.code)));
   if (f.onedrive.length) out = out.filter((c) => f.onedrive.includes(c.oneDriveUrl ? "linked" : "missing"));
   for (const k of ["pe", "research", "via"] as const) {
     if (k === "pe" && skip === "pe") continue;
@@ -144,6 +143,9 @@ export function applyFilters(list: CompanyRow[], f: Filters, skip?: "stage" | "p
   }
   return out;
 }
+
+/** The score a row ranks by (SPEC §17.9): the team's overall when set, else the read's; null when unread. */
+export const readScore = (c: CompanyRow): number | null => (c.read ? (c.read.team ?? c.read.overall) : null);
 
 /** Stage shown for sorting: the exit stage for exited companies, direct-invested last. */
 function sortStage(c: CompanyRow): number {
@@ -194,11 +196,9 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
       return out.sort(blanksLast((c) => c.sector || null, str));
     case "sector-za":
       return out.sort(blanksLast((c) => c.sector || null, (x, y) => str(y, x)));
-    // Unrated last; the default sort never changes (SPEC §17.10).
-    case "fit-high":
-      return out.sort(blanksLast((c) => c.fit?.fit ?? null, (x, y) => y - x));
-    case "promise-high":
-      return out.sort(blanksLast((c) => c.fit?.promise ?? null, (x, y) => y - x));
+    // Unread last; the team's overall first when there is one; the default sort never changes (SPEC §17.9, §17.10).
+    case "read-high":
+      return out.sort(blanksLast(readScore, (x, y) => y - x));
     case "amount-high":
       return out.sort(blanksLast((c) => c.holding?.invested ?? null, (x, y) => y - x));
     case "amount-low":

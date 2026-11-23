@@ -77,7 +77,7 @@ Env vars:
 - **AuditLog**: id, companyId (nullable), actorId, field (nullable), fromValue, toValue, note, at
 - **Sector**: id, name, sortOrder. Seed list (section 8).
 - **DeletionLog**: id, companyName, reason, byId, at
-- **Thesis and fit rating** (§17): `ThesisRow`, `ThesisVersion`, `FitRating`, `FitInput`, `FitJob`; on **Company**: `themeCode`, `themeEdited`, `activeFitId`.
+- **Thesis and analyst read** (§17): `ThesisRow`, `ThesisVersion`, `AnalystRead`, `FitInput` (team scores); on **Company**: `themeCode`, `themeEdited`, `activeReadId`. `FitRating`, `FitJob` and `activeFitId` are left from version 1 and unused (§17.13).
 
 Stages enum, in order:
 
@@ -128,7 +128,7 @@ Stages enum, in order:
 | Sector & sub-sector | Two lines. Click to edit: the sector comes from the master list, with "Add a new sector…" as an option (admin only); the sub-sector is free text. |
 | Stage | A thin 6-segment progress rail above an inline dropdown. Any stage can be chosen (skipping is allowed). The Rejected and Invested tabs show "Stage at exit" read-only, or "Added directly" for direct-invested companies. |
 | Priority | Inline dropdown: Set / P1…P5. P1 is solid gold, P2 gold outline, P3 neutral outline, P4–P5 muted, and unset uses a dashed outline. |
-| Fit, Promise | Pipeline and Rejected tabs only (§17.10): the score with its coverage beneath ("6 of 7"), "–" when unrated, a spinner while a job runs. Clicking opens the company file on the Fit tab. Not editable in the cell. |
+| Read | Pipeline and Rejected tabs only (§17.10): the overall score out of 10 with its confidence beneath, an "Out of date" mark when it applies, "–" when there is no read. Clicking opens the company file on the Read tab. Not editable in the cell. |
 | Assigned PE | People chips. Click to edit with the chip picker. |
 | Assigned Research | Same as Assigned PE, with its own name list (6.3). |
 | Comment | The latest comment (2-line clamp) with author and date, plus "· N comments". Click opens the drawer on Comments. In the Rejected tab this column shows the rejection reason and date instead. |
@@ -152,7 +152,7 @@ Stages enum, in order:
 | Stage | Pipeline order, or reverse |
 | Company | A–Z / Z–A |
 | Sector | A–Z / Z–A |
-| Fit, highest first / Promise, highest first | Pipeline and Rejected (§17.10). Unrated last |
+| Read, highest first | Pipeline and Rejected (§17.10). Unread last |
 
 ### 6.3 Name autofill (PE, Research, Via, Manage)
 
@@ -312,7 +312,7 @@ A summary is generated:
   - Edit
   - Regenerate (or a "Generate from…" dropdown when there are several decks)
   - the rendered summary
-- **Fit** (Pipeline and Rejected companies, after Summary): the fit rating, as §17.10.
+- **Read** (Pipeline and Rejected companies, after Summary): the analyst read, as §17.10.
 - **Materials:**
   - an upload zone with a Deck / Model / Other selector (drag and drop, or pick multiple files)
   - a file list with a type badge, size, uploader and date, and the actions View (PDF or image, inline), Download, Type (change kind) and Remove (with a confirm dialog)
@@ -386,8 +386,8 @@ Institutional and restrained, in Niveshaay's colours. Light and dark themes (`pr
   - store files with random keys; never trust the original filename on disk
   - serve files via an authorised route with `Content-Disposition`
 - The OneDrive URL is rendered only after protocol validation. No `javascript:` URLs.
-- Deck content is sent to the model only for summarising and the fit rating (§17). No logging of deck text.
-- Fit quotes and scores are never logged. `thesis/` (the confidential thesis seed) is git-ignored and never reaches the repository or the Docker image.
+- Deck content is sent to the model only for summarising. The analyst read (§17) is written outside the dashboard and sends no deck text to any search or outside tool. No logging of deck text.
+- Reads are never logged. `thesis/` (the confidential thesis seed and the read files) is git-ignored and never reaches the repository or the Docker image.
 - **Use a paid OpenRouter key with credits, never free (`:free`) models.** Free models and some providers may log or train on prompts, which is incompatible with NDA decks. Every request sets `provider.data_collection = "deny"`, so OpenRouter only routes to providers that don't store or train on data. Also turn off "prompt logging / training" in the OpenRouter account's privacy settings.
 - AuditLog entries for every field change, status change, file upload/remove and summary generate/edit.
 - Optimistic UI updates, with rollback and a toast on failure.
@@ -589,24 +589,27 @@ The goal (phases B–D): generate each portfolio company's quarterly result (ima
 - Rejection reason categories (still a non-goal after §17: a rejected company's theme comes from the company, not from its reason)
 - Details captured on Invest
 
-## 17. Thesis and fit rating
+## 17. Thesis and analyst read
 
-- **Purpose:** the pipeline holds about 43 deals and no clear order to work them in. Each deal gets two scores, with the reasons shown: **Fit** (how well it matches what Niveshaay buys today) and **Promise** (how strong the company is, whatever the thesis says). A deal with high Promise and low Fit stays visible; it is never filtered out.
-- **The rule that outranks every other rule here:** the tool ranks, it never decides. The words invest, pass, reject, recommend, buy and avoid never appear in a label, tooltip, export or AI text about a rating. No score hides, blocks, auto-rejects or reorders a deal against the user's chosen sort.
-- §9.3 stands: the summary still carries no ratings, risks or red flags. The rating lives in its own tab and its own tables.
+- **Purpose:** the pipeline holds about 43 deals and no clear order to work them in. Each deal gets an **analyst read**: outside research, reasoning against the thesis, and scores out of 10 with the sources shown. One overall score ranks the pipeline.
+- **The rule that outranks every other rule here:** the tool ranks, it never decides. The words invest, pass, reject, recommend, buy and avoid never appear in a label, tooltip, export or judgement text about a read. No score hides, blocks, auto-rejects or reorders a deal against the user's chosen sort.
+- **A deck is a claim, not a fact.** A read checks what the deck says against sources outside the company and says which claims held, which did not and which could not be checked.
+- **No matching against past deals.** The thesis is given to the reader as a way of thinking. A score is never set by resemblance to a named holding or a named rejection, and nothing in the read says "closest to".
+- §9.3 stands: the summary still carries no ratings, risks or red flags. The read lives in its own tab and its own tables.
 - The thesis is data, not a prompt. It is loaded from `thesis/thesis-seed.json` (built from the team's `thesis.md`), versioned, and shown in a Thesis tab with the evidence behind every line.
+- **Version 1 of the rating was withdrawn on 2026-11-23** (§17.13). It scored 1 to 5 from the deck alone and placed deals on ladders of past deals. This section replaces it.
 
 ### 17.1 The thesis as data
 
 - **Rows.** One `ThesisRow` per line of the thesis. `kind` is one of PRINCIPLE, THEME, PARAMETER, ANCHOR, FLAG, HIGHLIGHT. `code` is stable across versions (PR01, T06, F1, FL08, H01; anchors are `F1:5:1`). `data` holds the row's fields as JSON, validated by `thesisRowZ` in `src/lib/domain/thesis.ts`. `evidence` is the citation string as written in the source. `decision` names an open decision the row waits on (for example "D9"), or null.
+- **PARAMETER and ANCHOR rows are not used by the read** and are not shown. They stay in the database until a later thesis version drops them from the seed.
 - **Versions.** Rows are never edited in place. A change closes the old row (`toVersion` = the new version) and writes a new one (`fromVersion` = the new version). Current rows have `toVersion` null. `ThesisVersion` records the number, a label ("1.2"), a note and who made it. Any past version can be rebuilt with `fromVersion <= v AND (toVersion IS NULL OR toVersion > v)`.
 - **Import.** `npx tsx scripts/thesis-import.mts thesis/thesis-seed.json` writes a new version from the file: unchanged rows are left alone, changed rows are closed and rewritten, rows missing from the file are closed. Running it twice with the same file changes nothing. It prints counts only.
 - **The seed file is confidential** (it names holdings and rejected companies). `thesis/` is git-ignored. The import runs from a developer machine against the database; production needs no seed step.
 - **Row fields**
   - PRINCIPLE: `text`.
   - THEME: `name`, `status` (CORE, EMERGING, CAUTIONARY, NO_VIEW, UNRESOLVED), `priority` (boolean), `crossSector` (boolean: a tag, never a company's theme), `latestEvidence`, `basis`, `exceptions`, and the mapping lists `sectors`, `fundingSectors`, `eventSectors`, `keywords` (§17.2).
-  - PARAMETER: `name`, `question`, `group` (FIT or PROMISE), `source` (DECK, MEETING or LOOKUP), `weight` (default 1).
-  - ANCHOR: `param`, `score` (1 to 5), `label` (the company or companies it is anchored on), `shows`.
+  - PARAMETER, ANCHOR: as imported; unused.
   - FLAG: `name`, `fact`, `why`, `how` (CODE, DECK, STAGE or LATER).
   - HIGHLIGHT: `name`, `firesWhen`, `shownAs`.
 
@@ -618,8 +621,9 @@ The dashboard has three sector lists that do not share anything: the pipeline's 
 - **A company has at most one theme:** `Company.themeCode` (nullable) and `Company.themeEdited` (true once a person has set it, same pattern as `sectorEdited`). A person can change or clear it from the company file; that writes an `AuditLog` row.
 - **How a company gets its theme**
   1. A person set it: kept.
-  2. Pipeline deals with a deck: the fit reading picks it (§17.6).
-  3. Invested and Rejected companies, and deals without a deck: `scripts/theme-backfill.mts` asks the cheap check model (the one the news filter uses) in batches of 60, giving only name, sector and sub-sector, and the list of theme codes, names and keywords. The answer must be a current theme code or null. Invested companies listed under `holdingThemes` in the seed file take that value and skip the model.
+  2. A read is loaded for it: the read's theme is used, including "no theme" (§17.11). A keyword guess must not outlive a researched answer.
+  3. Everything else: `scripts/theme-backfill.mts` asks the cheap check model (the one the news filter uses) in batches of 60, giving only name, sector and sub-sector, and the list of theme codes, names and keywords. The answer must be a current theme code or null. Invested companies listed under `holdingThemes` in the seed file take that value and skip the model.
+- **A theme is context, never a score.** A cautionary theme does not lower a read. The read's Thesis fit score weighs principles first (§17.7).
 - **Code-only joins used by the Thesis tab** (pure helpers in `src/lib/domain/thesis.ts`, unit-tested):
   - `dealsForTheme(theme, deals)`: a `FundingDeal` belongs to a theme when its sector is in `fundingSectors` and, if the theme has keywords, `company` or `what` matches one.
   - `eventsForTheme(theme, events)`: `Event.sector` is in `eventSectors`.
@@ -630,12 +634,13 @@ The dashboard has three sector lists that do not share anything: the pipeline's 
 A **Thesis** tab after Funding (a side view like Events and Funding; URL `?view=thesis`). Not shown in the funding-only deployment.
 
 - **Header:** "Thesis, version 1.2" with the version note and date, and a version picker (read-only for older versions).
-- **Sub-views** (chips): Themes (default), Principles, Parameters, Flags and highlights.
+- **Sub-views** (chips): Themes (default), Principles, How deals are scored, Flags and highlights, Waiting for a read.
 - **Themes:** one row per theme, sorted Core, Emerging, Unresolved, No view, Cautionary, then by code. Each shows: name, status badge, a "Priority" badge when set, latest evidence (with "Stale" when older than 12 months and parseable), and three counts: holdings (number and ₹ Cr invested), pipeline deals, rejected. Selecting a row opens the theme page (§17.4).
 - **Principles:** the list, each with its evidence line and an "Open: D9" label when `decision` is set.
-- **Parameters:** grouped Fit and Promise. Each shows the question, where it is filled from, and its anchors as a 1 to 5 ladder (score, label, what it shows). Scores with no anchor show "No anchor yet".
+- **How deals are scored:** the five scores and the overall score with their questions and the scale, as written in §17.7, and the research rules of §17.6 in short. Static copy.
 - **Flags and highlights:** the two lists with what each records.
-- Every row shows its evidence string as written. No editing in this version (§17.13).
+- **Waiting for a read:** Pipeline companies with a deck that have no read, or whose read is out of date (§17.7). Columns: company, stage, priority, days, reason ("No read yet", "New deck since the read", "Thesis changed since the read", "Read is over 90 days old"). Sorted by priority, then days waiting. A count shows on the chip. This is the work list for whoever writes reads.
+- Every thesis row shows its evidence string as written. No editing in this version (§17.13).
 - **Status colours:** Core uses the existing positive tone, Emerging the neutral accent, Cautionary the existing warning tone, Unresolved and No view grey. Only CSS variables from §11.
 
 ### 17.4 Theme page
@@ -644,115 +649,177 @@ A **Thesis** tab after Funding (a side view like Events and Funding; URL `?view=
 
 1. **Header:** name, status, Priority badge, latest evidence, basis, known exceptions, evidence line.
 2. **Holdings:** Invested companies with this theme: name (opens the company file), ₹ Cr invested by fund, first invested.
-3. **In the pipeline:** deals with this theme: name, stage, Fit, Promise, highlight chips, days. Sorted by Fit, highest first, unrated last.
+3. **In the pipeline:** deals with this theme: name, stage, Read score with confidence, highlight chips, days. Sorted by Read, highest first, unread last.
 4. **Rejected:** name, date rejected, reason as written. Newest first, 20 at a time with "Show more".
 5. **Money raised in this theme:** equity `FundingDeal`s from the last 90 days via `dealsForTheme`: company, amount, round, lead, date, with the existing "In our pipeline / Rejected by us / In our portfolio" mark. A total line. Empty state: "No rounds reported in the last 90 days".
 6. **Events coming up:** via `eventsForTheme`, next 6 months, soonest first.
 
-### 17.5 Fit rating: what is scored
+### 17.5 The analyst read
 
-- **Parameters** come from the current thesis rows (today: F1 to F7 in Fit, P1 to P5 in Promise). Nothing about them is hard-coded except the handling below.
-- **By source**
-  - DECK: scored by the model from the deck reading (§17.6, §17.7).
-  - LOOKUP (F4, theme status): no model. Core = 5, Emerging = 3, No view or no theme = 3, Unresolved = 3, Cautionary = 1.
-  - MEETING (P4, P5): filled by a person after the founder meeting (§17.9). Blank until then, shown as "Fill in after the founder meeting".
-- **A score is 1 to 5 or blank.** Blank means the deck does not say, or the two readings disagreed. Blank is never treated as low.
-- **Fit** = weighted mean of the scored Fit parameters, one decimal. Shown only when at least 4 Fit parameters are scored; otherwise "Not enough in the deck". **Promise** the same, with a minimum of 2.
-- **Coverage is always shown beside the number:** "Fit 4.2 · 6 of 7". The first thesis version weights every parameter 1.
-- A person's score for a parameter (§17.9) replaces the model's in the mean. The model's score stays visible beneath it.
-
-### 17.6 Step 1: reading the deck
-
-One call per deck to the PDF-reading model (`aiModel`, the same as the summary), with the deck prepared by `prepareDeck` exactly as the summary job does. Strict JSON schema, zod-validated, one retry. It extracts; it does not judge.
+- **Who writes it.** Claude, working in a chat on the team's own subscription with web search, reading the dashboard's summary of the deck and the current thesis. The dashboard does no AI work for a read and spends nothing on OpenRouter for it. The dashboard stores, checks and shows the read.
+- **One read is one JSON document**, validated by `readZ` in `src/lib/domain/read.ts` (pure, unit-tested). Shape:
 
 ```
-theme: a current theme code, or null
-quotes: { <each DECK parameter code>: [{ text, page }] }   up to 4 per parameter, each copied word for word, 40 words at most
-qualification: [{ text, page }]    where the deck says the company is an approved, qualified or certified vendor of a named buyer or regulator
-numbers: { unit ("INR_CR" | "USD_MN" | null), lastActualYear, lastActualRevenue, lastActualEbitda, lastActualPat,
-           nextPlanYear, nextPlanRevenue, orderBook, raise, preMoney, secondaryPct, topCustomerPct,
-           schemeSharePct, receivableDays, capexPlanned, newDebt }    figures as printed, null when not stated
-flagQuotes: { relatedParty: [{ text, page }], subsidyProfit: [{ text, page }] }
+schema: 1
+company: the company's name exactly as in the dashboard
+readAt: date         thesisLabel: "1.2"        author: who wrote it        deckFile: the deck the summary came from, or null
+oneLine: what the company does, in the reader's own words
+overall: { score, why, confidence ("HIGH" | "MEDIUM" | "LOW"), confidenceWhy }
+scores: exactly five, one per key: POSITION, MOAT, MARKET, NUMBERS, THESIS
+        each { key, score, why, sources: [source ids] }
+research: {
+  whoElse: [{ name, what, scale, sources }]      who else does this
+  howHard: [point]                               how hard it is to do what the company does
+  rank:    [point]                               where the company stands among them
+  market:  [point]                               size, growth and direction
+  record:  [point]                               the public record: filings, ratings, funding, ownership
+}                                                point = { text, sources: [source ids], deck: boolean }
+deckVsPublic: [{ claim, found, status ("CONFIRMED" | "PARTLY" | "CONTRADICTED" | "NOT_FOUND"), sources }]
+thesis: [{ code (a current PRINCIPLE code), side ("FOR" | "AGAINST" | "OPEN"), note }]
+theme: { code (a current company theme code or null), note }
+highlights: [{ code ("H01"), state ("CLAIMED" | "SUPPORTED"), note }]
+flags: [{ label, value, sources }]
+openQuestions: [text]        what to ask the founder or check next
+notChecked: [text]           what the reader could not or did not check
+sources: [{ id, kind, publisher, title, url, date }]
 ```
 
-- The prompt lists each DECK parameter's question so the model knows what to look for, and the theme list (code, name, keywords).
-- Prompt rules: copy, never paraphrase; null or empty when the deck is silent; no opinions; projected years are not "last actual".
-- **Checked by code** (pure, in `src/lib/domain/fit.ts`): every quote must appear in the deck's text layer after normalising whitespace, case and punctuation, else it is dropped; every number must appear in the text layer using the same matching as `src/lib/summary/verify.ts`, else it is set to null. For scanned decks with no text layer, quotes are kept and the rating is marked "Read from a scanned deck, quotes not checked".
-- Stored on the rating as `facts`.
+- **Source kinds:** SUBJECT (the company's own site, release or filing-free statement), RIVAL (another company's site or release), GOVT (a government body, PSU or tender), RATING (a rating agency), REGISTRY (a company database or exchange listing page), RESEARCH (a research house), NEWS, TRADE (trade press or industry blog).
+- **Limits:** `oneLine` 240 characters; each `why` 600; a point's `text` 400; at most 12 rivals, 8 points a list, 8 deck checks, 8 thesis lines, 8 flags, 8 questions, 30 sources. A read is at most 64 KB.
+- A point with `deck: true` rests on the deck or the dashboard, not on an outside source, and is shown with a "From the deck" mark.
 
-### 17.7 Step 2: scoring
+### 17.6 Research rules
 
-For each DECK parameter with at least one quote, two separate calls to `fitModel` (`OPENROUTER_FIT_MODEL`, default `anthropic/claude-opus-5.5`), text only, no deck attached. A parameter with no quotes is blank without a call.
+These bind whoever writes a read. The checks marked **(code)** are also enforced when a read is loaded; a read that fails one is refused with the reason.
 
-- **Input:** the parameter's question; its anchors (score, label, what it shows); its quotes (F1 also gets the `qualification` quotes); the summary's business bullets for context.
-- **Output:** `{ score: 1 to 5 or null, anchor: the anchor code it sits closest to or null, why: 25 words at most }`.
-- **Prompt rules:** score proof, not claims (a claim with no number, name or date behind it cannot score above 3); use only the quotes given; compare with the anchors, do not invent a scale; null when the quotes do not answer the question; never use the words invest, pass, reject, recommend, buy or avoid.
-- **Agreement, decided by code:** equal scores stand. Scores one apart: the lower stands. Two or more apart, or one null: blank, with "Two readings disagreed" shown.
-- **Word check, by code:** a `why` containing a banned word is discarded and that call is retried once; if it fails again the `why` is stored empty. Any form of a banned word counts ("investment", "rejected", "buying"); "investor" and "buyer" name people, not an action, and are allowed (2026-11-23).
+- **Nothing confidential leaves.** Searches use the company's name and facts that are already public. Deck text, deck figures and file names are never put into a search, a fetch or any outside tool.
+- **Five questions are always answered:** who else does this; how hard it is; where the company ranks; what the market is doing; what the public record shows. An empty list is allowed only for `record`, and then `notChecked` says why.
+- **Every score except THESIS cites its sources, or says it rests on the deck.** **(code)** A POSITION, MOAT, MARKET or NUMBERS score above 6 must cite at least one source whose kind is not SUBJECT. A moat cannot score high on the company's word alone.
+- **Every source id used anywhere must exist in `sources`, and every URL is `http:` or `https:`.** **(code)**
+- **Deck claims are tested, not repeated.** The deck's main claims about position, moat, customers and numbers appear in `deckVsPublic` with what was found.
+- **Say what was not checked.** `notChecked` is never empty. **(code)**
+- **Figures:** as the source states them, with the year. A figure from the deck is marked as from the deck.
+- **Copyright:** sources are paraphrased. No quotation over 15 words, at most one per source.
+- **Judgement text carries no verdict.** **(code)** `oneLine`, `overall.why`, every score's `why` and every thesis `note` are checked with `hasBannedWord`; research text is not, because it reports what third parties did ("Hitachi is investing ₹300 Cr").
+- **No past-deal matching.** A holding or a rejected company may be named only as a fact that bears on the deal (a customer, a competitor, a reference call), never as the reason for a score.
+- **UI copy rules apply to the read's text:** sentence case, and no em dashes **(code)**.
+
+### 17.7 Scores
+
+- **Scale:** 0 to 10 in half points. **(code)** 9 to 10 is rare and needs outside proof; 7 to 8 strong; 5 to 6 mixed; 3 to 4 weak; 1 to 2 very weak. The full range is meant to be used.
+- **The five scores and their questions**
+  - **Position:** where does it rank among those doing the same thing, and how many have got this far? A company that is one of the only ones to build a large business in its category scores high here.
+  - **Moat:** what stops a well-funded rival, and what outside the deck shows it?
+  - **Market:** is the market large and moving the right way for this company to reach listing scale?
+  - **Numbers:** do the reported numbers, the public filings and the plan hold together?
+  - **Thesis fit:** how closely does it match how Niveshaay thinks? Principles first; the theme is context. What the funds already hold plays no part.
+- **Overall** is the reader's judgement, not an average. **(code)** It must lie between the lowest and the highest of the five. `overall.why` names what drives it and what holds it back.
+- **Confidence** says how much of the read rests on sources outside the company: HIGH, MEDIUM or LOW, with a reason. It is shown beside the overall score everywhere the score is shown.
+- **Out of date** (pure function `readStale`, unit-tested). A read is out of date when a deck was uploaded after it was loaded, when the thesis version has changed since, or when `readAt` is more than 90 days ago. It is still shown, with the reason. Nothing is re-scored automatically.
 
 ### 17.8 Flags and highlights
 
-Facts shown beside the scores. **None changes a score.** Each flag has a `how`:
+Facts shown beside the scores. **None changes a score.**
 
-- **CODE** (worked out by code from `numbers`, the summary's financials table or the database): price ask and its multiple of last actual EBITDA or revenue; stage (pre-revenue when last actual revenue is null or zero); holdings in the same theme (names, from `themeCode`); small scale (last actual revenue and raise size); revenue decline (two or more falling years in the financials table); profit status (from last actual EBITDA and PAT); numbers that do not reconcile (count of figures the summary check could not find); seen before (a `Rejection` row exists, or §7.4 duplicate detection matches a rejected company).
-- **DECK** (from `numbers` or `flagQuotes`, shown only when stated): related parties, subsidy as the source of profit, single-scheme share, concentration, cash strain, capex and debt plan, primary and secondary split.
-- **STAGE:** ground work, read from the stage: Not Assigned or Call Pending = "None yet"; Internal Discussion = "Call done"; Scuttlebutt and later = "Outside checks".
-- **LATER:** listed in the Thesis tab, not computed yet (listed alternative, round deadline).
+- **Flags** come from the read: a label, a value and its sources ("Close to listing: IPO targeted for early 2027"). Shown as a key and value list. The FLAG rows of the thesis stay in the Thesis tab as the list of things a reader should look for.
+- **Highlights** are the positive counterpart: patterns the team wants surfaced every time.
+  - **H01, sweet spot:** a small company that is already a qualified vendor in an industry with a long qualification timeline, in any theme. Set by the read: "Sweet spot (claimed)" when it rests on the deck, "Sweet spot (supported)" when outside sources back it. A person can mark it checked with a required note, which shows "Sweet spot (checked)", survives later reads and writes an `AuditLog` row. Small means last actual revenue under ₹100 Cr (constant `SMALL_REVENUE_CR`; an assumption to confirm with the IC).
+  - **H02, priority theme:** fires by code when the company's theme has `priority` true.
+- Highlights appear as chips in the Company cell of the table, in the Read tab and on the theme page. There is a filter for them (§17.10). They do not reorder the table.
 
-A flag with nothing to show is omitted, as the summary omits empty sections.
+### 17.9 People's scores
 
-**Highlights** are the positive counterpart: patterns the team wants surfaced every time.
+One table, `FitInput`, one row per company and key: `code` (POSITION, MOAT, MARKET, NUMBERS, THESIS or OVERALL), `score` (0 to 10 in half points), `reason` (required, 10 characters at least), who and when. Rows left by version 1 (codes F1 to P5) are ignored.
 
-- **H01, sweet spot:** fires when `qualification` has at least one quote and last actual revenue is under ₹100 Cr (constant `SMALL_REVENUE_CR`; an assumption to confirm with the IC). In any theme. Shown as "Sweet spot (claimed)". A person can mark it checked with a required note, which shows "Sweet spot (checked)" and writes an `AuditLog` row.
-- **H02, priority theme:** fires when the company's theme has `priority` true.
-- Highlights appear as chips in the Company cell of the table, in the Fit tab and on the theme page. There is a filter for them (§17.10). They do not reorder the table.
-
-### 17.9 People's inputs
-
-One table, `FitInput`, one row per company and parameter: `score` (1 to 5), `reason` (required, 10 characters at least), `kind` (OVERRIDE or MEETING), who and when.
-
-- **Change score** on any DECK or LOOKUP parameter: the person's score replaces the model's in the mean, with the reason shown. **Remove** restores the model's score.
-- **Founder meeting scores** for MEETING parameters: the same form, labelled by the parameter's question.
-- Inputs survive re-rating. Every save and removal writes an `AuditLog` row in the same transaction ("Fit: moat proof set to 4" with the reason as the note).
-- Weights cannot be changed here.
+- **Team score** on any of the five scores or on the overall: shown beside the read's score ("Team 8 · Read 7") with the reason. The table and the sorts use the team's overall when there is one.
+- **Remove** restores the read's score. Team scores survive a new read.
+- Every save and removal writes an `AuditLog` row in the same transaction ("Read: moat set to 8" with the reason as the note).
 
 ### 17.10 Where it shows
 
-- **Table, Pipeline and Rejected tabs:** two columns after Priority: **Fit** and **Promise**. Each cell: the number (tabular numerals) with coverage beneath in small text ("6 of 7"); "–" when there is no rating; a spinner while a job runs. Clicking opens the company file on the Fit tab. Not editable in the cell.
-- **Sorts** (Pipeline, Rejected): "Fit, highest first", "Promise, highest first". Unrated rows last. The default sort does not change.
+- **Table, Pipeline and Rejected tabs:** one column after Priority: **Read**. The cell shows the overall score to one decimal (tabular numerals) with "out of 10" for screen readers, the confidence beneath in small text, and an "Out of date" mark when §17.7 says so; "–" when there is no read. Clicking opens the company file on the Read tab. Not editable in the cell. The Fit and Promise columns of version 1 are removed.
+- **Sorts** (Pipeline, Rejected): "Read, highest first". Unread rows last. The default sort does not change.
 - **Filters:** Theme (theme names plus "No theme") on all three tabs; Highlights (Sweet spot, Priority theme) on Pipeline.
 - **Company cell:** highlight chips under the name.
-- **Company file:** a **Fit** tab after Summary, for Pipeline and Rejected companies.
-  1. Theme, with its status badge. Click to change.
-  2. "Fit 4.2 · 6 of 7" and "Promise 3.5 · 2 of 5", and highlight chips.
-  3. A fixed line: "Ranks fit with the thesis. It is not a recommendation."
-  4. Fit parameters, then Promise parameters. Each: name, score pill, the question, the quotes with page numbers, "Closest to: <anchor label>", the `why`, and **Change score**. Blank ones say why: "Not in the deck", "Two readings disagreed" or "Fill in after the founder meeting".
-  5. Flags, as a key and value list.
-  6. Footer: "Rated from <file>, thesis version 1.2, 22 Nov 2026" and **Rate again**.
-  - Empty state: "No rating yet. Upload a deck to get one." Failed job: the error and **Try again**.
+- **Company file:** a **Read** tab after Summary, for Pipeline and Rejected companies, in this order:
+  1. The overall score ("7.0 out of 10"), confidence chip with its reason, highlight chips, and the theme with its status badge (click to change).
+  2. A fixed line: "Ranks deals after outside research. It is not a recommendation."
+  3. `oneLine`, then `overall.why`.
+  4. The five scores: name, score pill, the question, the `why`, numbered source links, and **Team score**.
+  5. **Who else does this:** a table of name, what they do, scale, sources.
+  6. **How hard is it**, **Where it ranks**, **Market**, **Public record:** the points, each with its source numbers or "From the deck".
+  7. **Deck against the public record:** claim, what was found, a status badge (Confirmed, Partly, Contradicted, Not found).
+  8. **Against the thesis:** each principle's code and text (from the current thesis), a For, Against or Open mark, and the note.
+  9. **Things to know:** the flags.
+  10. **Questions for the founder** and **Not checked.**
+  11. **Sources:** numbered, with publisher, title, date and kind. Links open in a new tab with `rel="noopener noreferrer"`; a URL is validated again before rendering, like OneDrive links.
+  12. Footer: "Read by <author> on 23 Nov 2026, thesis version 1.2, from <deck file>", **Load a read** (a file picker for a `.json` read) and **Earlier reads** (date, overall, who loaded it; selecting one shows it read-only).
+  - Empty state: "No read yet." with **Load a read**.
 - **Excel export:** unchanged in this version.
 
-### 17.11 Jobs, triggers and cost
+### 17.11 Loading reads
 
-- **`FitJob`**, a DB-backed worker built like the summary worker in `src/lib/ai/jobs.ts`: claim with `FOR UPDATE SKIP LOCKED`, heartbeat, three attempts, stale after 5 minutes, two in parallel. Started from `src/instrumentation.ts`, never in the funding-only deployment.
-- **A job is queued when:** a new `Summary` version is written from a deck for a Pipeline company (reason DECK); **Rate again** is clicked (MANUAL); a new thesis version is imported, for every Pipeline company that has a deck (THESIS). One open job per company: a second request while one is queued or running does nothing.
-- **A THESIS re-rate reuses the stored `facts`** and redoes only §17.5 lookups, §17.7 scoring and §17.8. The deck is read again only for DECK and MANUAL. A parameter added in the new version has no stored quotes, so it stays blank ("Not in the deck") until **Rate again** reads the deck.
-- **Result:** a new `FitRating` row (kept as history) and `Company.activeFitId` pointed at it. Rejected and Invested companies are never re-rated automatically; their last rating stays as it was.
-- **First run:** `npx tsx --conditions=react-server scripts/fit-backfill.mts` queues every Pipeline company with a deck. `--limit 5` rates five first.
-- **Cost:** counted through `aiUsage`. Target under US$0.50 a deal; measure on five deals before the full run and record the figure in the README. Never `:free` models; `data_collection: "deny"` as everywhere.
+- **`AnalystRead`** keeps every read as history; `Company.activeReadId` points at the one shown. The same read loaded twice is stored once (unique on company and content hash).
+- **One function does the work:** `loadRead` in `src/lib/server/read.ts`, used by all three ways in.
+  1. Parse with `readZ` and run the code checks of §17.6 and §17.7. Any failure refuses the whole read and returns the reasons as a `UserError`.
+  2. Find the company: `company` must match exactly one Pipeline or Rejected company by name, ignoring case and outer spaces. No match or several: refused, nothing guessed.
+  3. Check `thesis[].code` and `theme.code` against the current thesis rows. An unknown code is refused.
+  4. In one transaction: write the `AnalystRead` with the current thesis version; point `activeReadId` at it; when `themeEdited` is false, set `themeCode` to the read's theme (null included); carry over a checked H01 mark; write an `AuditLog` row ("Read loaded: 7.0 out of 10").
+- **Ways in**
+  - `POST /api/reads`: a JSON body holding one read or a list of up to 50. Starts with `requireRole()`, requires `Content-Type: application/json` and an `Origin` equal to the app's own, and a body of at most 512 KB. Returns one result per read: `{ company, ok, id or reasons }`. This is how a chat session with a browser loads reads straight into the dashboard.
+  - **Load a read** in the Read tab and on the Thesis tab's waiting list: a file picker that posts to the same route and shows the result per company.
+  - `npx tsx --conditions=react-server scripts/read-import.mts thesis/reads`: loads every `.json` in a folder as the shared Team user and prints one line per file with the company's id, ok or the reason codes. It never prints the read.
+- **No job, no worker, no AI call.** Loading is synchronous. `FitJob` is no longer written.
+- **Read files are confidential** (they carry deck figures). `thesis/reads/` sits inside the git-ignored `thesis/` folder. Test fixtures use made-up companies only.
 
 ### 17.12 Security
 
 - Every action and route starts with `requireRole()` and a zod schema, as everywhere. The funding-only deployment refuses all of it.
-- Quotes are deck text. They are stored on the rating like the summary is, served only through the authorised actions, and never logged. Log ids, counts, costs and error codes only.
-- `thesis/` is git-ignored. The seed file never reaches the repository or the Docker image.
-- All AI modules `import "server-only"`.
+- A read holds deck figures. It is stored like the summary is, served only through the authorised actions, and never logged. Log ids, counts and error codes only.
+- Every string in a read is rendered as text, never as HTML. Source URLs are `http:` or `https:` only, checked on load and again before rendering.
+- `thesis/` is git-ignored. The seed file and the read files never reach the repository or the Docker image.
 
-### 17.13 Not in this version
+### 17.13 Version 1, and what is not in this version
 
+**Withdrawn on 2026-11-23:** the deck reading, the two-call scoring, the 1 to 5 scale, anchors and "Closest to", the theme lookup score, Fit and Promise, the `FitJob` worker and its triggers, `OPENROUTER_FIT_MODEL`, `scripts/fit-backfill.mts` and `scripts/try-fit.mts`. The `FitRating` and `FitJob` tables and their rows stay in the database, unread; `Company.activeFitId` is left as it is. Nothing is deleted.
+
+**Not in this version**
+
+- Reads written by the dashboard itself through a paid API with web search. The read's shape and checks are the same either way, so this can be added without changing what is stored or shown.
 - Editing the thesis in the app, and an inbox of proposed changes from new sources.
 - Watching for new founder interviews or research notes.
-- Web research to check a deck's claims (the "claimed" and "checked" marks are set by people for now).
-- A calibration view for the IC's own ranking, and parameter weights other than 1.
-- Fit ratings for Invested companies; Fit columns in the Excel export.
+- A calibration view for the IC's own ranking.
+- Reads for Invested companies; the Read column in the Excel export.
 - "Waiting on" and round deadline fields.
+
+**Data model added**
+
+```prisma
+/// One analyst read for a company (SPEC §17.5). Kept as history; Company.activeReadId is the one shown.
+model AnalystRead {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation("CompanyReads", fields: [companyId], references: [id], onDelete: Cascade)
+  thesisVersion Int
+  /// 0 to 10 in half points
+  overall       Decimal  @db.Decimal(3, 1)
+  /// HIGH, MEDIUM or LOW
+  confidence    String
+  /// The whole validated read (readZ). Holds deck figures: never logged
+  body          Json
+  /// sha256 of the canonical JSON, so the same read is stored once
+  hash          String
+  readAt        DateTime @db.Date
+  author        String
+  loadedById    String
+  loadedBy      User     @relation(fields: [loadedById], references: [id])
+  loadedAt      DateTime @default(now())
+
+  activeFor Company? @relation("ActiveRead")
+
+  @@unique([companyId, hash])
+  @@index([companyId, loadedAt])
+}
+// Company gains: activeReadId String? @unique, activeRead (relation "ActiveRead", onDelete: SetNull), reads (relation "CompanyReads")
+// FitInput.score changes from Int to Decimal(3,1) so a team score can be a half point; existing rows keep their values.
+```

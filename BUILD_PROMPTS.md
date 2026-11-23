@@ -274,6 +274,41 @@ Check by hand: sort the pipeline by Fit, highest first. Then send the top ten an
 
 ---
 
+## Prompt 13: The analyst read replaces the fit rating
+
+Version 1 (Prompts 11 and 12) scored 1 to 5 from the deck alone and placed deals on ladders of past deals; the team found it unresearched. It is withdrawn and replaced by an analyst read: researched outside the dashboard (by Claude in a chat, with web search), scored out of 10, with sources. The dashboard checks, stores and shows a read. This phase makes no AI call.
+
+```
+Read CLAUDE.md, then SPEC.md §17 in full (rewritten 23 Nov 2026, uncommitted in the tree: the source of truth; do not rewrite it).
+Reads waiting in thesis/reads/ are confidential: never commit, print or use them as fixtures.
+
+Rules: only `prisma migrate deploy` (never reset or db push); the migration is additive (AnalystRead, Company.activeReadId,
+FitInput.score widened to Decimal(3,1)); back up first with scripts/db-data.mts export; never log a read's body; made-up
+fixtures only; E2E only on the *_test database.
+
+1. Docs: this prompt here; CLAUDE.md (AI row, folder notes, "Reads carry deck figures" rule).
+2. Data model (§17.13): AnalystRead, Company.activeReadId, FitInput.score widened; migration <timestamp>_analyst_read; db-data.mts.
+3. Domain (src/lib/domain/read.ts, pure): readZ with the limits of §17.5; checkRead (§17.6, §17.7: half points, the five keys
+   in order, overall inside the range, an outside source behind any score above 6 except THESIS, source ids that resolve,
+   http(s) URLs, non-empty notChecked, no banned word in judgement text, no em dash); readStale; the canonical JSON for the
+   hash; labels; the score questions. Unit tests: one passing and one failing fixture per rule.
+4. Loading (§17.11): loadRead in src/lib/server/read.ts, one transaction with the audit row; POST /api/reads (requireRole,
+   JSON only, same-origin Origin, 512 KB, one result per read); scripts/read-import.mts (one line per file: name, company
+   id, ok or reason codes).
+5. Withdraw version 1: no fit worker, no queueFitJob calls; delete src/lib/fit/, fit-backfill.mts, try-fit.mts,
+   OPENROUTER_FIT_MODEL and the version 1 actions. FitRating and FitJob tables and rows stay.
+6. Team scores (§17.9): setReadInput, removeReadInput, checkSweetSpot; ignore FitInput rows with version 1 codes.
+7. Table (§17.10): one Read column replaces Fit and Promise; "Read, highest first"; CompanyRow.read.
+8. Read tab (§17.10) in the spec's order; every read string rendered as text; source links validated, new tab, noopener.
+9. Thesis tab: "How deals are scored" replaces Parameters; "Waiting for a read" with its count; theme page shows Read.
+10. Checks: lint, typecheck, unit, E2E (Read column and sort, Read tab, each code check refused through POST /api/reads,
+    a team score changing the table, the waiting list, 390 px). Verdict words only in the fixed line.
+11. Real database: migrate deploy, then read-import.mts thesis/reads. A name that does not match is reported, not guessed.
+12. Report in thesis/REPORT_13.md. Commit and push only if every check passed.
+```
+
+---
+
 ## Not in these prompts
 
 These wait until the first version has been used for a couple of weeks (SPEC §17.13): the inbox of proposed thesis changes, watchers for new interviews and notes, web research to check claims, the IC calibration view and weights, "waiting on" and round deadline fields.

@@ -12,7 +12,9 @@ import { isStale, themeByCode, type StoredThesisRow } from "@/lib/domain/thesis"
 import type { CompanyRow } from "@/lib/domain/types";
 import { useStore } from "../store";
 import { Evidence, StatusBadge } from "./ThesisView";
-import { HighlightChips } from "../drawer/FitTab";
+import { HighlightChips } from "../drawer/ReadTab";
+import { CONFIDENCE_LABELS, fmtScore } from "@/lib/domain/read";
+import { readScore } from "@/lib/domain/view";
 
 const PAGE = 20;
 
@@ -38,14 +40,13 @@ export function ThemePage({ code, rows, current, onBack }: { code: string; rows:
 
   const mine = useMemo(() => companies.filter((c) => c.themeCode === code), [companies, code]);
   const holdings = mine.filter((c) => c.status === "INVESTED").sort((a, b) => (b.holding?.invested ?? 0) - (a.holding?.invested ?? 0) || a.name.localeCompare(b.name));
-  // By Fit, highest first, unrated last (SPEC §17.4).
+  // By Read, highest first, unread last (SPEC §17.4).
   const pipeline = mine.filter((c) => c.status === "PIPELINE").sort((a, b) => {
-    const x = a.fit?.fit ?? null;
-    const y = b.fit?.fit ?? null;
+    const x = readScore(a);
+    const y = readScore(b);
     if (x === null || y === null) return x === y ? a.name.localeCompare(b.name) : x === null ? 1 : -1;
     return y - x || a.name.localeCompare(b.name);
   });
-  const score = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v.toFixed(1));
   const rejected = mine.filter((c) => c.status === "REJECTED").sort((a, b) => (b.exitAt ?? "").localeCompare(a.exitAt ?? ""));
 
   const back = (
@@ -131,8 +132,7 @@ export function ThemePage({ code, rows, current, onBack }: { code: string; rows:
                 <tr>
                   <th>Company</th>
                   <th>Stage</th>
-                  <th className="num">Fit</th>
-                  <th className="num">Promise</th>
+                  <th className="num">Read</th>
                   <th className="num">Days</th>
                 </tr>
               </thead>
@@ -141,11 +141,19 @@ export function ThemePage({ code, rows, current, onBack }: { code: string; rows:
                   <tr key={c.id}>
                     <td>
                       {name(c)}
-                      {c.fit && <HighlightChips list={c.fit.highlights} />}
+                      <HighlightChips list={c.highlights} />
                     </td>
                     <td>{STAGE_LABELS[c.stage]}</td>
-                    <td className="num">{score(c.fit?.fit)}</td>
-                    <td className="num">{score(c.fit?.promise)}</td>
+                    <td className="num">
+                      {c.read ? (
+                        <>
+                          {fmtScore(readScore(c) ?? c.read.overall)}
+                          <span className="hint rd-sub">{CONFIDENCE_LABELS[c.read.confidence]}</span>
+                        </>
+                      ) : (
+                        "–"
+                      )}
+                    </td>
                     <td className="num">{daysFor(c) ?? "–"}</td>
                   </tr>
                 ))}

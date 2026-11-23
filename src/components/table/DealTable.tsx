@@ -11,7 +11,8 @@ import { portfolioSummary, splitParts, type FundSplit } from "@/lib/domain/portf
 import { DatePopover, OneDrivePopover, PeoplePopover, SectorPopover } from "../cells/popovers";
 import { useStore, type DrawerTab } from "../store";
 import { CloudFill, CloudLine } from "../ui/icons";
-import { HighlightChips } from "../drawer/FitTab";
+import { HighlightChips } from "../drawer/ReadTab";
+import { CONFIDENCE_LABELS, fmtScore, STALE_LABELS } from "@/lib/domain/read";
 
 type Props = {
   rows: CompanyRow[];
@@ -36,7 +37,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   const exited = view.tab !== "pipeline";
   // Invested: no Priority, Stage at exit or Via; an Amount invested column instead.
   const invested = view.tab === "invested";
-  const colCount = invested ? 8 : 13;
+  const colCount = invested ? 8 : 12;
 
   if (!rows.length) {
     const [h, p] = EMPTY[view.tab];
@@ -102,8 +103,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
             {invested && th("c-amt", "Invested", "amount")}
             {!invested && th("c-stage", exited ? "Stage at exit" : "Stage", "stage")}
             {!invested && th("c-pri", "Priority", "pri")}
-            {!invested && th("c-fit", "Fit")}
-            {!invested && th("c-fit", "Promise")}
+            {!invested && th("c-read", "Read")}
             {th("c-pe", "Assigned PE")}
             {th("c-re", "Assigned Research")}
             {th("c-cm", view.tab === "rejected" ? "Rejection reason" : invested ? "Latest update" : "Comment")}
@@ -147,7 +147,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                       {c.fileCount} file{c.fileCount > 1 ? "s" : ""}
                     </span>
                   )}
-                  {!invested && c.fit && <HighlightChips list={c.fit.highlights} />}
+                  {!invested && <HighlightChips list={c.highlights} />}
                 </td>
                 <td className="c-od">
                   {c.oneDriveUrl ? (
@@ -221,14 +221,9 @@ export function DealTable({ rows, view, setView, openId }: Props) {
                 </td>
                 )}
                 {!invested && (
-                  <>
-                    <td className="c-fit">
-                      <FitCell c={c} which="fit" open={() => openDrawer(c.id, "fit")} />
-                    </td>
-                    <td className="c-fit">
-                      <FitCell c={c} which="promise" open={() => openDrawer(c.id, "fit")} />
-                    </td>
-                  </>
+                  <td className="c-read">
+                    <ReadCell c={c} open={() => openDrawer(c.id, "read")} />
+                  </td>
                 )}
                 <td className="c-pe editable" {...editable("PE")}>
                   <Chips names={c.pe} />
@@ -410,33 +405,26 @@ function StageCell({ c, onChange }: { c: CompanyRow; onChange: (s: Stage) => voi
   );
 }
 
-/** Fit or Promise in the table (SPEC §17.10): the number with its coverage, "–" when unrated, a spinner while rating. */
-function FitCell({ c, which, open }: { c: CompanyRow; which: "fit" | "promise"; open: () => void }) {
-  const f = c.fit;
-  const value = f ? f[which] : null;
-  const scored = f ? (which === "fit" ? f.fitScored : f.promiseScored) : 0;
-  const total = f ? (which === "fit" ? f.fitTotal : f.promiseTotal) : 0;
-  const label = which === "fit" ? "Fit" : "Promise";
-  return (
-    <button
-      type="button"
-      className="fit-cell"
-      onClick={open}
-      aria-label={c.fitJob ? `${label} for ${c.name}: rating in progress` : value === null ? `${label} for ${c.name}: not rated` : `${label} for ${c.name}: ${value.toFixed(1)}, ${scored} of ${total} scored`}
-    >
-      {c.fitJob && !f ? (
-        <span className="spin" aria-hidden="true" />
-      ) : value === null ? (
+/**
+ * Read in the table (SPEC §17.10): the overall to one decimal (the team's when set), the confidence beneath, an "Out of
+ * date" mark when the read is stale, "–" when there is no read. Opens the company file on the Read tab.
+ */
+function ReadCell({ c, open }: { c: CompanyRow; open: () => void }) {
+  const r = c.read;
+  if (!r) {
+    return (
+      <button type="button" className="rd-cell" onClick={open} aria-label={`Read for ${c.name}: no read yet`}>
         <span className="ph">–</span>
-      ) : (
-        <>
-          <span className="fit-num">{value.toFixed(1)}</span>
-          <small>
-            {scored} of {total}
-          </small>
-        </>
-      )}
-      {c.fitJob && f && <span className="spin sm" aria-hidden="true" />}
+      </button>
+    );
+  }
+  const value = r.team ?? r.overall;
+  const label = `Read for ${c.name}: ${fmtScore(value)} out of 10${r.team !== null ? ", team score" : ""}, ${CONFIDENCE_LABELS[r.confidence].toLowerCase()}${r.stale ? `, out of date: ${STALE_LABELS[r.stale].toLowerCase()}` : ""}`;
+  return (
+    <button type="button" className="rd-cell" onClick={open} aria-label={label} title={r.stale ? STALE_LABELS[r.stale] : undefined}>
+      <span className="rd-num">{fmtScore(value)}</span>
+      <small>{CONFIDENCE_LABELS[r.confidence].replace(" confidence", "")}</small>
+      {r.stale && <small className="rd-stale">Out of date</small>}
     </button>
   );
 }

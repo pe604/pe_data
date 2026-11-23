@@ -3,6 +3,7 @@ import { execSync } from "node:child_process";
 import { Client } from "pg";
 import { E2E_DB, E2E_DB_ENV } from "../../playwright.config";
 import { dbConfig, pgSsl } from "../../src/lib/db-config";
+import { madeUpRead } from "./madeUpRead";
 
 // Fresh test database for every run: migrate, wipe, and add the fixtures the tests use.
 async function resetTestDb() {
@@ -40,7 +41,8 @@ async function resetTestDb() {
   await db.query(
     `insert into "Company"(id, name, "sectorId", stage, priority, status, "dateReceived", "createdById", "updatedAt")
      values ('e2e-voltaris', 'Voltaris Grid Systems', $1, 'INTERNAL_DISCUSSION', 1, 'PIPELINE', current_date - 42, $2, now()),
-            ('e2e-mokobara', 'Mokobara', null, 'NOT_ASSIGNED', null, 'INVESTED', null, $2, now())`,
+            ('e2e-mokobara', 'Mokobara', null, 'NOT_ASSIGNED', null, 'INVESTED', null, $2, now()),
+            ('e2e-kestrel', 'Kestrel Foods', null, 'INTERNAL_DISCUSSION', 2, 'PIPELINE', current_date - 10, $2, now())`,
     [power, user],
   );
   await db.query(`update "Company" set "directInvested" = true where id = 'e2e-mokobara'`);
@@ -86,6 +88,7 @@ async function resetTestDb() {
     ["THEME", "T02", theme("Snacks test", "CAUTIONARY", { fundingSectors: ["Consumer"] })],
     ["THEME", "T03", theme("Cross-sector test", "NO_VIEW", { crossSector: true })],
     ["PRINCIPLE", "PR01", { text: "Test principle about proof over claims." }],
+    ["PRINCIPLE", "PR02", { text: "Test principle about margins." }],
     ["PARAMETER", "F1", { name: "Proof", question: "Is there proof?", group: "FIT", source: "DECK", weight: 1 }],
     ["ANCHOR", "F1:5:1", { param: "F1", score: 5, label: "Example Co", shows: "named buyers" }],
     ["PARAMETER", "F2", { name: "Own plant", question: "Does it make the product?", group: "FIT", source: "DECK", weight: 1 }],
@@ -101,23 +104,20 @@ async function resetTestDb() {
     await db.query(`insert into "ThesisRow"(id, kind, code, data, evidence, decision, "fromVersion") values (gen_random_uuid()::text, $1, $2, $3, 'Test note, Jan 2026', null, 1)`, [kind, code, JSON.stringify(data)]);
   }
   await db.query(`update "Company" set "themeCode" = 'T01' where id in ('e2e-voltaris', 'e2e-mokobara')`);
-  // A fit rating for Voltaris (SPEC §17.5): F1 4, F2 3, F3 5, F4 5 (Core) → Fit 4.3 · 4 of 4; Promise: only P1, so none yet.
-  const n = Object.fromEntries(["lastActualRevenue", "lastActualEbitda", "lastActualPat", "nextPlanRevenue", "orderBook", "raise", "preMoney", "secondaryPct", "topCustomerPct", "schemeSharePct", "receivableDays", "capexPlanned", "newDebt"].map((k) => [k, null]));
-  const facts = {
-    theme: "T01",
-    quotes: { F1: [{ text: "Approved vendor to two state utilities since 2022", page: 4 }], F2: [{ text: "Our own plant in Pune", page: 6 }], F3: [{ text: "Smart meter rollout of 250 million units", page: 8 }], P1: [{ text: "CTO ran meters at a listed utility", page: 12 }] },
-    qualification: [{ text: "Approved vendor to two state utilities since 2022", page: 4 }],
-    numbers: { unit: "INR_CR", lastActualYear: "FY25", nextPlanYear: "FY26E", ...n, lastActualRevenue: 42 },
-    flagQuotes: { relatedParty: [], subsidyProfit: [] },
-  };
-  const s = (code: string, score: number | null, blank: string | null = null, why = "") => ({ code, score, anchor: code === "F1" ? "F1:5:1" : null, why, readings: score === null ? [] : [score, score], agreed: true, blank });
-  const scores = [s("F1", 4, null, "Named utility approvals with a start date."), s("F2", 3), s("F3", 5), { ...s("F4", 5), readings: [] }, s("P1", 3), { ...s("P4", null, "MEETING"), readings: [] }];
+  // An analyst read for Voltaris (SPEC §17.5), made up: overall 7.0, medium confidence, sweet spot supported.
   await db.query(
-    `insert into "FitRating"(id, "companyId", "sourceFileName", "thesisVersion", "themeCode", fit, promise, "fitScored", "fitTotal", "promiseScored", "promiseTotal", facts, scores, flags, highlights, model)
-     values ('e2e-fit', 'e2e-voltaris', 'voltaris-deck.pdf', 1, 'T01', 4.3, null, 4, 4, 1, 2, $1, $2, $3, $4, 'test')`,
-    [JSON.stringify(facts), JSON.stringify(scores), JSON.stringify([{ code: "FL02", value: "Revenue ₹ 42 Cr (FY25)", note: null }]), JSON.stringify([{ code: "H01", state: "CLAIMED", note: null }, { code: "H02", state: "ON", note: null }])],
+    `insert into "AnalystRead"(id, "companyId", "thesisVersion", overall, confidence, body, hash, "readAt", author, "loadedById", "loadedAt")
+     values ('e2e-read', 'e2e-voltaris', 1, 7, 'MEDIUM', $1, 'e2e-hash', current_date, 'Test reader', $2, now() at time zone 'utc')`,
+    [JSON.stringify(madeUpRead("Voltaris Grid Systems")), user],
   );
-  await db.query(`update "Company" set "activeFitId" = 'e2e-fit' where id = 'e2e-voltaris'`);
+  await db.query(`update "Company" set "activeReadId" = 'e2e-read' where id = 'e2e-voltaris'`);
+  // Kestrel has a deck and no read, so it is on the "Waiting for a read" list. The file is never opened.
+  await db.query(
+    // Times in UTC, as Prisma writes them (the local test server's clock may not be UTC).
+    `insert into "File"(id, "companyId", "originalName", kind, mime, "sizeBytes", "storageKey", "uploadedById", "uploadedAt")
+     values ('e2e-deck', 'e2e-kestrel', 'kestrel-deck.pdf', 'DECK', 'application/pdf', 1000, 'e2e-never-stored', $1, (now() at time zone 'utc') - interval '1 day')`,
+    [user],
+  );
   await db.end();
 }
 

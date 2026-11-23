@@ -13,9 +13,12 @@ test("thesis: the theme list, sub-views, and a theme page with its blocks", asyn
   await expect(rows.first()).toContainText("1 holding");
   await expect(rows.first()).toContainText("1 in the pipeline");
 
-  await page.getByRole("tab", { name: "Parameters" }).click();
-  await expect(page.getByText("Is there proof?")).toBeVisible();
-  await expect(page.getByText("No anchor yet").first()).toBeVisible();
+  // How deals are scored: the five scores and the scale, no version 1 parameters or anchors
+  await page.getByRole("tab", { name: "How deals are scored" }).click();
+  await expect(page.getByText("What stops a well-funded rival, and what outside the deck shows it?")).toBeVisible();
+  await expect(page.getByText("Rare, and needs outside proof")).toBeVisible();
+  await expect(page.getByText("Is there proof?")).toHaveCount(0);
+  await expect(page.getByText("No anchor yet")).toHaveCount(0);
   await page.getByRole("tab", { name: "Themes" }).click();
 
   await page.getByRole("button", { name: "Grid equipment test" }).click();
@@ -26,7 +29,8 @@ test("thesis: the theme list, sub-views, and a theme page with its blocks", asyn
   await expect(page.getByRole("region", { name: "Holdings" })).toContainText("Mokobara");
   const pipeline = page.getByRole("region", { name: "In the pipeline" });
   await expect(pipeline).toContainText("Voltaris Grid Systems");
-  await expect(pipeline).toContainText("4.3"); // Fit from the rating fixture
+  await expect(pipeline).toContainText("7.0"); // Read from the fixture
+  await expect(pipeline).toContainText("Medium confidence");
   const money = page.getByRole("region", { name: "Money raised in this theme" });
   await expect(money).toContainText("Voltaris Grid Systems");
   await expect(money).toContainText("In our pipeline");

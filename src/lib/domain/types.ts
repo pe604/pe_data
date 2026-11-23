@@ -1,7 +1,7 @@
 import type { FileKind, Stage, Status } from "./constants";
 import type { Fund, Holding } from "./portfolio";
 import type { ThemeOption } from "./thesis";
-import type { HighlightRow } from "./fit";
+import type { Confidence, HighlightRow, StaleReason } from "./read";
 
 /** One table row. Serialisable; sent from server to client. */
 export interface CompanyRow {
@@ -35,20 +35,22 @@ export interface CompanyRow {
   /** SPEC §17.2: a current, non-cross-sector theme code, or null. `themeEdited` once a person has set it. */
   themeCode: string | null;
   themeEdited: boolean;
-  /** SPEC §17.10: the active fit rating's numbers and highlights, or null when the company has none */
-  fit: FitSummary | null;
-  /** A fit rating job queued or running for this company */
-  fitJob: "QUEUED" | "RUNNING" | null;
+  /** SPEC §17.10: the active analyst read's numbers, or null when the company has none */
+  read: ReadSummary | null;
+  /** SPEC §17.8: highlight chips (H01 from the read, H02 when the theme is a priority one) */
+  highlights: HighlightRow[];
+  /** A deck is attached (for the "Waiting for a read" list, SPEC §17.3) */
+  hasDeck: boolean;
 }
 
-export interface FitSummary {
-  fit: number | null;
-  promise: number | null;
-  fitScored: number;
-  fitTotal: number;
-  promiseScored: number;
-  promiseTotal: number;
-  highlights: HighlightRow[];
+export interface ReadSummary {
+  /** The read's overall score, 0 to 10 */
+  overall: number;
+  /** The team's overall score, when someone has set one (SPEC §17.9); the table and sorts use it first */
+  team: number | null;
+  confidence: Confidence;
+  /** Why the read is out of date, or null (SPEC §17.7) */
+  stale: StaleReason | null;
 }
 
 export interface UpdateItem {

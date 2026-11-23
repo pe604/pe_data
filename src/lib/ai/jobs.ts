@@ -4,7 +4,6 @@ import { norm } from "@/lib/domain/names";
 import { audit } from "@/lib/server/company";
 import { storage } from "@/lib/storage";
 import { buildMarkdown } from "@/lib/summary/markdown";
-import { queueFitJob } from "@/lib/fit/jobs";
 import { prepareDeck } from "./deck";
 import { AiError, aiProvider } from "./provider";
 import type { SummaryOutput } from "./schema";
@@ -101,8 +100,6 @@ async function writeSummary(tx: Tx, job: JobRow & { companyId: string }, actorId
   }
   await tx.company.update({ where: { id: company.id }, data });
   await tx.summaryJob.update({ where: { id: job.id }, data: { summaryId: summary.id } });
-  // A new summary from a deck rates a pipeline deal (SPEC §17.11, reason DECK). Rejected and Invested are left as they are.
-  if (company.status === "PIPELINE" && file?.kind === "DECK") await queueFitJob(company.id, "DECK", tx);
   await audit(tx, company.id, actorId, [
     { note: `Generated summary version ${version}` + (file ? ` from ${file.originalName}` : "") },
     ...changes,

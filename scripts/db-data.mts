@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import pg from "pg";
 import { dbConfig, pgSsl } from "../src/lib/db-config";
 
-// Parent tables first. Company.activeSummaryId → Summary and Company.activeFitId → FitRating are cycles, so they are
+// Parent tables first. Company.activeSummaryId, activeFitId and activeReadId are cycles, so they are
 // set after those tables are loaded. Export refuses a table missing from this list, so a new table can't be left out.
 const ORDER = [
   "User", "TeamMember", "Sector", "AppSetting", "Company", "CompanyPerson", "Comment", "File", "Summary",
@@ -19,11 +19,12 @@ const ORDER = [
   // Events and funding (SPEC §15.14–15.16)
   "EventSector", "Event", "EventSeen", "FundingDeal", "FundingSeen", "FundingNote",
   // Thesis and fit rating (SPEC §17)
-  "ThesisVersion", "ThesisRow", "FitRating", "FitInput", "FitJob",
+  "ThesisVersion", "ThesisRow", "FitRating", "FitInput", "FitJob", "AnalystRead",
 ];
 const ACTIVE = [
   ["activeSummaryId", "Summary"],
   ["activeFitId", "FitRating"],
+  ["activeReadId", "AnalystRead"],
 ] as const;
 
 type Dump = { exportedAt: string; tables: Record<string, Record<string, string | null>[]> };

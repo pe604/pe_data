@@ -63,7 +63,10 @@ export function Popover({
         close.current();
       }
     };
+    // A scroll caused by opening (an autofocused field scrolled into view) must not close the popover it belongs to.
+    const opened = performance.now();
     const scroll = (e: Event) => {
+      if (performance.now() - opened < 400) return;
       if (e.target instanceof Node && (e.target as Element).contains?.(anchor)) close.current();
     };
     document.addEventListener("mousedown", down, true);

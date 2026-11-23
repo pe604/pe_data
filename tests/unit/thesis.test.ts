@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  anchorsFor,
   companyThemes,
   currentRows,
   sortThemes,
@@ -13,7 +12,6 @@ import {
   isStale,
   rowsAt,
   themeByCode,
-  themeScore,
   thesisRowZ,
   thesisSeedZ,
   type StoredThesisRow,
@@ -73,10 +71,6 @@ describe("lookups", () => {
     expect(themeByCode(rows, "T99")).toBeUndefined();
     expect(themeByCode(rows, null)).toBeUndefined();
   });
-  it("lists a parameter's anchors, highest score first", () => {
-    expect(anchorsFor(rows, "F1").map((a) => a.code)).toEqual(["F1:5:1", "F1:5:2", "F1:3:1"]);
-    expect(anchorsFor(rows, "F7")).toEqual([]);
-  });
   it("sorts the theme list Core, Emerging, Unresolved, No view, Cautionary, then by code", () => {
     const list = [
       { code: "T10", status: "CAUTIONARY" as const },
@@ -92,14 +86,6 @@ describe("lookups", () => {
     const opts = themeOptions([theme("T01"), theme("T08", { crossSector: true }), theme("T02", { status: "EMERGING" })]);
     expect(opts.map((t) => t.code)).toEqual(["T01", "T08", "T02"]); // Core before Emerging
     expect(companyThemes(opts).map((t) => t.code)).toEqual(["T01", "T02"]);
-  });
-  it("scores the theme status lookup (F4)", () => {
-    expect(themeScore("CORE")).toBe(5);
-    expect(themeScore("EMERGING")).toBe(3);
-    expect(themeScore("NO_VIEW")).toBe(3);
-    expect(themeScore("UNRESOLVED")).toBe(3);
-    expect(themeScore("CAUTIONARY")).toBe(1);
-    expect(themeScore(null)).toBe(3);
   });
 });
 

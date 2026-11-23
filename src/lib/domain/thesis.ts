@@ -134,17 +134,6 @@ export const companyThemes = (themes: ThemeOption[]): ThemeOption[] => themes.fi
 export const themeByCode = (rows: ThesisRow[], code: string | null | undefined): ThemeRow | undefined =>
   code ? rows.find((r): r is ThemeRow => r.kind === "THEME" && r.code === code) : undefined;
 
-/** A parameter's anchors, highest score first. */
-export const anchorsFor = (rows: ThesisRow[], param: string): AnchorRow[] =>
-  rows.filter((r): r is AnchorRow => r.kind === "ANCHOR" && r.data.param === param).sort((a, b) => b.data.score - a.data.score || a.code.localeCompare(b.code));
-
-/** F4 (theme status) is a lookup, not a model score (SPEC §17.5). No theme scores like No view. */
-export function themeScore(status: ThemeStatus | null | undefined): number {
-  if (status === "CORE") return 5;
-  if (status === "CAUTIONARY") return 1;
-  return 3; // EMERGING, NO_VIEW, UNRESOLVED, or no theme
-}
-
 // ─── Joins (SPEC §17.2) ─────────────────────────────────────────────────────
 
 /** A funding round belongs to a theme when its sector is mapped and, if the theme has keywords, the company or what it does matches one. */
@@ -200,17 +189,18 @@ export function isStale(latestEvidence: string, today: string): boolean {
 
 // ─── Import diff (SPEC §17.1) ───────────────────────────────────────────────
 
-/** JSON with sorted keys, so two rows compare equal whatever order their fields were written in. */
-function canonical(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+/** JSON with sorted keys, so two values compare equal whatever order their fields were written in. */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(",")}]`;
   if (v && typeof v === "object") {
     return `{${Object.keys(v)
       .sort()
-      .map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`)
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
       .join(",")}}`;
   }
   return JSON.stringify(v ?? null);
 }
+const canonical = canonicalJson;
 
 export const sameRow = (a: ThesisRow, b: ThesisRow): boolean =>
   a.kind === b.kind && a.code === b.code && canonical(a.data) === canonical(b.data) && (a.evidence ?? null) === (b.evidence ?? null) && (a.decision ?? null) === (b.decision ?? null);

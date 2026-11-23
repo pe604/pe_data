@@ -3,7 +3,7 @@
 //   npx tsx --conditions=react-server scripts/theme-backfill.mts [thesis/thesis-seed.json] --apply-plan thesis/theme-plan.json
 //   npx tsx --conditions=react-server scripts/theme-backfill.mts [thesis/thesis-seed.json]            (asks the model and writes)
 // 1. Invested companies named in the seed's holdingThemes take that value (exact name), without the model.
-// 2. The rest with no theme and themeEdited false, except Pipeline deals with a deck (the fit reading picks theirs),
+// 2. The rest with no theme and themeEdited false, except companies with an analyst read (the read sets theirs, SPEC §17.2),
 //    go to the cheap check model in batches of 60: name, sector and sub-sector only.
 // --dry-run writes nothing to the database: it prints counts per theme and saves the plan (company ids and codes, no
 // names) to thesis/theme-plan.json, so --apply-plan writes exactly what was reviewed. Never prints company names.
@@ -33,7 +33,7 @@ const keywords = new Map(rows.filter((r): r is typeof r & ThemeRow => r.kind ===
 const nameOf = (code: string | null) => (code ? `${code} ${themes.find((t) => t.code === code)?.name ?? ""}` : "No theme");
 
 const companies = await db.company.findMany({
-  select: { id: true, name: true, status: true, subSector: true, themeCode: true, themeEdited: true, sector: { select: { name: true } }, files: { where: { kind: "DECK" }, select: { id: true }, take: 1 } },
+  select: { id: true, name: true, status: true, subSector: true, themeCode: true, themeEdited: true, sector: { select: { name: true } }, activeReadId: true },
 });
 
 let plan: Plan;
@@ -60,8 +60,8 @@ if (planFile) {
   console.log(`holdingThemes: ${byName.size} names, ${matched} matched an Invested company, ${[...byName.keys()].filter((n) => !names.has(n)).length} did not match`);
 
   // 2. The model, for the rest
-  const todo = open.filter((c) => !taken.has(c.id) && !(c.status === "PIPELINE" && c.files.length > 0));
-  console.log(`asking the model about ${todo.length} companies (${companies.length - todo.length - taken.size} left alone: theme set by a person, already themed, or a pipeline deal with a deck)`);
+  const todo = open.filter((c) => !taken.has(c.id) && !c.activeReadId);
+  console.log(`asking the model about ${todo.length} companies (${companies.length - todo.length - taken.size} left alone: theme set by a person, already themed, or the theme came from a read)`);
   const list = themes.map((t) => ({ ...t, keywords: keywords.get(t.code) ?? [] }));
   for (let i = 0; i < todo.length; i += BATCH) {
     const batch = todo.slice(i, i + BATCH).map((c, j) => ({ key: `C${j + 1}`, id: c.id, name: c.name, sector: c.sector?.name ?? null, subSector: c.subSector }));
