@@ -25,6 +25,7 @@ import { UpdatesTab } from "./UpdatesTab";
 import { CompanyMeetings } from "../portfolio/MeetingsView";
 import { MaterialsTab } from "./MaterialsTab";
 import { SummaryTab } from "./SummaryTab";
+import { FitTab } from "./FitTab";
 import { ThemePopover, themeLabel } from "../thesis/ThemePicker";
 
 type Props = { openId: string | null; tab: DrawerTab; setTab: (t: DrawerTab) => void; onClose: () => void };
@@ -198,6 +199,7 @@ function DrawerBody({
       ]
     : [
         ["summary", "Summary", null],
+        ["fit", "Fit", null],
         ["materials", "Materials", detail?.files.length ?? c.fileCount],
         ["comments", "Comments", detail?.comments.length ?? c.commentCount],
         ["history", "History", null],
@@ -346,6 +348,8 @@ function DrawerBody({
             <div className="tab-gap" />
             <CompanyMeetings companyId={c.id} />
           </>
+        ) : current === "fit" ? (
+          <FitTab c={c} reload={reload} />
         ) : current === "summary" ? (
           <SummaryTab detail={detail} reload={reload} goMaterials={() => setTab("materials")} setBusyEditing={setBusyEditing} />
         ) : current === "materials" ? (

@@ -10,8 +10,8 @@ export const TAB_STATUS: Record<Tab, Status> = {
   invested: "INVESTED",
 };
 
-export type SetKey = "priority" | "stage" | "sector" | "theme" | "pe" | "research" | "via" | "onedrive";
-export const SET_KEYS: SetKey[] = ["priority", "stage", "sector", "theme", "pe", "research", "via", "onedrive"];
+export type SetKey = "priority" | "stage" | "sector" | "theme" | "highlight" | "pe" | "research" | "via" | "onedrive";
+export const SET_KEYS: SetKey[] = ["priority", "stage", "sector", "theme", "highlight", "pe", "research", "via", "onedrive"];
 /** Theme filter value for companies without a theme (SPEC §17.10). */
 export const NO_THEME = "none";
 
@@ -23,6 +23,7 @@ export interface Filters {
   stage: string[]; // Stage values
   sector: string[]; // sector names
   theme: string[]; // theme codes | "none"
+  highlight: string[]; // highlight codes: H01 sweet spot, H02 priority theme
   pe: string[];
   research: string[];
   via: string[];
@@ -37,6 +38,7 @@ export const emptyFilters = (): Filters => ({
   stage: [],
   sector: [],
   theme: [],
+  highlight: [],
   pe: [],
   research: [],
   via: [],
@@ -56,6 +58,8 @@ export const SORTS = [
   ["name-za", "Company Z–A"],
   ["sector-az", "Sector A–Z"],
   ["sector-za", "Sector Z–A"],
+  ["fit-high", "Fit, highest first"],
+  ["promise-high", "Promise, highest first"],
   ["amount-high", "Invested, highest first"],
   ["amount-low", "Invested, lowest first"],
   ["first-new", "First invested, newest first"],
@@ -76,7 +80,7 @@ export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
   return SORTS.filter(([k]) => {
     const group = k.split("-")[0];
     if (ONLY[group]) return ONLY[group] === tab;
-    if (tab === "invested") return !["priority", "stage", "date", "days"].includes(group);
+    if (tab === "invested") return !["priority", "stage", "date", "days", "fit", "promise"].includes(group);
     return true;
   });
 }
@@ -85,7 +89,9 @@ export function sortsForTab(tab: Tab): (typeof SORTS)[number][] {
 export const defaultSortFor = (tab: Tab): SortKey => (tab === "rejected" ? "rejected-old" : tab === "invested" ? "amount-high" : DEFAULT_SORT);
 /** Filter buttons shown per tab. */
 export function filtersForTab(tab: Tab): SetKey[] {
-  return tab === "invested" ? SET_KEYS.filter((k) => k !== "priority" && k !== "stage" && k !== "via") : [...SET_KEYS];
+  // Highlights are a Pipeline filter only (SPEC §17.10).
+  if (tab === "invested") return SET_KEYS.filter((k) => k !== "priority" && k !== "stage" && k !== "via" && k !== "highlight");
+  return tab === "pipeline" ? [...SET_KEYS] : SET_KEYS.filter((k) => k !== "highlight");
 }
 
 /** Column header → [first click, second click]. */
@@ -130,6 +136,7 @@ export function applyFilters(list: CompanyRow[], f: Filters, skip?: "stage" | "p
   if (skip !== "stage" && f.stage.length) out = out.filter((c) => f.stage.includes(c.stage));
   if (f.sector.length) out = out.filter((c) => f.sector.includes(c.sector ?? ""));
   if (f.theme.length) out = out.filter((c) => f.theme.includes(c.themeCode ?? NO_THEME));
+  if (f.highlight.length) out = out.filter((c) => (c.fit?.highlights ?? []).some((h) => f.highlight.includes(h.code)));
   if (f.onedrive.length) out = out.filter((c) => f.onedrive.includes(c.oneDriveUrl ? "linked" : "missing"));
   for (const k of ["pe", "research", "via"] as const) {
     if (k === "pe" && skip === "pe") continue;
@@ -187,6 +194,11 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
       return out.sort(blanksLast((c) => c.sector || null, str));
     case "sector-za":
       return out.sort(blanksLast((c) => c.sector || null, (x, y) => str(y, x)));
+    // Unrated last; the default sort never changes (SPEC §17.10).
+    case "fit-high":
+      return out.sort(blanksLast((c) => c.fit?.fit ?? null, (x, y) => y - x));
+    case "promise-high":
+      return out.sort(blanksLast((c) => c.fit?.promise ?? null, (x, y) => y - x));
     case "amount-high":
       return out.sort(blanksLast((c) => c.holding?.invested ?? null, (x, y) => y - x));
     case "amount-low":

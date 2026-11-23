@@ -24,7 +24,9 @@ test("thesis: the theme list, sub-views, and a theme page with its blocks", asyn
     await expect(page.getByRole("heading", { name: block, exact: true })).toBeVisible();
   }
   await expect(page.getByRole("region", { name: "Holdings" })).toContainText("Mokobara");
-  await expect(page.getByRole("region", { name: "In the pipeline" })).toContainText("Voltaris Grid Systems");
+  const pipeline = page.getByRole("region", { name: "In the pipeline" });
+  await expect(pipeline).toContainText("Voltaris Grid Systems");
+  await expect(pipeline).toContainText("4.3"); // Fit from the rating fixture
   const money = page.getByRole("region", { name: "Money raised in this theme" });
   await expect(money).toContainText("Voltaris Grid Systems");
   await expect(money).toContainText("In our pipeline");

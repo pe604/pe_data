@@ -1022,3 +1022,51 @@ button.ev-check-tag:hover{border-color:var(--gold)}
   .th-counts{align-items:flex-start}
   .th-table{display:block;overflow-x:auto}
 }
+/* Fit rating (SPEC §17.10) */
+.c-fit{text-align:right;white-space:nowrap}
+.fit-cell{background:none;border:0;padding:2px 4px;border-radius:5px;display:inline-flex;flex-direction:column;align-items:flex-end;gap:0;color:var(--ink);cursor:pointer;font-variant-numeric:tabular-nums}
+.fit-cell:hover{background:var(--hover)}
+.fit-cell:focus-visible,.fit-row .linkbtn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.fit-num{font-weight:600;font-size:14px}
+.fit-cell small{font-size:11px;color:var(--muted)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--rule);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+.spin.sm{width:10px;height:10px;border-width:2px}
+.fit-chips{display:inline-flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.fit-chip{font-size:11px;font-weight:600;padding:1px 6px;border-radius:999px;background:var(--green-soft);color:var(--green);white-space:nowrap}
+.fit-chip.sweet{background:var(--gold-soft);color:var(--gold)}
+.fit{display:flex;flex-direction:column;gap:8px}
+.fit-theme{display:flex;align-items:center;gap:8px;font-size:13px}
+.fit-means{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.fit-mean{font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+.fit-fixed{margin:2px 0;font-size:12.5px;color:var(--muted);font-style:italic}
+.fit-job{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);padding:8px 10px;border-radius:6px;background:var(--surface-2);border:1px solid var(--rule-2)}
+.fit-job.warn{color:var(--brick);background:var(--brick-soft);border-color:transparent}
+.fit-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.fit-row{padding:10px 0;border-bottom:1px solid var(--rule-2);display:flex;flex-direction:column;gap:3px}
+.fit-head{display:flex;align-items:center;gap:8px}
+.fit-pill{flex:none;width:26px;height:24px;border-radius:6px;background:var(--green);color:var(--on-green);font-weight:600;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.fit-pill.blank{background:var(--rule-2);color:var(--muted)}
+.fit-name{font-weight:500;font-size:14px}
+.fit-code{font-size:12px;font-weight:400}
+.fit-head .hint{margin-left:auto}
+.fit-input{font-size:13px;color:var(--ink);background:var(--gold-soft);border-radius:5px;padding:4px 8px}
+.fit-quotes{margin:2px 0;padding-left:18px;font-size:13px;color:var(--ink-2);font-family:var(--serif)}
+.fit-quotes li{margin:2px 0}
+.fit-flags{margin:0;display:grid;grid-template-columns:minmax(140px,max-content) 1fr;gap:4px 14px;font-size:13px}
+.fit-flags div{display:contents}
+.fit-flags dt{color:var(--muted)}
+.fit-flags dd{margin:0;color:var(--ink)}
+.fit-note{display:block;font-size:12px;color:var(--muted);font-family:var(--serif)}
+.fit-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--rule)}
+.fit-form{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--surface-2)}
+.fit-form .field{margin-top:0}
+.fit-form textarea{width:100%;resize:vertical}
+.fit-scores{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fit-scores legend{font-size:12.5px;color:var(--muted);margin-bottom:4px;padding:0}
+.fit-scores label{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:30px;border:1px solid var(--rule);border-radius:6px;cursor:pointer;font-variant-numeric:tabular-nums}
+.fit-scores label.on{border-color:var(--green);background:var(--green-soft);color:var(--green);font-weight:600}
+.fit-scores input{position:absolute;opacity:0;width:1px;height:1px}
+.fit-scores label:focus-within{outline:2px solid var(--green);outline-offset:2px}
+.fit-form-acts{display:flex;justify-content:flex-end;gap:8px}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+@media (max-width:760px){.fit-flags{grid-template-columns:1fr}.fit-flags dt{margin-top:6px}.fit-head .hint{display:none}}

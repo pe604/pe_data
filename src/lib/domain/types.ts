@@ -1,6 +1,7 @@
 import type { FileKind, Stage, Status } from "./constants";
 import type { Fund, Holding } from "./portfolio";
 import type { ThemeOption } from "./thesis";
+import type { HighlightRow } from "./fit";
 
 /** One table row. Serialisable; sent from server to client. */
 export interface CompanyRow {
@@ -34,6 +35,20 @@ export interface CompanyRow {
   /** SPEC §17.2: a current, non-cross-sector theme code, or null. `themeEdited` once a person has set it. */
   themeCode: string | null;
   themeEdited: boolean;
+  /** SPEC §17.10: the active fit rating's numbers and highlights, or null when the company has none */
+  fit: FitSummary | null;
+  /** A fit rating job queued or running for this company */
+  fitJob: "QUEUED" | "RUNNING" | null;
+}
+
+export interface FitSummary {
+  fit: number | null;
+  promise: number | null;
+  fitScored: number;
+  fitTotal: number;
+  promiseScored: number;
+  promiseTotal: number;
+  highlights: HighlightRow[];
 }
 
 export interface UpdateItem {

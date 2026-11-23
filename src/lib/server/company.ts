@@ -7,6 +7,7 @@ import type { CompanyRow, DashboardData, Me, TeamMemberOption } from "@/lib/doma
 import { safeHref } from "@/lib/domain/onedrive";
 import { FUNDS, holdingOf, type Fund } from "@/lib/domain/portfolio";
 import { themeOptions } from "@/lib/domain/thesis";
+import { highlightRowZ } from "@/lib/domain/fit";
 import { currentThesis } from "@/lib/server/thesis";
 
 /** DB text → Fund (null for rounds entered before funds existed). */
@@ -28,6 +29,9 @@ export const rowInclude = {
     select: { date: true, text: true, createdBy: { select: { name: true } } },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   },
+  // Fit rating (SPEC §17.10): the numbers only; quotes and reasons load with the Fit tab.
+  activeFit: { select: { fit: true, promise: true, fitScored: true, fitTotal: true, promiseScored: true, promiseTotal: true, highlights: true } },
+  fitJobs: { where: { status: { in: ["QUEUED", "RUNNING"] } }, select: { status: true }, take: 1 },
 } satisfies Prisma.CompanyInclude;
 
 /** Prisma Decimal | null → number | null. */
@@ -71,6 +75,18 @@ export function toRow(c: RowSource): CompanyRow {
     commentSearch: [...c.comments.map((x) => x.text), ...c.updates.map((u) => u.text)].join("\n").toLowerCase(),
     themeCode: c.themeCode,
     themeEdited: c.themeEdited,
+    fit: c.activeFit
+      ? {
+          fit: num(c.activeFit.fit),
+          promise: num(c.activeFit.promise),
+          fitScored: c.activeFit.fitScored,
+          fitTotal: c.activeFit.fitTotal,
+          promiseScored: c.activeFit.promiseScored,
+          promiseTotal: c.activeFit.promiseTotal,
+          highlights: highlightRowZ.array().catch([]).parse(c.activeFit.highlights),
+        }
+      : null,
+    fitJob: (c.fitJobs[0]?.status as CompanyRow["fitJob"] | undefined) ?? null,
   };
 }
 

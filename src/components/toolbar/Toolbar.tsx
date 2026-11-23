@@ -29,6 +29,7 @@ const TITLES: Record<FKey, string> = {
   stage: "Stage",
   sector: "Sector",
   theme: "Theme",
+  highlight: "Highlights",
   pe: "Assigned PE",
   research: "Assigned Research",
   via: "Via",
@@ -40,6 +41,7 @@ const BUTTONS: [FKey, string][] = [
   ["stage", "Stage"],
   ["sector", "Sector"],
   ["theme", "Theme"],
+  ["highlight", "Highlights"],
   ["pe", "PE"],
   ["research", "Research"],
   ["via", "Via"],
@@ -80,6 +82,7 @@ export function Toolbar({ rows, view, setView }: Props) {
       onedrive: [["linked", "Link saved"], ["missing", "Link missing"]] as [string, string][],
       sector: [...sectors].sort().map((s) => [s, s] as [string, string]),
       // Theme names in thesis order, then "No theme" (SPEC §17.10)
+      highlight: [["H01", "Sweet spot"], ["H02", "Priority theme"]] as [string, string][],
       theme: [...companyThemes(themes).map((t) => [t.code, t.name] as [string, string]), [NO_THEME, "No theme"] as [string, string]],
       pe: collect("pe"),
       research: collect("research"),

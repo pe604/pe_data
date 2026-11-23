@@ -12,6 +12,7 @@ import { isStale, themeByCode, type StoredThesisRow } from "@/lib/domain/thesis"
 import type { CompanyRow } from "@/lib/domain/types";
 import { useStore } from "../store";
 import { Evidence, StatusBadge } from "./ThesisView";
+import { HighlightChips } from "../drawer/FitTab";
 
 const PAGE = 20;
 
@@ -37,8 +38,14 @@ export function ThemePage({ code, rows, current, onBack }: { code: string; rows:
 
   const mine = useMemo(() => companies.filter((c) => c.themeCode === code), [companies, code]);
   const holdings = mine.filter((c) => c.status === "INVESTED").sort((a, b) => (b.holding?.invested ?? 0) - (a.holding?.invested ?? 0) || a.name.localeCompare(b.name));
-  // Sorted by Fit once ratings exist (SPEC §17.4); until then every deal is unrated, so by name.
-  const pipeline = mine.filter((c) => c.status === "PIPELINE").sort((a, b) => a.name.localeCompare(b.name));
+  // By Fit, highest first, unrated last (SPEC §17.4).
+  const pipeline = mine.filter((c) => c.status === "PIPELINE").sort((a, b) => {
+    const x = a.fit?.fit ?? null;
+    const y = b.fit?.fit ?? null;
+    if (x === null || y === null) return x === y ? a.name.localeCompare(b.name) : x === null ? 1 : -1;
+    return y - x || a.name.localeCompare(b.name);
+  });
+  const score = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v.toFixed(1));
   const rejected = mine.filter((c) => c.status === "REJECTED").sort((a, b) => (b.exitAt ?? "").localeCompare(a.exitAt ?? ""));
 
   const back = (
@@ -132,10 +139,13 @@ export function ThemePage({ code, rows, current, onBack }: { code: string; rows:
               <tbody>
                 {pipeline.map((c) => (
                   <tr key={c.id}>
-                    <td>{name(c)}</td>
+                    <td>
+                      {name(c)}
+                      {c.fit && <HighlightChips list={c.fit.highlights} />}
+                    </td>
                     <td>{STAGE_LABELS[c.stage]}</td>
-                    <td className="num">–</td>
-                    <td className="num">–</td>
+                    <td className="num">{score(c.fit?.fit)}</td>
+                    <td className="num">{score(c.fit?.promise)}</td>
                     <td className="num">{daysFor(c) ?? "–"}</td>
                   </tr>
                 ))}

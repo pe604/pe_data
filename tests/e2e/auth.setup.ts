@@ -88,13 +88,36 @@ async function resetTestDb() {
     ["PRINCIPLE", "PR01", { text: "Test principle about proof over claims." }],
     ["PARAMETER", "F1", { name: "Proof", question: "Is there proof?", group: "FIT", source: "DECK", weight: 1 }],
     ["ANCHOR", "F1:5:1", { param: "F1", score: 5, label: "Example Co", shows: "named buyers" }],
+    ["PARAMETER", "F2", { name: "Own plant", question: "Does it make the product?", group: "FIT", source: "DECK", weight: 1 }],
+    ["PARAMETER", "F3", { name: "Demand", question: "What drives demand?", group: "FIT", source: "DECK", weight: 1 }],
+    ["PARAMETER", "F4", { name: "Theme status", question: "Which theme?", group: "FIT", source: "LOOKUP", weight: 1 }],
+    ["PARAMETER", "P1", { name: "Team depth", question: "Who has joined?", group: "PROMISE", source: "DECK", weight: 1 }],
+    ["PARAMETER", "P4", { name: "Founder execution", question: "Did they do what they said?", group: "PROMISE", source: "MEETING", weight: 1 }],
     ["FLAG", "FL01", { name: "Price ask", fact: "The ask and its multiple", why: "Context", how: "CODE" }],
+    ["FLAG", "FL02", { name: "Stage", fact: "Pre-revenue, early or growth", why: "Context", how: "CODE" }],
     ["HIGHLIGHT", "H01", { name: "Sweet spot", firesWhen: "Qualified and small", shownAs: "Sweet spot (claimed)" }],
   ];
   for (const [kind, code, data] of thesis) {
     await db.query(`insert into "ThesisRow"(id, kind, code, data, evidence, decision, "fromVersion") values (gen_random_uuid()::text, $1, $2, $3, 'Test note, Jan 2026', null, 1)`, [kind, code, JSON.stringify(data)]);
   }
   await db.query(`update "Company" set "themeCode" = 'T01' where id in ('e2e-voltaris', 'e2e-mokobara')`);
+  // A fit rating for Voltaris (SPEC §17.5): F1 4, F2 3, F3 5, F4 5 (Core) → Fit 4.3 · 4 of 4; Promise: only P1, so none yet.
+  const n = Object.fromEntries(["lastActualRevenue", "lastActualEbitda", "lastActualPat", "nextPlanRevenue", "orderBook", "raise", "preMoney", "secondaryPct", "topCustomerPct", "schemeSharePct", "receivableDays", "capexPlanned", "newDebt"].map((k) => [k, null]));
+  const facts = {
+    theme: "T01",
+    quotes: { F1: [{ text: "Approved vendor to two state utilities since 2022", page: 4 }], F2: [{ text: "Our own plant in Pune", page: 6 }], F3: [{ text: "Smart meter rollout of 250 million units", page: 8 }], P1: [{ text: "CTO ran meters at a listed utility", page: 12 }] },
+    qualification: [{ text: "Approved vendor to two state utilities since 2022", page: 4 }],
+    numbers: { unit: "INR_CR", lastActualYear: "FY25", nextPlanYear: "FY26E", ...n, lastActualRevenue: 42 },
+    flagQuotes: { relatedParty: [], subsidyProfit: [] },
+  };
+  const s = (code: string, score: number | null, blank: string | null = null, why = "") => ({ code, score, anchor: code === "F1" ? "F1:5:1" : null, why, readings: score === null ? [] : [score, score], agreed: true, blank });
+  const scores = [s("F1", 4, null, "Named utility approvals with a start date."), s("F2", 3), s("F3", 5), { ...s("F4", 5), readings: [] }, s("P1", 3), { ...s("P4", null, "MEETING"), readings: [] }];
+  await db.query(
+    `insert into "FitRating"(id, "companyId", "sourceFileName", "thesisVersion", "themeCode", fit, promise, "fitScored", "fitTotal", "promiseScored", "promiseTotal", facts, scores, flags, highlights, model)
+     values ('e2e-fit', 'e2e-voltaris', 'voltaris-deck.pdf', 1, 'T01', 4.3, null, 4, 4, 1, 2, $1, $2, $3, $4, 'test')`,
+    [JSON.stringify(facts), JSON.stringify(scores), JSON.stringify([{ code: "FL02", value: "Revenue ₹ 42 Cr (FY25)", note: null }]), JSON.stringify([{ code: "H01", state: "CLAIMED", note: null }, { code: "H02", state: "ON", note: null }])],
+  );
+  await db.query(`update "Company" set "activeFitId" = 'e2e-fit' where id = 'e2e-voltaris'`);
   await db.end();
 }
 

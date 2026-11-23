@@ -45,6 +45,8 @@ const row = (p: Partial<CompanyRow>): CompanyRow => ({
   commentSearch: "",
   themeCode: null,
   themeEdited: false,
+  fit: null,
+  fitJob: null,
   ...p,
 });
 
@@ -148,5 +150,29 @@ describe("theme filter and the Thesis address (SPEC §17.3, §17.10)", () => {
     expect(thesisFromQuery("view=thesis")).toBeNull();
     expect(thesisFromQuery("view=thesis&theme=<script>")).toBeNull();
     expect(thesisFromQuery("tab=rejected")).toBeUndefined();
+  });
+});
+describe("fit sorts and the highlights filter (SPEC §17.10)", () => {
+  const fs = (fit: number | null, promise: number | null, codes: string[] = []) => ({
+    fit, promise, fitScored: 5, fitTotal: 7, promiseScored: 2, promiseTotal: 5,
+    highlights: codes.map((code) => ({ code, state: "CLAIMED" as const, note: null })),
+  });
+  const rated = [row({ name: "A", fit: fs(3.1, 4) }), row({ name: "B" }), row({ name: "C", fit: fs(4.5, null, ["H01"]) }), row({ name: "D", fit: fs(null, 2.5, ["H02"]) })];
+  it("sorts by Fit or Promise, highest first, unrated last", () => {
+    expect(names(sortRows(rated, "fit-high", "2026-06-01"))).toBe("CABD");
+    expect(names(sortRows(rated, "promise-high", "2026-06-01"))).toBe("ADBC");
+  });
+  it("offers the fit sorts on Pipeline and Rejected, not Invested; the default sort is unchanged", () => {
+    expect(sortsForTab("pipeline").map(([k]) => k)).toEqual(expect.arrayContaining(["fit-high", "promise-high"]));
+    expect(sortsForTab("rejected").map(([k]) => k)).toContain("fit-high");
+    expect(sortsForTab("invested").map(([k]) => k)).not.toContain("fit-high");
+    expect(defaultSortFor("pipeline")).toBe("priority");
+  });
+  it("filters by highlight on Pipeline only", () => {
+    expect(names(applyFilters(rated, { ...emptyFilters(), highlight: ["H01"] }))).toBe("C");
+    expect(names(applyFilters(rated, { ...emptyFilters(), highlight: ["H01", "H02"] }))).toBe("CD");
+    expect(filtersForTab("pipeline")).toContain("highlight");
+    expect(filtersForTab("rejected")).not.toContain("highlight");
+    expect(filtersForTab("invested")).not.toContain("highlight");
   });
 });
