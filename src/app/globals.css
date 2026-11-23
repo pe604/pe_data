@@ -985,3 +985,40 @@ button.ev-check-tag:hover{border-color:var(--gold)}
 .ev-owner.set{border-color:var(--green);color:var(--green);font-weight:500}
 .ev-warn{color:var(--amber)}
 .fd-pdf{height:34px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:0 14px}
+
+/* Thesis tab and theme pages (SPEC §17.3, §17.4) */
+.th-head{align-items:flex-end}
+.th-title{font-family:var(--serif);font-weight:500;font-size:22px;margin:0;color:var(--ink)}
+.th-code{font-family:var(--sans);font-size:13px;font-weight:400}
+.th-link{background:none;border:0;padding:0;font:inherit;color:var(--ink);text-align:left;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px;cursor:pointer}
+.th-link:hover{color:var(--green)}
+.th-link:focus-visible,.th-menu button:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:3px}
+.th-badge{display:inline-flex;align-items:center;border-radius:5px;padding:1px 7px;font-size:11.5px;font-weight:600}
+.th-core{background:var(--green-soft);color:var(--green)}
+.th-emerging{background:var(--gold-soft);color:var(--gold)}
+.th-cautionary{background:var(--brick-soft);color:var(--brick)}
+.th-unresolved,.th-no-view{background:var(--rule-2);color:var(--muted)}
+.th-stale{margin-left:6px;font-size:11px;font-weight:600;color:var(--amber)}
+.th-open{margin-left:8px;font-size:11px;font-weight:600;color:var(--amber)}
+.th-evidence{font-style:italic}
+.th-text{font-size:14px;color:var(--ink)}
+.th-row .ev-date{font-weight:500}
+.th-counts{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.th-ladder{list-style:none;margin:6px 0 4px;padding:0;display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--ink-2)}
+.th-ladder li{display:flex;gap:8px;align-items:baseline}
+.th-score{flex:none;width:20px;height:20px;border-radius:5px;background:var(--rule-2);color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-variant-numeric:tabular-nums}
+.th-anchor{display:block}
+.th-page-head{margin:8px 0 6px;display:flex;flex-direction:column;gap:6px}
+.th-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.th-table th{text-align:left;font-weight:500;color:var(--muted);font-size:12.5px;padding:6px 8px;border-bottom:1px solid var(--rule)}
+.th-table td{padding:8px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+.th-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.th-total{margin-top:6px}
+.th-menu{max-height:360px;overflow:auto}
+.th-menu-head{font-size:11.5px;font-weight:600;color:var(--muted);padding:6px 8px 2px;text-transform:none}
+.pview-pad{padding:20px 28px}
+@media (max-width:760px){
+  .th-row{grid-template-columns:1fr}
+  .th-counts{align-items:flex-start}
+  .th-table{display:block;overflow-x:auto}
+}

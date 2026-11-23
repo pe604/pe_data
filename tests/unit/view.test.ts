@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CompanyRow } from "@/lib/domain/types";
-import { applyFilters, defaultSortFor, emptyFilters, filtersForTab, queryToView, sortRows, sortsForTab, viewToQuery } from "@/lib/domain/view";
+import { applyFilters, defaultSortFor, emptyFilters, filtersForTab, NO_THEME, queryToView, sortRows, sortsForTab, thesisFromQuery, thesisQuery, viewToQuery } from "@/lib/domain/view";
 
 describe("per-tab filters and sorts", () => {
   it("Invested hides Priority, Stage and Via and offers amount sorting", () => {
-    expect(filtersForTab("invested")).toEqual(["sector", "pe", "research", "onedrive"]);
+    expect(filtersForTab("invested")).toEqual(["sector", "theme", "pe", "research", "onedrive"]);
+    // Theme is a filter on all three tabs (SPEC §17.10)
+    expect(filtersForTab("pipeline")).toContain("theme");
+    expect(filtersForTab("rejected")).toContain("theme");
     const inv = sortsForTab("invested").map(([k]) => k);
     expect(inv).toContain("amount-high");
     expect(inv.some((k) => k.startsWith("priority") || k.startsWith("stage"))).toBe(false);
@@ -40,6 +43,8 @@ const row = (p: Partial<CompanyRow>): CompanyRow => ({
   updateCount: 0,
   fileCount: 0,
   commentSearch: "",
+  themeCode: null,
+  themeEdited: false,
   ...p,
 });
 
@@ -122,5 +127,26 @@ describe("rejected and invested sorts", () => {
     const inv = sortsForTab("invested").map(([k]) => k);
     expect(inv).toEqual(expect.arrayContaining(["amount-high", "first-new", "first-old"]));
     expect(inv.some((k) => k.startsWith("date") || k.startsWith("days"))).toBe(false);
+  });
+});
+
+describe("theme filter and the Thesis address (SPEC §17.3, §17.10)", () => {
+  const themed = [row({ name: "A", themeCode: "T06" }), row({ name: "B", themeCode: "T02" }), row({ name: "C" })];
+  it("filters by theme code, and by No theme", () => {
+    expect(names(applyFilters(themed, { ...emptyFilters(), theme: ["T06"] }))).toBe("A");
+    expect(names(applyFilters(themed, { ...emptyFilters(), theme: ["T06", NO_THEME] }))).toBe("AC");
+    expect(names(applyFilters(themed, emptyFilters()))).toBe("ABC");
+  });
+  it("keeps the theme filter in the URL", () => {
+    const v = queryToView(viewToQuery({ tab: "rejected", sort: defaultSortFor("rejected"), f: { ...emptyFilters(), theme: ["T06", NO_THEME] } }));
+    expect(v.f.theme).toEqual(["T06", NO_THEME]);
+  });
+  it("builds and reads the Thesis tab's address", () => {
+    expect(thesisQuery(null)).toBe("?view=thesis");
+    expect(thesisQuery("T06")).toBe("?view=thesis&theme=T06");
+    expect(thesisFromQuery("view=thesis&theme=T06")).toBe("T06");
+    expect(thesisFromQuery("view=thesis")).toBeNull();
+    expect(thesisFromQuery("view=thesis&theme=<script>")).toBeNull();
+    expect(thesisFromQuery("tab=rejected")).toBeUndefined();
   });
 });

@@ -100,6 +100,7 @@ export const FIELD_LABELS: Record<string, string> = {
   oneDriveUrl: "OneDrive link",
   status: "Status",
   peTeam: "PE team order",
+  theme: "Theme",
 };
 
 export const ROLE_FIELD: Record<PersonRole, "pe" | "research" | "via"> = {

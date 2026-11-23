@@ -25,6 +25,7 @@ import { UpdatesTab } from "./UpdatesTab";
 import { CompanyMeetings } from "../portfolio/MeetingsView";
 import { MaterialsTab } from "./MaterialsTab";
 import { SummaryTab } from "./SummaryTab";
+import { ThemePopover, themeLabel } from "../thesis/ThemePicker";
 
 type Props = { openId: string | null; tab: DrawerTab; setTab: (t: DrawerTab) => void; onClose: () => void };
 
@@ -140,7 +141,7 @@ function DrawerBody({
   const { mutate, putRow, removeRow, toast } = store;
   const [editName, setEditName] = useState(false);
   const [modal, setModal] = useState<"reject" | "delete" | null>(null);
-  const [pop, setPop] = useState<{ kind: "sector" | "od" | "date" | "more"; el: HTMLElement } | null>(null);
+  const [pop, setPop] = useState<{ kind: "sector" | "theme" | "od" | "date" | "more"; el: HTMLElement } | null>(null);
   const openId = detail?.row.id;
   const c = store.companies.find((x) => x.id === openId) ?? detail?.row;
 
@@ -263,6 +264,9 @@ function DrawerBody({
           <button className="meta-btn" type="button" onClick={(e) => setPop({ kind: "sector", el: e.currentTarget })}>
             {c.sector || c.subSector ? [c.sector, c.subSector].filter(Boolean).join(", ") : "Add sector"}
           </button>
+          <button className="meta-btn" type="button" title="The thesis theme this company sits in" onClick={(e) => setPop({ kind: "theme", el: e.currentTarget })}>
+            {themeLabel(c, store.themes)}
+          </button>
           {c.oneDriveUrl ? (
             <>
               <a className="meta-btn" href={c.oneDriveUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--green)", fontWeight: 500 }}>
@@ -354,6 +358,7 @@ function DrawerBody({
       </div>
 
       {pop?.kind === "sector" && <SectorPopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
+      {pop?.kind === "theme" && <ThemePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
       {pop?.kind === "od" && <OneDrivePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
       {pop?.kind === "date" && <DatePopover c={c} anchor={pop.el} onClose={() => setPop(null)} />}
       {pop?.kind === "more" && (

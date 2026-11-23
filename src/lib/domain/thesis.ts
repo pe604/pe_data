@@ -7,6 +7,22 @@ export const THESIS_KINDS = ["PRINCIPLE", "THEME", "PARAMETER", "ANCHOR", "FLAG"
 export type ThesisKind = (typeof THESIS_KINDS)[number];
 export const THEME_STATUSES = ["CORE", "EMERGING", "CAUTIONARY", "NO_VIEW", "UNRESOLVED"] as const;
 export type ThemeStatus = (typeof THEME_STATUSES)[number];
+export const THEME_STATUS_LABELS: Record<ThemeStatus, string> = { CORE: "Core", EMERGING: "Emerging", CAUTIONARY: "Cautionary", NO_VIEW: "No view", UNRESOLVED: "Unresolved" };
+/** Display order of the theme list (SPEC §17.3): Core, Emerging, Unresolved, No view, Cautionary. */
+export const THEME_ORDER: ThemeStatus[] = ["CORE", "EMERGING", "UNRESOLVED", "NO_VIEW", "CAUTIONARY"];
+
+/** A theme as the dashboard needs it: for pickers, filters and the theme column. */
+export interface ThemeOption {
+  code: string;
+  name: string;
+  status: ThemeStatus;
+  priority: boolean;
+  crossSector: boolean;
+}
+
+/** Status order, then code (T2 before T10). */
+export const sortThemes = <T extends { code: string; status: ThemeStatus }>(themes: T[]): T[] =>
+  themes.slice().sort((a, b) => THEME_ORDER.indexOf(a.status) - THEME_ORDER.indexOf(b.status) || a.code.localeCompare(b.code, undefined, { numeric: true }));
 
 const text = z.string().trim().min(1);
 const names = z.array(z.string().trim().min(1));
@@ -108,6 +124,12 @@ export const rowsAt = <R extends { fromVersion: number; toVersion: number | null
   rows.filter((r) => r.fromVersion <= version && (r.toVersion === null || r.toVersion > version));
 
 // ─── Lookups ────────────────────────────────────────────────────────────────
+
+export const themeOptions = (rows: ThesisRow[]): ThemeOption[] =>
+  sortThemes(rows.filter((r): r is ThemeRow => r.kind === "THEME").map((r) => ({ code: r.code, name: r.data.name, status: r.data.status, priority: r.data.priority, crossSector: r.data.crossSector })));
+
+/** Themes a company can carry: cross-sector themes are tags only (SPEC §17.2). */
+export const companyThemes = (themes: ThemeOption[]): ThemeOption[] => themes.filter((t) => !t.crossSector);
 
 export const themeByCode = (rows: ThesisRow[], code: string | null | undefined): ThemeRow | undefined =>
   code ? rows.find((r): r is ThemeRow => r.kind === "THEME" && r.code === code) : undefined;

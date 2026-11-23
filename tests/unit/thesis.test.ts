@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   anchorsFor,
+  companyThemes,
   currentRows,
+  sortThemes,
+  themeOptions,
   dealsForTheme,
   diffIsEmpty,
   diffThesis,
@@ -73,6 +76,22 @@ describe("lookups", () => {
   it("lists a parameter's anchors, highest score first", () => {
     expect(anchorsFor(rows, "F1").map((a) => a.code)).toEqual(["F1:5:1", "F1:5:2", "F1:3:1"]);
     expect(anchorsFor(rows, "F7")).toEqual([]);
+  });
+  it("sorts the theme list Core, Emerging, Unresolved, No view, Cautionary, then by code", () => {
+    const list = [
+      { code: "T10", status: "CAUTIONARY" as const },
+      { code: "T2", status: "NO_VIEW" as const },
+      { code: "T11", status: "CORE" as const },
+      { code: "T3", status: "UNRESOLVED" as const },
+      { code: "T9", status: "CORE" as const },
+      { code: "T1", status: "EMERGING" as const },
+    ];
+    expect(sortThemes(list).map((t) => t.code)).toEqual(["T9", "T11", "T1", "T3", "T2", "T10"]);
+  });
+  it("offers only non-cross-sector themes to companies", () => {
+    const opts = themeOptions([theme("T01"), theme("T08", { crossSector: true }), theme("T02", { status: "EMERGING" })]);
+    expect(opts.map((t) => t.code)).toEqual(["T01", "T08", "T02"]); // Core before Emerging
+    expect(companyThemes(opts).map((t) => t.code)).toEqual(["T01", "T02"]);
   });
   it("scores the theme status lookup (F4)", () => {
     expect(themeScore("CORE")).toBe(5);

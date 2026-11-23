@@ -6,6 +6,8 @@ import { nameKey, titleCase } from "@/lib/domain/names";
 import type { CompanyRow, DashboardData, Me, TeamMemberOption } from "@/lib/domain/types";
 import { safeHref } from "@/lib/domain/onedrive";
 import { FUNDS, holdingOf, type Fund } from "@/lib/domain/portfolio";
+import { themeOptions } from "@/lib/domain/thesis";
+import { currentThesis } from "@/lib/server/thesis";
 
 /** DB text → Fund (null for rounds entered before funds existed). */
 export const asFund = (f: string | null): Fund | null => (FUNDS as readonly string[]).includes(f ?? "") ? (f as Fund) : null;
@@ -67,6 +69,8 @@ export function toRow(c: RowSource): CompanyRow {
     updateCount: c.updates.length,
     fileCount: c._count.files,
     commentSearch: [...c.comments.map((x) => x.text), ...c.updates.map((u) => u.text)].join("\n").toLowerCase(),
+    themeCode: c.themeCode,
+    themeEdited: c.themeEdited,
   };
 }
 
@@ -76,7 +80,7 @@ export async function getRow(id: string, tx: Tx | typeof db = db): Promise<Compa
 }
 
 export async function loadDashboard(me: Me): Promise<DashboardData> {
-  const [companies, sectors, team, peLog] = await Promise.all([
+  const [companies, sectors, team, peLog, thesis] = await Promise.all([
     db.company.findMany({ include: rowInclude }),
     db.sector.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),
     db.teamMember.findMany({ orderBy: { name: "asc" } }),
@@ -85,10 +89,12 @@ export async function loadDashboard(me: Me): Promise<DashboardData> {
       orderBy: { at: "desc" },
       include: { actor: { select: { name: true } } },
     }),
+    currentThesis(),
   ]);
   return {
     companies: companies.map(toRow),
     sectors: sectors.map((s) => ({ id: s.id, name: s.name })),
+    themes: themeOptions(thesis),
     team: team.map(toTeamOption),
     peMeta: peLog ? { by: peLog.actor.name, at: peLog.at.toISOString() } : null,
     me,

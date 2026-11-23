@@ -75,6 +75,26 @@ async function resetTestDb() {
     sectors: [{ name: "Consumer", headline: "Food leads consumer", text: "[[Kiran Foods]] took $12M." }],
   };
   await db.query(`insert into "FundingNote"(period, kind, data, model, unchecked) values ($1, 'MONTH', $2, 'anthropic/claude-opus-5.5', '{}')`, [month, JSON.stringify(column)]);
+  // Thesis (SPEC §17): a made-up version, never the real seed. Voltaris and Mokobara sit in the grid theme.
+  await db.query(`insert into "ThesisVersion"(version, label, note) values (1, '1.0', 'Test thesis')`);
+  const theme = (name: string, status: string, d: Record<string, unknown> = {}) => ({
+    name, status, priority: false, crossSector: false, latestEvidence: "Jan 2026", basis: "Test basis.", exceptions: null,
+    sectors: [], fundingSectors: [], eventSectors: [], keywords: [], ...d,
+  });
+  const thesis: [string, string, unknown][] = [
+    ["THEME", "T01", theme("Grid equipment test", "CORE", { priority: true, fundingSectors: ["Energy transition"], eventSectors: ["Renewables"], keywords: ["grid"] })],
+    ["THEME", "T02", theme("Snacks test", "CAUTIONARY", { fundingSectors: ["Consumer"] })],
+    ["THEME", "T03", theme("Cross-sector test", "NO_VIEW", { crossSector: true })],
+    ["PRINCIPLE", "PR01", { text: "Test principle about proof over claims." }],
+    ["PARAMETER", "F1", { name: "Proof", question: "Is there proof?", group: "FIT", source: "DECK", weight: 1 }],
+    ["ANCHOR", "F1:5:1", { param: "F1", score: 5, label: "Example Co", shows: "named buyers" }],
+    ["FLAG", "FL01", { name: "Price ask", fact: "The ask and its multiple", why: "Context", how: "CODE" }],
+    ["HIGHLIGHT", "H01", { name: "Sweet spot", firesWhen: "Qualified and small", shownAs: "Sweet spot (claimed)" }],
+  ];
+  for (const [kind, code, data] of thesis) {
+    await db.query(`insert into "ThesisRow"(id, kind, code, data, evidence, decision, "fromVersion") values (gen_random_uuid()::text, $1, $2, $3, 'Test note, Jan 2026', null, 1)`, [kind, code, JSON.stringify(data)]);
+  }
+  await db.query(`update "Company" set "themeCode" = 'T01' where id in ('e2e-voltaris', 'e2e-mokobara')`);
   await db.end();
 }
 

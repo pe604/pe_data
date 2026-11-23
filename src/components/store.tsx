@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import type { PersonRole } from "@/lib/domain/constants";
+import type { ThemeOption } from "@/lib/domain/thesis";
 import type {
   ActionResult,
   CompanyRow,
@@ -35,6 +36,8 @@ export interface Store {
   me: Me;
   companies: CompanyRow[];
   sectors: SectorOption[];
+  /** Current thesis themes in display order, including cross-sector ones (SPEC §17.3) */
+  themes: ThemeOption[];
   team: TeamMemberOption[];
   /** Autofill names per field (PE and Research separate; Via = PE + Via names). */
   pools: Record<PersonRole, string[]>;

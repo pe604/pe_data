@@ -1,5 +1,6 @@
 import type { FileKind, Stage, Status } from "./constants";
 import type { Fund, Holding } from "./portfolio";
+import type { ThemeOption } from "./thesis";
 
 /** One table row. Serialisable; sent from server to client. */
 export interface CompanyRow {
@@ -30,6 +31,9 @@ export interface CompanyRow {
   fileCount: number;
   /** All comment and update text, lower-cased, for search. */
   commentSearch: string;
+  /** SPEC §17.2: a current, non-cross-sector theme code, or null. `themeEdited` once a person has set it. */
+  themeCode: string | null;
+  themeEdited: boolean;
 }
 
 export interface UpdateItem {
@@ -71,6 +75,8 @@ export interface Me {
 export interface DashboardData {
   companies: CompanyRow[];
   sectors: SectorOption[];
+  /** Current thesis themes, in display order (SPEC §17.3) */
+  themes: ThemeOption[];
   team: TeamMemberOption[];
   peMeta: { by: string; at: string } | null;
   me: Me;

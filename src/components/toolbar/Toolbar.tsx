@@ -8,6 +8,7 @@ import {
   activeFilterCount,
   emptyFilters,
   filtersForTab,
+  NO_THEME,
   sortsForTab,
   type Filters,
   type SetKey,
@@ -16,6 +17,8 @@ import {
 } from "@/lib/domain/view";
 import { IconCaret, IconSearch } from "../ui/icons";
 import { Popover } from "../ui/overlay";
+import { useStore } from "../store";
+import { companyThemes } from "@/lib/domain/thesis";
 
 type Props = { rows: CompanyRow[]; view: ViewState; setView: React.Dispatch<React.SetStateAction<ViewState>> };
 
@@ -25,6 +28,7 @@ const TITLES: Record<FKey, string> = {
   priority: "Priority",
   stage: "Stage",
   sector: "Sector",
+  theme: "Theme",
   pe: "Assigned PE",
   research: "Assigned Research",
   via: "Via",
@@ -35,6 +39,7 @@ const BUTTONS: [FKey, string][] = [
   ["priority", "Priority"],
   ["stage", "Stage"],
   ["sector", "Sector"],
+  ["theme", "Theme"],
   ["pe", "PE"],
   ["research", "Research"],
   ["via", "Via"],
@@ -42,6 +47,7 @@ const BUTTONS: [FKey, string][] = [
 ];
 
 export function Toolbar({ rows, view, setView }: Props) {
+  const { themes } = useStore();
   const [open, setOpen] = useState<{ k: FKey; el: HTMLElement } | null>(null);
   const [q, setQ] = useState(view.f.q);
   const f = view.f;
@@ -73,11 +79,13 @@ export function Toolbar({ rows, view, setView }: Props) {
       stage: STAGES.map((s) => [s, STAGE_LABELS[s]] as [string, string]),
       onedrive: [["linked", "Link saved"], ["missing", "Link missing"]] as [string, string][],
       sector: [...sectors].sort().map((s) => [s, s] as [string, string]),
+      // Theme names in thesis order, then "No theme" (SPEC §17.10)
+      theme: [...companyThemes(themes).map((t) => [t.code, t.name] as [string, string]), [NO_THEME, "No theme"] as [string, string]],
       pe: collect("pe"),
       research: collect("research"),
       via: collect("via"),
     } satisfies Record<SetKey, [string, string][]>;
-  }, [rows, f]);
+  }, [rows, f, themes]);
 
   const count = (k: FKey) => (k === "date" ? (f.from || f.to ? 1 : 0) : f[k].length);
   const any = activeFilterCount(f) > 0;

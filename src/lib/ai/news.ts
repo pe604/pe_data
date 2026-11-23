@@ -6,7 +6,9 @@ import { aiProvider } from "./provider";
 // The news agent's AI filter (SPEC §15.10). Text only, cheaper model, data_collection deny (set by the provider).
 // Never log the items or the model's output.
 
-const MODEL = "google/gemini-2.5-flash";
+/** The cheap check model, also used by the theme backfill (SPEC §17.2). */
+export const CHECK_MODEL = "google/gemini-2.5-flash";
+const MODEL = CHECK_MODEL;
 /** Used once for a batch the cheaper model fails on (it occasionally loops and its JSON comes back cut off). */
 export const FALLBACK_MODEL = "google/gemini-2.5-pro";
 

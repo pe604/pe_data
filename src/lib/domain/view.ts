@@ -10,8 +10,10 @@ export const TAB_STATUS: Record<Tab, Status> = {
   invested: "INVESTED",
 };
 
-export type SetKey = "priority" | "stage" | "sector" | "pe" | "research" | "via" | "onedrive";
-export const SET_KEYS: SetKey[] = ["priority", "stage", "sector", "pe", "research", "via", "onedrive"];
+export type SetKey = "priority" | "stage" | "sector" | "theme" | "pe" | "research" | "via" | "onedrive";
+export const SET_KEYS: SetKey[] = ["priority", "stage", "sector", "theme", "pe", "research", "via", "onedrive"];
+/** Theme filter value for companies without a theme (SPEC §17.10). */
+export const NO_THEME = "none";
 
 export interface Filters {
   q: string;
@@ -20,6 +22,7 @@ export interface Filters {
   priority: string[]; // "1".."5" | "unset"
   stage: string[]; // Stage values
   sector: string[]; // sector names
+  theme: string[]; // theme codes | "none"
   pe: string[];
   research: string[];
   via: string[];
@@ -33,6 +36,7 @@ export const emptyFilters = (): Filters => ({
   priority: [],
   stage: [],
   sector: [],
+  theme: [],
   pe: [],
   research: [],
   via: [],
@@ -125,6 +129,7 @@ export function applyFilters(list: CompanyRow[], f: Filters, skip?: "stage" | "p
   if (f.priority.length) out = out.filter((c) => f.priority.includes(c.priority ? String(c.priority) : "unset"));
   if (skip !== "stage" && f.stage.length) out = out.filter((c) => f.stage.includes(c.stage));
   if (f.sector.length) out = out.filter((c) => f.sector.includes(c.sector ?? ""));
+  if (f.theme.length) out = out.filter((c) => f.theme.includes(c.themeCode ?? NO_THEME));
   if (f.onedrive.length) out = out.filter((c) => f.onedrive.includes(c.oneDriveUrl ? "linked" : "missing"));
   for (const k of ["pe", "research", "via"] as const) {
     if (k === "pe" && skip === "pe") continue;
@@ -199,6 +204,19 @@ export function sortRows(list: CompanyRow[], s: SortKey, today = todayISO()): Co
 }
 
 // ─── URL state ───────────────────────────────────────────────────────────────
+
+/** The Thesis tab's address (SPEC §17.3, §17.4): `?view=thesis`, plus `&theme=T06` on a theme page. */
+export function thesisQuery(theme: string | null): string {
+  return theme ? `?view=thesis&theme=${encodeURIComponent(theme)}` : "?view=thesis";
+}
+
+/** The theme page asked for by the URL: undefined when the URL is not the Thesis tab, null for the theme list. */
+export function thesisFromQuery(search: string | URLSearchParams): string | null | undefined {
+  const p = typeof search === "string" ? new URLSearchParams(search) : search;
+  if (p.get("view") !== "thesis") return undefined;
+  const t = p.get("theme");
+  return t && /^[A-Za-z0-9:_-]{1,20}$/.test(t) ? t : null;
+}
 
 export interface ViewState {
   tab: Tab;

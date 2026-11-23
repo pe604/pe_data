@@ -12,6 +12,8 @@ import {
   queryToView,
   sortsForTab,
   viewToQuery,
+  thesisFromQuery,
+  thesisQuery,
   type Tab,
   type ViewState,
 } from "@/lib/domain/view";
@@ -27,6 +29,7 @@ import { StoreCtx, type DrawerTab, type Store } from "./store";
 import { DealTable } from "./table/DealTable";
 import { EventsView } from "./events/EventsView";
 import { FundingView } from "./funding/FundingView";
+import { ThesisView } from "./thesis/ThesisView";
 import { Toolbar } from "./toolbar/Toolbar";
 import { ToastProvider, useToast } from "./ui/toast";
 
@@ -42,6 +45,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const toast = useToast();
   const [companies, setCompanies] = useState(initial.companies);
   const [sectors, setSectors] = useState(initial.sectors);
+  const [themes, setThemes] = useState(initial.themes);
   const [team, setTeam] = useState(initial.team);
   const [peMeta, setPeMeta] = useState(initial.peMeta);
   const [view, setView] = useState<ViewState>(() => queryToView(query));
@@ -53,9 +57,13 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   const [invView, setInvView] = useState<"portfolio" | "quarterly" | "meetings" | "results">("portfolio");
   // The company Results opens on, when opened from a company file (Numbers → Make result).
   const [resultsFor, setResultsFor] = useState<string | null>(null);
-  // The Events and Funding tabs sit beside the company lists; they have no filters of their own in the URL
-  // (SPEC §15.14, §15.16). "?view=funding" (the link in the WhatsApp funding notes) opens Funding.
-  const [side, setSide] = useState<"events" | "funding" | null>(() => (new URLSearchParams(query).get("view") === "funding" ? "funding" : null));
+  // The Events, Funding and Thesis tabs sit beside the company lists (SPEC §15.14, §15.16, §17.3). "?view=funding"
+  // (the link in the WhatsApp funding notes) opens Funding; "?view=thesis&theme=T06" opens a theme page.
+  const [side, setSide] = useState<"events" | "funding" | "thesis" | null>(() => {
+    const v = new URLSearchParams(query).get("view");
+    return v === "funding" ? "funding" : v === "thesis" ? "thesis" : null;
+  });
+  const [themePage, setThemePage] = useState<string | null>(() => thesisFromQuery(query) ?? null);
 
   const rowsRef = useRef(companies);
   useEffect(() => {
@@ -63,11 +71,11 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
   }, [companies]);
   const pending = useRef(0);
 
-  // Keep filters and sort in the URL so a view can be shared.
+  // Keep filters and sort (or the Thesis page) in the URL so a view can be shared.
   useEffect(() => {
-    const q = viewToQuery(view);
+    const q = side === "thesis" ? thesisQuery(themePage) : viewToQuery(view);
     if (q !== window.location.search) window.history.replaceState(null, "", window.location.pathname + q);
-  }, [view]);
+  }, [view, side, themePage]);
 
   const syncRow = useCallback((row: CompanyRow) => {
     setCompanies((list) => {
@@ -147,6 +155,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
     setCompanies(r.data.companies);
     setTeam(r.data.team);
     setSectors(r.data.sectors);
+    setThemes(r.data.themes);
     setPeMeta(r.data.peMeta);
     if (detail) setDetailVersion((v) => v + 1);
   }, []);
@@ -166,6 +175,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       me: initial.me,
       companies,
       sectors,
+      themes,
       team,
       pools: namePools(team),
       peMeta,
@@ -192,7 +202,7 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
       },
       openAdd: () => setAddOpen(true),
     }),
-    [initial, companies, sectors, team, peMeta, detailVersion, putRow, syncRow, removeRow, mutate, addTeamNames, refresh, toast, openDrawer, setTab],
+    [initial, companies, sectors, themes, team, peMeta, detailVersion, putRow, syncRow, removeRow, mutate, addTeamNames, refresh, toast, openDrawer, setTab],
   );
 
   const inTab = useMemo(() => companies.filter((c) => c.status === TAB_STATUS[view.tab]), [companies, view.tab]);
@@ -229,11 +239,16 @@ function Inner({ initial, query }: { initial: DashboardData; query: string }) {
           <button className="tab" role="tab" type="button" aria-selected={side === "funding"} onClick={() => setSide("funding")}>
             Funding
           </button>
+          <button className="tab" role="tab" type="button" aria-selected={side === "thesis"} onClick={() => setSide("thesis")}>
+            Thesis
+          </button>
         </nav>
         {side === "events" ? (
           <EventsView />
         ) : side === "funding" ? (
           <FundingView />
+        ) : side === "thesis" ? (
+          <ThesisView theme={themePage} setTheme={setThemePage} />
         ) : (
           <>
         {showBars && (
