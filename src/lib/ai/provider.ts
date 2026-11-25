@@ -72,7 +72,7 @@ class OpenRouterProvider implements AiProvider {
         headers: {
           Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "X-Title": "Niveshaay Deal Pipeline",
+          "X-Title": "Niveshaay PE Desk",
         },
         body: JSON.stringify({
           model: useModel,

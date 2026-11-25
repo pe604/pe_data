@@ -17,7 +17,7 @@ export async function GET() {
     return new Response(new Uint8Array(buf), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": contentDisposition("attachment", `Niveshaay Deal Pipeline ${todayISO()}.xlsx`),
+        "Content-Disposition": contentDisposition("attachment", `Niveshaay PE Desk ${todayISO()}.xlsx`),
         "Cache-Control": "private, no-store",
       },
     });

@@ -1,27 +1,36 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import { Hanken_Grotesk, Jost, Source_Serif_4 } from "next/font/google";
 import { connection } from "next/server";
 import { fundingOnly } from "@/lib/env";
 import "./globals.css";
 
-const plex = IBM_Plex_Sans({
+// SPEC §11: Hanken Grotesk for the UI and data (tabular figures), Jost for the wordmark, counts and titles,
+// Source Serif 4 for long reading text (Funding letters, analyst reads).
+const sans = Hanken_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
-  variable: "--font-plex",
+  variable: "--font-sans",
+  display: "swap",
+});
+
+// Variable font: no weight list (a fixed list trips a Turbopack font-loader bug on a clean build).
+const display = Jost({
+  subsets: ["latin"],
+  variable: "--font-display",
   display: "swap",
 });
 
 const serif = Source_Serif_4({
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["500", "600", "700"],
   variable: "--font-serif",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: fundingOnly ? "Niveshaay Funding Tracker" : "Niveshaay Deal Pipeline",
-  description: fundingOnly ? "Indian startup and growth equity rounds, with a monthly letter" : "Internal deal pipeline for the Niveshaay private equity team",
+  title: fundingOnly ? "Niveshaay Funding Tracker" : "Niveshaay PE Desk",
+  description: fundingOnly ? "Indian startup and growth equity rounds, with a monthly letter" : "The Niveshaay private equity team's desk for every deal",
   robots: { index: false, follow: false },
 };
 
@@ -37,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     // suppressHydrationWarning: browser extensions (QuillBot, Grammarly) add attributes to <html> before React loads.
     // It only affects this element's attributes, not the app below it.
-    <html lang="en" className={`${plex.variable} ${serif.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${sans.variable} ${display.variable} ${serif.variable}`} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
