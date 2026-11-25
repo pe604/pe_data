@@ -14,9 +14,9 @@ const sans = Hanken_Grotesk({
   display: "swap",
 });
 
+// Variable font: no weight list (a fixed list trips a Turbopack font-loader bug on a clean build).
 const display = Jost({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
   variable: "--font-display",
   display: "swap",
 });

@@ -8,7 +8,7 @@
   --gold:#85620C; --gold-fill:#D4AE3A; --gold-soft:#F6EDD2; --on-gold:#211904;
   --brick:#A3341F; --brick-soft:#F8E4DE; --amber:#875900;
   --coral:#EE7A5B; --coral-2:#F28D71; --on-coral:#2A0E06;
-  --band:#0F3B3A; --band-2:#134645; --band-ink:#F3EFE4; --band-muted:#A3C4BF; --band-rule:rgba(243,239,228,.16);
+  --band:#0F3B3A; --band-2:#134645; --band-ink:#F3EFE4; --band-muted:#A3C4BF; --band-rule:rgba(243,239,228,.16); --band-alert:#F6B3A6;
   --s0:#E3ECEA; --s1:#D2EAE5; --s2:#ACDCD4; --s3:#6CBFB3; --s4:#23877D; --s5:#0F5C58;
   --t0:#2D4544; --t1:#0F3B3A; --t2:#0B3533; --t3:#072D2A; --t4:#FFFFFF; --t5:#FFFFFF;
   --shadow-sm:0 1px 2px rgba(13,33,33,.07);
@@ -544,7 +544,8 @@ table.grid{min-width:1240px}
 @media (max-width:760px){.pf-cards{grid-template-columns:1fr}.qfiles-row{grid-template-columns:1fr}}
 /* Allocation pie (SPEC §15.1): validated categorical palette, fixed order; Other = neutral */
 :root{--pie-1:#2a78d6;--pie-2:#eb6834;--pie-3:#1baf7a;--pie-4:#eda100;--pie-5:#e87ba4;--pie-6:#008300;--pie-7:#6250d6;--pie-other:#a9a8a0}
-@media (prefers-color-scheme:dark){:root{--pie-1:#3987e5;--pie-2:#d95926;--pie-3:#199e70;--pie-4:#c98500;--pie-5:#d55181;--pie-6:#008300;--pie-7:#9085e9;--pie-other:#6e6d68}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--pie-1:#3987e5;--pie-2:#d95926;--pie-3:#199e70;--pie-4:#c98500;--pie-5:#d55181;--pie-6:#008300;--pie-7:#9085e9;--pie-other:#6e6d68}}
+:root[data-theme="dark"]{--pie-1:#3987e5;--pie-2:#d95926;--pie-3:#199e70;--pie-4:#c98500;--pie-5:#d55181;--pie-6:#008300;--pie-7:#9085e9;--pie-other:#6e6d68}
 .pf-actions{display:flex;justify-content:flex-end;margin-bottom:6px}
 .alloc-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 14px;margin-bottom:12px}
 .alloc-crumbs{font-size:13.5px}
@@ -686,7 +687,7 @@ table.grid{min-width:1240px}
 .rb-h{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--ink-2)}
 .rb-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .rb-item{display:flex;gap:6px;align-items:flex-start;padding:6px;border:1px solid var(--rule);border-radius:8px;background:var(--surface)}
-.rb-row-key{border-left:3px solid var(--green)}
+.rb-row-key{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 30%,var(--rule))}
 .rb-row-sub{padding-left:14px}
 .rb-main{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;min-width:0}
 .rb-main .inp.sm{flex:1;min-width:120px}
@@ -1307,3 +1308,86 @@ table.grid{min-width:1240px}
   .strip.pe .seg:hover{background:var(--hover)}
 }
 @media (prefers-reduced-motion:reduce){.stamp{transform:none}.strip-stages .seg{animation:none}.dcard.open{transform:none}}
+
+/* ---------- Marine Drive deco, pass 2 (SPEC §11): drawer, Invested views, modals, Events, Funding, Thesis ---------- */
+
+/* company drawer: its head is a band, mirroring the shell */
+.dh{background:var(--band);color:var(--band-ink);border-bottom:0;position:relative;padding-bottom:7px}
+.dh::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;background:linear-gradient(var(--gold-fill),var(--gold-fill)) 0 0/100% 1px no-repeat,linear-gradient(var(--band-rule),var(--band-rule)) 0 3px/100% 1px no-repeat,linear-gradient(var(--band-rule),var(--band-rule)) 0 6px/100% 1px no-repeat;pointer-events:none}
+.dh .icon-btn,.dh .btn-ghost{color:var(--band-muted)}
+.dh .icon-btn:hover,.dh .btn-ghost:hover{background:var(--band-2);color:var(--band-ink)}
+.dh .btn:not(.primary){background:transparent;border-color:var(--band-rule);color:var(--band-ink);box-shadow:none}
+.dh .btn:not(.primary):hover{background:var(--band-2);border-color:var(--band-muted)}
+.dh .btn.danger{color:var(--band-alert);border-color:color-mix(in srgb,var(--band-alert) 40%,transparent)}
+.dh :focus-visible{outline-color:var(--gold-fill)}
+.dh-name{font-size:30px;color:var(--band-ink)}
+.dh-name button{color:inherit}
+.dh-name button:hover{color:var(--gold-fill)}
+.dh-name-input{background:var(--band-2);color:var(--band-ink);border-color:var(--gold-fill)}
+.dh-meta{color:var(--band-muted)}
+.dh .meta-btn{color:var(--band-ink)}
+.dh .meta-btn:hover{color:var(--gold-fill)}
+.dh .badge.pipeline{background:var(--band-rule);color:var(--band-ink)}
+.dh .badge.rejected{background:color-mix(in srgb,var(--band-alert) 20%,transparent);color:var(--band-alert)}
+.dh .badge.invested{background:var(--gold-fill);color:var(--on-gold)}
+.dtabs{gap:4px;margin-left:-10px}
+.dtab{color:var(--band-muted);border-bottom:0;margin-bottom:0;padding:8px 10px 14px;position:relative;transition:color .15s}
+.dtab:hover{color:var(--band-ink)}
+.dtab .n{color:var(--band-muted)}
+.dtab[aria-selected="true"]{color:var(--band-ink);font-weight:600}
+.dtab[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:3px;border-radius:2px 2px 0 0;background:var(--gold-fill)}
+
+/* section titles and key figures in the display face */
+.ev-group h3,.th-title,.fd-head h1,.fd-sec h2,.fd-empty-h,.sec-title,.inv-head h3,.mtg-group h3,.fd-ch h3,.nb-h4,.rb-h{font-family:var(--display);font-weight:500;letter-spacing:0}
+.fd-head h1{font-size:30px}
+.ev-group h3,.fd-sec h2{font-size:21px}
+.pf-total strong,.inv-sum strong,.pf-card strong,.nb-tile strong,.nb-key strong,.nb-latest,.fd-kv,.fd-tv,.fd-pstats b,.rd-big,.dc-amt .amt{font-family:var(--display);font-weight:500;letter-spacing:-.005em}
+.pf-total strong{font-size:22px}
+
+/* sentence case: no tracked uppercase labels */
+.pf-card .lab,.inv-sum .lab,.pf-split h4,.nb-tile .lab,.nb-key .lab,.nb-label,.fd-side h3,.fd-seen h3,.fd-eyebrow{text-transform:none;letter-spacing:.005em;font-size:12.5px;font-weight:600}
+.fd-eyebrow{color:var(--muted);font-weight:500}
+.fd-pband .fd-eyebrow{color:var(--ink-2)}
+.fd-dot{display:none}
+
+/* segmented switches: the chosen option is filled teal */
+.seg-switch{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:3px}
+.seg-switch button{border-radius:var(--r-sm);color:var(--ink-2);transition:background-color .15s,color .15s}
+.seg-switch button:hover{background:var(--hover)}
+.seg-switch button[aria-selected="true"]{background:var(--green);color:var(--on-green);box-shadow:none}
+.seg-toggle button[aria-pressed="true"],.target button[aria-pressed="true"]{background:var(--green);color:var(--on-green);box-shadow:none}
+
+/* one container language: 12px radius, rule border, whisper shadow on top-level panels */
+.pf-line,.updates,.mtg-list,.contacts,.latest-update,.qfiles-q,.nb-card,.nb-tile,.nb-key,.inv-sum>div,.mread,.inv-form,.fit-form,.preview-sum,.rv-scroll,.mr-scroll,.alloc-tip{border-radius:var(--r-lg)}
+.pf-line,.mtg-list,.updates,.contacts{box-shadow:var(--shadow-sm)}
+.pf-line{padding:12px 16px}
+
+/* Funding: flat fields in the world's colours; sector colours stay as data */
+.fd-card{border-radius:var(--r-lg);border-color:var(--rule);box-shadow:var(--shadow-sm)}
+.fd-kpi-hero{background:var(--band-2);color:var(--band-ink)}
+.fd-kpi-hero .fd-kl{color:var(--band-muted)}
+.fd-kpi-hero .fd-kd{background:var(--band-rule);color:var(--band-ink)}
+.fd-chip.on,.fd-week-sel.on{background:var(--green);color:var(--on-green);border-color:var(--green)}
+.fd-side{background:var(--surface-2)}
+.fd-tk span{background:var(--band);color:var(--band-ink);font-family:var(--display);font-weight:500}
+.fd-tile{background:color-mix(in srgb,var(--c) 10%,var(--surface));border-radius:var(--r-lg)}
+.fd-tile::after{display:none}
+.fd-tile:hover{transform:none;box-shadow:var(--shadow-pop)}
+.fd-ic{box-shadow:none;border-radius:var(--r)}
+.fd-pband{background:color-mix(in srgb,var(--c) 10%,var(--surface))}
+.fd-bar{background:var(--s4);border-radius:var(--r-sm) var(--r-sm) 2px 2px}
+.fd-vb .fd-col:last-child .fd-bar{background:var(--green)}
+.fd-by + .fd-b::first-letter{color:var(--gold)}
+.fd-chip,.fd-week-sel,.fd-close,.fd-pdf{border-radius:var(--r)}
+
+/* Events */
+.ev-top{background:var(--gold-soft);color:var(--gold);font-weight:600}
+.ev-list{border-top-color:var(--rule)}
+
+@media (max-width:760px){
+  .dh{padding-left:16px;padding-right:16px}
+  .dh-name{font-size:24px}
+  .dtabs{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}
+  .dtabs::-webkit-scrollbar{display:none}
+  .dtab{white-space:nowrap;flex:none}
+}

@@ -203,7 +203,7 @@ Density follows the work: a wide table that fits every Pipeline column at 1440px
 - Flat surfaces with a whisper shadow; the open row or card is the one thing that lifts.
 - Exit states stamp onto the row instead of disappearing.
 
-**Scope.** This system is evidenced by the header band, stage skyline, PE row, toolbar, the Pipeline, Rejected and Invested lists, phone cards, and drawer and modal chrome. Events, Funding and Thesis inherit the tokens but are not yet restyled; they are pending and not a source for these rules. The Results document's fixed brand colours and the Excel and PDF exports sit outside this world.
+**Scope.** This system covers the whole dashboard: the header band, stage skyline, PE row, toolbar, the Pipeline, Rejected and Invested lists, phone cards, the company drawer (its head is a second band: ivory Jost name, ivory meta, drawer tabs with a brass underline, closed by the same triple rule), the Invested views (Portfolio, Quarterly tracker, Meetings, Results), modals and popovers, Events, Funding and Thesis (pass 2, 2026-11-25). Section titles and key figures use Jost; small labels are sentence case, never tracked uppercase; the selected option in a segmented switch is a solid teal fill (`green` / `on-green`); Funding's sector and stage colours stay as categorical data, on flat tints with no gradients or ornaments. Text on the band that signals rejection uses `band-alert` (#F6B3A6, the same in both themes). The Results document's fixed brand colours and the Excel and PDF exports sit outside this world.
 
 ## Colors
 

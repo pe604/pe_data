@@ -336,7 +336,7 @@ A summary is generated:
 
 **Name:** the tool is **Niveshaay PE Desk** (wordmark "Niveshaay", product label "PE Desk"). The Excel export uses the same name (§12). WhatsApp messages still say "the deal pipeline" in plain words.
 
-**World: Marine Drive deco** (2026-11-25). Taken from Mumbai's Art Deco financial district: a peacock-teal band, a cool white page (never cream), coral for primary actions, brass for P1, and sea-glass stages from pale aqua to deep teal. Light and dark themes (`prefers-color-scheme`); the band stays teal in both. Events, Funding and Thesis inherit the tokens now and get their own pass later.
+**World: Marine Drive deco** (2026-11-25). Taken from Mumbai's Art Deco financial district: a peacock-teal band, a cool white page (never cream), coral for primary actions, brass for P1, and sea-glass stages from pale aqua to deep teal. Light and dark themes (`prefers-color-scheme`); the band stays teal in both. Pass 2 (2026-11-25) carries the world across the company drawer, the Invested views, modals and popovers, Events, Funding and Thesis.
 
 | Token | Light | Dark |
 |---|---|---|
@@ -364,6 +364,8 @@ The full set (surface-2, hover, faint, soft fills, band tints, shadows, radii) l
 - **Stage bar (signature):** six segments that step up from left to right like the Marine Drive skyline, standing on a deep teal baseline, with large counts. Stages with no deals are drawn as outlines, so weight follows the count. The selected stage gets an ink ring. On first load the segments rise into place once (skipped with reduced motion). On phones the six stages sit in two rows of three, still rising left to right. Each row's stage rail steps up the same way.
 - **PE team bar:** each person shows their initials, name and count.
 - **Ornament:** a triple hairline between the bars and the list is the only decoration.
+- **Company drawer:** its head is a second teal band: the company name in ivory Jost, ivory meta and badges, and drawer tabs with a brass underline, closed by the same brass rule and hairlines.
+- **Everywhere else:** section titles and key figures use Jost; small labels are sentence case (no tracked uppercase); the selected option in a segmented switch (Invested views, Thesis sections, fund switch, Add company target, Funding months) is a solid teal fill; panels share one 12px-radius container. Funding keeps its sector and stage colours as data, on flat tints: no gradients, decorative circles or uppercase labels, and its headline figure card sits on the band colour.
 - **Exit stamps:** in Rejected and Invested, the stage column shows a stamp ("Rejected" in brick, "Invested" in brass) above "at <stage>", instead of a plain label.
 - **Sentence case everywhere.** No em dashes in UI copy. The wordmark and stamps are set in uppercase by CSS only; the text stays in sentence case.
 - **Responsive:** 16px gutters on phones. Below 760px:

@@ -179,8 +179,8 @@
     ]
   },
   "scope": {
-    "inSystem": ["Header band and tabs", "Stage skyline", "PE row", "Toolbar", "Pipeline, Rejected and Invested lists", "Phone deal cards", "Drawer and modal chrome"],
-    "pending": ["Events", "Funding", "Thesis (inherit tokens; not yet restyled, not part of the system)"],
+    "inSystem": ["Header band and tabs", "Stage skyline", "PE row", "Toolbar", "Pipeline, Rejected and Invested lists", "Phone deal cards", "Company drawer (band head)", "Invested views: Portfolio, Quarterly tracker, Meetings, Results", "Modals and popovers", "Events", "Funding (sector and stage colours kept as categorical data)", "Thesis"],
+    "pending": [],
     "outsideWorld": ["Results document styles (fixed Niveshaay brand colours for a generated document)", "Excel and PDF exports"]
   }
 }
