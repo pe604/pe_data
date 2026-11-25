@@ -326,7 +326,7 @@ test("Excel export downloads", async ({ page }) => {
   const dl = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export to Excel" }).click();
   const d = await dl;
-  expect(d.suggestedFilename()).toMatch(/^Niveshaay Deal Pipeline \d{4}-\d{2}-\d{2}\.xlsx$/);
+  expect(d.suggestedFilename()).toMatch(/^Niveshaay PE Desk \d{4}-\d{2}-\d{2}\.xlsx$/);
 });
 
 test("quarterly tracker: upload MIS and result note from the table, view them in the company file; contacts show as POC", async ({ page }) => {

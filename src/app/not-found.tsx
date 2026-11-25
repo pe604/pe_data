@@ -6,7 +6,7 @@ export default function NotFound() {
       <div className="signin-card">
         <div className="brand">
           <span className="wm">Niveshaay</span>
-          <span className="app">Deal pipeline</span>
+          <span className="app">PE Desk</span>
         </div>
         <p className="muted">This page doesn’t exist.</p>
         <Link className="btn primary signin-btn" href="/">

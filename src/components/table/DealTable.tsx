@@ -93,6 +93,15 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   const popRow = pop ? getRow(pop.id) : undefined;
 
   return (
+    <>
+    <DealCards
+      list={list}
+      today={today}
+      openId={openId}
+      onClear={() => setView((v) => ({ ...v, f: emptyFilters() }))}
+      onStage={(c, s) => mutate(c.id, { stage: s }, () => updateCompany(c.id, { stage: s }))}
+      onPriority={(c, p) => mutate(c.id, { priority: p }, () => updateCompany(c.id, { priority: p }))}
+    />
     <div className="table-wrap">
       <table className="grid">
         <thead>
@@ -286,6 +295,146 @@ export function DealTable({ rows, view, setView, openId }: Props) {
         </>
       )}
     </div>
+    </>
+  );
+}
+
+/**
+ * Phones (SPEC §11): the same rows as cards instead of the wide table. Stage and priority stay editable in place;
+ * everything else opens the company drawer. CSS shows either the cards or the table, never both.
+ */
+function DealCards({
+  list,
+  today,
+  openId,
+  onClear,
+  onStage,
+  onPriority,
+}: {
+  list: CompanyRow[];
+  today: string;
+  openId: string | null;
+  onClear: () => void;
+  onStage: (c: CompanyRow, s: Stage) => void;
+  onPriority: (c: CompanyRow, p: number | null) => void;
+}) {
+  const { openDrawer } = useStore();
+  if (!list.length)
+    return (
+      <div className="dcards">
+        <div className="empty" style={{ padding: 40 }}>
+          <p>No companies match these filters.</p>
+          <button className="btn" type="button" onClick={onClear}>
+            Clear filters
+          </button>
+        </div>
+      </div>
+    );
+  return (
+    <ol className="dcards" aria-label="Companies">
+      {list.map((c, i) => {
+        const d = daysFor(c, today);
+        const pipeline = c.status === "PIPELINE";
+        const invested = c.status === "INVESTED";
+        return (
+          <li key={c.id} className={"dcard" + (c.id === openId ? " open" : "")}>
+            <div className="dc-top">
+              <span className="idx">{i + 1}</span>
+              <button className="co-name dc-name" type="button" onClick={() => openDrawer(c.id)}>
+                {c.name || "Untitled"}
+              </button>
+              {pipeline && (
+                <select
+                  className={"pri-sel p" + (c.priority ?? 0)}
+                  aria-label={`Priority for ${c.name}`}
+                  value={c.priority ?? ""}
+                  onChange={(e) => onPriority(c, e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Set</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      P{n}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {/* The next step leads (SPEC §11): latest comment, reason or update right under the name. */}
+            <button type="button" className="dc-cm" onClick={() => openDrawer(c.id, cmTab(c))}>
+              <CommentCell c={c} />
+            </button>
+            {(c.sector || c.subSector) && (
+              <p className="dc-sec">
+                {c.sector}
+                {c.sector && c.subSector && <span aria-hidden="true"> · </span>}
+                {c.subSector && <span className="sub">{c.subSector}</span>}
+              </p>
+            )}
+            {!invested && <HighlightChips list={c.highlights} />}
+            {invested ? (
+              <div className="dc-amt">
+                {c.holding?.invested ? (
+                  <>
+                    <span className="amt">{fmtCr(c.holding.invested)}</span>
+                    <FundSplitLine split={c.holding.byFund} />
+                  </>
+                ) : (
+                  <span className="ph">No rounds yet</span>
+                )}
+              </div>
+            ) : (
+              <div className="dc-stage">
+                <StageCell c={c} onChange={(s) => onStage(c, s)} />
+              </div>
+            )}
+            {(c.pe.length > 0 || c.research.length > 0) && (
+              <dl className="dc-people">
+                {c.pe.length > 0 && (
+                  <div>
+                    <dt>PE</dt>
+                    <dd>{c.pe.join(", ")}</dd>
+                  </div>
+                )}
+                {c.research.length > 0 && (
+                  <div>
+                    <dt>Research</dt>
+                    <dd>{c.research.join(", ")}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+            <div className="dc-foot">
+              <span className="c-date">
+                {invested
+                  ? c.holding?.firstDate
+                    ? `First invested ${fmtDate(c.holding.firstDate)}`
+                    : "First round not set"
+                  : c.dateReceived
+                    ? `Received ${fmtDate(c.dateReceived)}`
+                    : "No date received"}
+              </span>
+              {c.fileCount > 0 && (
+                <span className="muted">
+                  {c.fileCount} file{c.fileCount > 1 ? "s" : ""}
+                </span>
+              )}
+              {c.oneDriveUrl && (
+                <a className="od-btn on" href={c.oneDriveUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open the OneDrive folder for ${c.name}`}>
+                  <CloudFill />
+                </a>
+              )}
+              <span className="tb-spacer" />
+              {!invested && d !== null && (
+                <span className={"days " + ageClass(d, c.status)}>
+                  {d}
+                  <small>d</small>
+                </span>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -382,12 +531,11 @@ export function StageRail({ stage }: { stage: Stage }) {
 function StageCell({ c, onChange }: { c: CompanyRow; onChange: (s: Stage) => void }) {
   if (c.status !== "PIPELINE") {
     const s = c.exitStage ?? c.stage;
+    // Exit stamp (SPEC §11): the deal keeps its place with a stamp instead of vanishing.
     return (
       <>
-        {!c.directInvested && <StageRail stage={s} />}
-        <span className="muted" style={{ fontSize: 13 }}>
-          {c.directInvested ? "Added directly" : STAGE_LABELS[s]}
-        </span>
+        <span className={"stamp " + (c.status === "REJECTED" ? "rejected" : "invested")}>{c.status === "REJECTED" ? "Rejected" : "Invested"}</span>
+        <span className="stamp-sub">{c.directInvested ? "Added directly" : `at ${STAGE_LABELS[s]}`}</span>
       </>
     );
   }
@@ -447,8 +595,10 @@ function CommentCell({ c }: { c: CompanyRow }) {
       <>
         <div className="cm-text">{c.latestUpdate.text}</div>
         <div className="cm-meta">
-          {fmtDate(c.latestUpdate.date)}, {c.latestUpdate.author}
-          {c.updateCount > 1 ? ` · ${c.updateCount} updates` : ""}
+          <span className="nw">
+            {fmtDate(c.latestUpdate.date)}, {c.latestUpdate.author}
+          </span>
+          {c.updateCount > 1 && <span className="nw">{` · ${c.updateCount} updates`}</span>}
         </div>
       </>
     );
@@ -458,8 +608,10 @@ function CommentCell({ c }: { c: CompanyRow }) {
     <>
       <div className="cm-text">{c.latestComment.text}</div>
       <div className="cm-meta">
-        {c.latestComment.author}, {fmtDate(todayISO(new Date(c.latestComment.at)))}
-        {c.commentCount > 1 ? ` · ${c.commentCount} comments` : ""}
+        <span className="nw">
+          {c.latestComment.author}, {fmtDate(todayISO(new Date(c.latestComment.at)))}
+        </span>
+        {c.commentCount > 1 && <span className="nw">{` · ${c.commentCount} comments`}</span>}
       </div>
     </>
   );

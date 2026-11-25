@@ -10,6 +10,14 @@ import { RemindersModal } from "./RemindersModal";
 
 type Props = { rows: CompanyRow[]; view: ViewState; setView: React.Dispatch<React.SetStateAction<ViewState>> };
 
+/** "Arjun Bhattar" → "AB", "Urvi" → "UR". */
+const initials = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  const s = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2);
+  return s.toUpperCase();
+};
+
 const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
 /** Six stage segments. Counts apply every filter except the stage filter (SPEC §5.3). */
@@ -24,7 +32,7 @@ export function StagesBar({ rows, view, setView }: Props) {
         return (
           <button
             key={s}
-            className="seg"
+            className={"seg" + (n === 0 ? " zero" : "")}
             type="button"
             aria-pressed={on}
             style={{ "--c": `var(--s${i})`, "--tc": `var(--t${i})` } as React.CSSProperties}
@@ -78,6 +86,9 @@ export function PeBar({ rows, view, setView }: Props) {
               title={`Show only ${n}’s companies`}
               onClick={() => setView((v) => ({ ...v, f: { ...v.f, pe: toggle(v.f.pe, n) } }))}
             >
+              <span className="av" aria-hidden="true">
+                {initials(n)}
+              </span>
               <span className="sn">{n}</span>
               <span className="sc">{cnt}</span>
             </button>

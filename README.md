@@ -1,4 +1,4 @@
-# Niveshaay Deal Pipeline
+# Niveshaay PE Desk
 
 Internal deal tracker for Niveshaay's PE team. It replaces the Excel deck tracker. `SPEC.md` is the source of truth; `reference/` holds the v1.3 prototype.
 

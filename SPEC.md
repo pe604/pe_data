@@ -1,4 +1,4 @@
-# Niveshaay Deal Pipeline: Product Spec
+# Niveshaay PE Desk: Product Spec
 
 Source of truth for the rebuild. A working prototype (v1.3) is in `reference/niveshaay-deal-pipeline-v1.3.html`. Match its behaviour and look unless this spec says otherwise. Where they disagree, this spec wins.
 
@@ -91,7 +91,7 @@ Stages enum, in order:
 ## 5. Page layout (single page)
 
 1. **Header.**
-   - Left: the wordmark "Niveshaay" (serif, green) and "Deal pipeline".
+   - Left: the wordmark "Niveshaay" and the product label "PE Desk" (see §11).
    - Right: **Export to Excel** (secondary) and **Add company** (primary).
 2. **Tabs**: Pipeline · Rejected · Invested, each with a count, then the side views Events · Funding · **Thesis** (§17.3; Thesis after Funding).
 3. **Stages bar** (Pipeline tab only).
@@ -334,39 +334,58 @@ A summary is generated:
 
 ## 11. Design system
 
-Institutional and restrained, in Niveshaay's colours. Light and dark themes (`prefers-color-scheme`).
+**Name:** the tool is **Niveshaay PE Desk** (wordmark "Niveshaay", product label "PE Desk"). The Excel export uses the same name (§12). WhatsApp messages still say "the deal pipeline" in plain words.
+
+**World: Marine Drive deco** (2026-11-25). Taken from Mumbai's Art Deco financial district: a peacock-teal band, a cool white page (never cream), coral for primary actions, brass for P1, and sea-glass stages from pale aqua to deep teal. Light and dark themes (`prefers-color-scheme`); the band stays teal in both. Events, Funding and Thesis inherit the tokens now and get their own pass later.
 
 | Token | Light | Dark |
 |---|---|---|
-| paper (page) | #F5F6F0 | #0F1510 |
-| surface | #FFFFFF | #151D16 |
-| ink | #16241A | #E6ECE2 |
-| muted | #6A766D | #8E9A8F |
-| rule | #DDE2D6 | #28332A |
-| green (brand/primary) | #27500A | #86B85C |
-| gold (P1) | #C5963A | #D0A24C |
-| brick (reject/danger) | #8A2C1F | #E48A78 |
-| amber (ageing) | #946510 | #DDAE52 |
-| stage 0–5 | #E4E7DF, #D8E6CD, #BED6AC, #96BC7C, #5F8C43, #27500A | #252E26, #243522, #2D4625, #3C5E2C, #557F3A, #86B85C |
+| paper (page) | #F2F6F5 | #060E0E |
+| surface | #FFFFFF | #0C1818 |
+| ink | #0D2121 | #E7F0EE |
+| muted | #536B6A | #88A29E |
+| rule | #D5E1DE | #1F3433 |
+| band (header and tabs) | #0F3B3A, ivory text #F3EFE4 | #0B2E2D (deeper), ivory text #F3EFE4 |
+| green (teal: links, focus, selection) | #0F5C58 | #5FD1C1 |
+| coral (primary action only: Add company and modal primaries) | #EE7A5B, dark text #2A0E06 | #F28B6E, dark text #2A0E06 |
+| gold (P1 and the active tab underline) | #D4AE3A, dark text #211904 | #D6B14A, dark text #1F1903 |
+| brick (reject/danger) | #A3341F | #F0937E |
+| amber (ageing) | #875900 | #E6B85A |
+| stage 0–5 | #E3ECEA, #D2EAE5, #ACDCD4, #6CBFB3, #23877D, #0F5C58 | #172625, #163533, #1B4A46, #22665F, #2F8F84, #5FD1C1 |
+
+The full set (surface-2, hover, faint, soft fills, band tints, shadows, radii) lives at the top of `src/app/globals.css`.
 
 - **Fonts:**
-  - IBM Plex Sans for the UI, with tabular numerals for figures
-  - Source Serif 4 for the wordmark, drawer company name and modal titles
-- **Sentence case everywhere.** No em dashes in UI copy.
-- **Responsive:** 16px gutters on phones; the table scrolls horizontally with Company pinned.
-- **Motion:** respect reduced-motion settings.
+  - Hanken Grotesk for the UI and data, with tabular numerals for figures
+  - Jost for the wordmark (uppercase, widely tracked), the stage and PE counts, drawer company name, modal titles and stamps
+  - Source Serif 4 for long reading text (Funding letters, analyst reads)
+  - Generated documents (Excel, PDF letters, results) keep their own fixed fonts
+- **Band:** header and tabs sit on one teal field. The active tab has a brass underline and an ivory count; a brass rule and two faint hairlines close the band.
+- **Stage bar (signature):** six segments that step up from left to right like the Marine Drive skyline, standing on a deep teal baseline, with large counts. Stages with no deals are drawn as outlines, so weight follows the count. The selected stage gets an ink ring. On first load the segments rise into place once (skipped with reduced motion). On phones the six stages sit in two rows of three, still rising left to right. Each row's stage rail steps up the same way.
+- **PE team bar:** each person shows their initials, name and count.
+- **Ornament:** a triple hairline between the bars and the list is the only decoration.
+- **Exit stamps:** in Rejected and Invested, the stage column shows a stamp ("Rejected" in brick, "Invested" in brass) above "at <stage>", instead of a plain label.
+- **Sentence case everywhere.** No em dashes in UI copy. The wordmark and stamps are set in uppercase by CSS only; the text stays in sentence case.
+- **Responsive:** 16px gutters on phones. Below 760px:
+  - the page scrolls as a whole; the band stays pinned at the top
+  - Export to Excel and Add company show as icon buttons (with labels for screen readers)
+  - the PE team bar, filter row and Invested view switcher scroll sideways instead of wrapping
+  - the Pipeline, Rejected and Invested lists show as cards instead of the table: company and priority, then the latest comment (or reason or update) as the next step, then sector, highlights, stage (or amount invested), PE and research, date, files, OneDrive and days. Stage and priority are editable on the card; the company name and comment open the company drawer
+  - touch targets are at least 40px tall
+- **Table:** every Pipeline column fits at 1440px wide. The open row is tinted and outlined in teal; on phones the open card lifts.
+- **Motion:** respect reduced-motion settings (stamps lose their tilt, the stage bar does not animate).
 
 ## 12. Export to Excel
 
 - **Button:** header. Available to all roles.
 - **Scope:** always exports **everything**, ignoring active filters.
-- **File:** `Niveshaay Deal Pipeline YYYY-MM-DD.xlsx`.
+- **File:** `Niveshaay PE Desk YYYY-MM-DD.xlsx`.
 - **Sheets:**
   - **Pipeline:** Sr. No., Company, Sector, Sub-sector, Stage, Priority, Assigned PE, Assigned Research, Latest comment, Comments (count), Via, Date received, Days, OneDrive, Files (count)
   - **Rejected:** Sr. No., Company, Sector, Sub-sector, Stage at exit, Priority, Assigned PE, Assigned Research, Rejection reason, Rejected on, Via, Date received, Days in pipeline, OneDrive
   - **Invested:** Sr. No., Company, Sector, Sub-sector, Stage at exit (or "Added directly"), Priority, Assigned PE, Assigned Research, Latest comment, Via, Date received, Invested on, Days in pipeline, OneDrive
 - **Each sheet:**
-  - row 1: title "Niveshaay Deal Pipeline: <Sheet>" in Times New Roman 14 bold, dark green #004800
+  - row 1: title "Niveshaay PE Desk: <Sheet>" in Times New Roman 14 bold, dark green #004800
   - row 2: "N companies. Exported on <datetime>." in italic grey
   - row 3: headers in Times New Roman bold white on blue #1F4E79
   - body: Times New Roman 11, thin light borders, light zebra fill #F4F7F1
@@ -576,7 +595,8 @@ The goal (phases B–D): generate each portfolio company's quarterly result (ima
 - **Fact check:** every dollar figure and percentage in the text must match a deal, a sector or kind total, a sum of two deals in one sector, the period totals, the previous period or the benchmark, or a round threshold. One corrective retry; any figure still unmatched is listed under the byline.
 - **The letter (PDF):** each note is sent as an A4 PDF in the style of a fund's LP letter (fixed Niveshaay colours, IBM Plex Sans and Source Serif 4 from `assets/fonts`): a green cover with the headline, key figures and what it means for us (the weekly cover lists the biggest rounds); the editor's letter with linked company names; charts (money by sector, rounds by stage, round sizes, biggest investors by money, most active leads); the editor's take on each sector (monthly); and every equity round as an appendix, with a note on method. "Letter (PDF)" in the Funding tab downloads it (`/api/funding/letter/<period>`). Rendered with `@react-pdf/renderer`.
 - **WhatsApp:** both notes go, as the PDF with a short caption, to the portfolio updates group (`NEWS_WHATSAPP_GROUP`; `FUNDING_WHATSAPP_GROUP` overrides it), once each, with a link to the tab (`APP_URL/?view=funding`). Notes more than 10 days old are never posted.
-- **Funding-only deployment (2026-11-03):** the same code with APP_MODE=funding, on its own address, for people outside the PE team. It shows only the Funding tab and its PDFs, read-only (no Edit or Leave out). equireRole() refuses every other page, action and file route (403), so nothing else can be reached even directly; "Companies we have seen" and every mark of our own pipeline are removed on the server; no background jobs run there (the main app runs them). Each note has two versions: the team version (sent to WhatsApp, shown in the main app) is written with our portfolio, deck counts and which companies are in our deal list; a separate shareable version (`publicData`) is written without any of that, for growth investors in general, and is the only one the funding-only deployment shows, on screen and in the PDF. The job writes the shareable version after each note (one try a day per note). About $0.20 a month more.
+- **Funding-only deployment (2026-11-03):** the same code with APP_MODE=funding, on its own address, for people outside the PE team. It shows only the Funding tab and its PDFs, read-only (no Edit or Leave out). 
+equireRole() refuses every other page, action and file route (403), so nothing else can be reached even directly; "Companies we have seen" and every mark of our own pipeline are removed on the server; no background jobs run there (the main app runs them). Each note has two versions: the team version (sent to WhatsApp, shown in the main app) is written with our portfolio, deck counts and which companies are in our deal list; a separate shareable version (`publicData`) is written without any of that, for growth investors in general, and is the only one the funding-only deployment shows, on screen and in the PDF. The job writes the shareable version after each note (one try a day per note). About $0.20 a month more.
 - Never log headlines or AI output; counts, ids and costs only.
 
 ## 16. Non-goals (for now)

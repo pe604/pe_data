@@ -15,7 +15,7 @@ const box: Partial<ExcelJS.Borders> = { top: thin, left: thin, bottom: thin, rig
 
 export async function buildResultWorkbook(r: BuiltResult, sheetName: string): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Niveshaay Deal Pipeline";
+  wb.creator = "Niveshaay PE Desk";
   const ws = wb.addWorksheet(sheetName.replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Result", { views: [{ showGridLines: false }] });
   const cols = 1 + r.headers.length;
   const longest = Math.max(28, ...r.tables.flatMap((t) => [t.caption.length, ...t.rows.map((x) => x.label.length)]));

@@ -18,7 +18,7 @@ Internal, login-only deal tracker for Niveshaay's PE team (SEBI Cat II AIF). It 
 | PPTX | LibreOffice headless converts PPTX → PDF (installed in the Docker image); slide-text extraction is the fallback when it's missing (e.g. Windows dev) |
 | Excel / zip | `exceljs` / `archiver`, in route handlers |
 | Validation | `zod` on every input |
-| Styling | `src/app/globals.css`: the prototype's stylesheet ported as-is (SPEC §11 tokens as CSS variables, same class names), plus a small "additions" block at the end. IBM Plex Sans + Source Serif 4 via `next/font` |
+| Styling | `src/app/globals.css`: the prototype's stylesheet ported as-is (SPEC §11 tokens as CSS variables, same class names), plus a small "additions" block at the end. Marine Drive deco world (SPEC §11): Hanken Grotesk + Jost (+ Source Serif 4 for reading text) via `next/font`; phone cards for the lists below 760px |
 | Tests | Vitest (unit), Playwright (E2E) |
 | Deploy | `Dockerfile` on Easypanel (from GitHub, container port 3000), or `docker-compose.prod.yml` (app only) |
 

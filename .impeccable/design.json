@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-25T00:00:00Z",
+  "title": "Design System: Niveshaay PE Desk",
+  "extensions": {
+    "colorMeta": {
+      "band": { "role": "primary", "displayName": "Peacock Band", "dark": "#0B2E2D", "tonalRamp": ["#061A19", "#0B2E2D", "#0F3B3A", "#134645", "#2A6361", "#5A8E8A", "#A3C4BF", "#E3EEEC"] },
+      "band-ink": { "role": "primary", "displayName": "Marine Ivory", "dark": "#F3EFE4" },
+      "band-muted": { "role": "primary", "displayName": "Band Muted", "dark": "#9FC2BC" },
+      "coral": { "role": "primary", "displayName": "Harbour Coral", "dark": "#F28B6E", "tonalRamp": ["#4A1A0D", "#7A2E19", "#B04A2D", "#D9623F", "#EE7A5B", "#F28D71", "#F7B9A6", "#FCE6DE"] },
+      "coral-2": { "role": "primary", "displayName": "Coral Hover", "dark": "#F6A28A" },
+      "on-coral": { "role": "primary", "displayName": "On Coral", "dark": "#2A0E06" },
+      "green": { "role": "secondary", "displayName": "Deep Teal", "dark": "#5FD1C1", "tonalRamp": ["#072D2A", "#0B3533", "#0F5C58", "#127069", "#23877D", "#6CBFB3", "#ACDCD4", "#DCEFEB"] },
+      "green-2": { "role": "secondary", "displayName": "Teal Hover", "dark": "#84DFD2" },
+      "green-soft": { "role": "secondary", "displayName": "Teal Wash", "dark": "#123433" },
+      "on-green": { "role": "secondary", "displayName": "On Teal", "dark": "#04201D" },
+      "stage-0": { "role": "secondary", "displayName": "Not Assigned", "dark": "#172625", "textToken": "--t0" },
+      "stage-1": { "role": "secondary", "displayName": "Call Pending", "dark": "#163533", "textToken": "--t1" },
+      "stage-2": { "role": "secondary", "displayName": "Internal Discussion", "dark": "#1B4A46", "textToken": "--t2" },
+      "stage-3": { "role": "secondary", "displayName": "Scuttlebutt", "dark": "#22665F", "textToken": "--t3" },
+      "stage-4": { "role": "secondary", "displayName": "Allocation", "dark": "#2F8F84", "textToken": "--t4" },
+      "stage-5": { "role": "secondary", "displayName": "Due Diligence", "dark": "#5FD1C1", "textToken": "--t5" },
+      "gold-fill": { "role": "tertiary", "displayName": "Brass", "dark": "#D6B14A", "tonalRamp": ["#211904", "#4A3808", "#85620C", "#B08A1E", "#D4AE3A", "#E3C063", "#EED99A", "#F6EDD2"] },
+      "gold": { "role": "tertiary", "displayName": "Brass Text", "dark": "#E3C063" },
+      "gold-soft": { "role": "tertiary", "displayName": "Brass Wash", "dark": "#2C2712" },
+      "on-gold": { "role": "tertiary", "displayName": "On Brass", "dark": "#1F1903" },
+      "brick": { "role": "tertiary", "displayName": "Brick", "dark": "#F0937E", "tonalRamp": ["#3A1E18", "#6B2416", "#A3341F", "#C24A33", "#E0705A", "#F0937E", "#F6BFB2", "#F8E4DE"] },
+      "brick-soft": { "role": "tertiary", "displayName": "Brick Wash", "dark": "#3A1E18" },
+      "amber": { "role": "tertiary", "displayName": "Ageing Amber", "dark": "#E6B85A" },
+      "paper": { "role": "neutral", "displayName": "Cool Paper", "dark": "#060E0E", "tonalRamp": ["#060E0E", "#0C1818", "#1F3433", "#536B6A", "#88A29E", "#D5E1DE", "#F2F6F5", "#FFFFFF"] },
+      "surface": { "role": "neutral", "displayName": "Surface", "dark": "#0C1818" },
+      "surface-2": { "role": "neutral", "displayName": "Surface Inset", "dark": "#101F1F" },
+      "hover": { "role": "neutral", "displayName": "Hover", "dark": "#152828" },
+      "sel": { "role": "neutral", "displayName": "Open Row", "dark": "#173131" },
+      "ink": { "role": "neutral", "displayName": "Harbour Ink", "dark": "#E7F0EE" },
+      "ink-2": { "role": "neutral", "displayName": "Ink Secondary", "dark": "#BFD1CD" },
+      "muted": { "role": "neutral", "displayName": "Muted", "dark": "#88A29E" },
+      "faint": { "role": "neutral", "displayName": "Faint", "dark": "#7A9490" },
+      "rule": { "role": "neutral", "displayName": "Rule", "dark": "#1F3433" },
+      "rule-2": { "role": "neutral", "displayName": "Row Rule", "dark": "#172928" }
+    },
+    "typographyMeta": {
+      "wordmark": { "displayName": "Wordmark", "purpose": "\"Niveshaay\" on the band only; uppercase by CSS." },
+      "display": { "displayName": "Display", "purpose": "Stage counts, PE counts (19px), drawer company name." },
+      "headline": { "displayName": "Headline", "purpose": "Modal titles and empty-state headings." },
+      "title": { "displayName": "Title", "purpose": "Company names in the table and phone cards." },
+      "body": { "displayName": "Body", "purpose": "All data and controls, tabular figures." },
+      "label": { "displayName": "Label", "purpose": "Table headers, stage names, field labels." },
+      "stamp": { "displayName": "Stamp", "purpose": "Rejected and Invested exit stamps only; uppercase by CSS." },
+      "reading": { "displayName": "Reading", "purpose": "Funding letters and analyst reads." }
+    },
+    "shadows": [
+      { "name": "whisper", "value": "0 1px 2px rgba(13,33,33,.07)", "token": "--shadow-sm", "purpose": "Buttons, table well, deal cards at rest." },
+      { "name": "pop", "value": "0 1px 2px rgba(13,33,33,.07), 0 16px 40px rgba(13,33,33,.16)", "token": "--shadow-pop", "purpose": "Popovers, modals, the open deal card." },
+      { "name": "drawer", "value": "-24px 0 56px rgba(13,33,33,.16)", "token": "--shadow-drawer", "purpose": "The company drawer." },
+      { "name": "stage-selected", "value": "inset 0 0 0 2px var(--ink), 0 -6px 18px rgba(0,0,0,.10)", "purpose": "The selected skyline segment." }
+    ],
+    "motion": [
+      { "name": "rise", "value": "0.7s cubic-bezier(.16,1,.3,1), staggered 40ms", "purpose": "Skyline segments rise from scaleY(.82) once on load; skipped with reduced motion." },
+      { "name": "drawer", "value": "0.22s cubic-bezier(.2,.7,.2,1)", "purpose": "Drawer slide in from the right." },
+      { "name": "state", "value": "0.15s", "purpose": "Colour, border and shadow changes on buttons, tabs, inputs, segments." },
+      { "name": "row", "value": "0.12s", "purpose": "Table row background on hover." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "760px", "purpose": "Cards replace the table, pinned band, 16px gutters, 40px targets." },
+      { "name": "tabs-scroll", "value": "720px", "purpose": "Tab row scrolls sideways." },
+      { "name": "narrow", "value": "340px", "purpose": "The PE Desk label drops." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Coral, once per view: Add company and modal primaries.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><path d=\"M7 2v10M2 7h10\"/></svg>Add company</button>",
+      "css": ".ds-btn-primary{height:36px;border-radius:var(--r,8px);border:1px solid var(--coral);background:var(--coral);color:var(--on-coral);padding:0 13px;font:600 13.5px var(--sans);display:inline-flex;align-items:center;gap:7px;box-shadow:var(--shadow-sm);cursor:pointer;transition:background-color .15s,border-color .15s}.ds-btn-primary:hover{background:var(--coral-2);border-color:var(--coral-2)}.ds-btn-primary:focus-visible{outline:2px solid var(--green);outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Surface button for every non-primary action.",
+      "html": "<button class=\"ds-btn\">Cancel</button>",
+      "css": ".ds-btn{height:36px;border-radius:var(--r,8px);border:1px solid var(--rule);background:var(--surface);color:var(--ink);padding:0 13px;font:500 13.5px var(--sans);box-shadow:var(--shadow-sm);cursor:pointer;transition:border-color .15s}.ds-btn:hover{border-color:var(--faint)}.ds-btn:focus-visible{outline:2px solid var(--green);outline-offset:2px}"
+    },
+    {
+      "name": "Band with tabs",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Header and tabs on one teal field, closed by a brass rule and two hairlines.",
+      "html": "<div class=\"ds-band\"><div class=\"ds-band-top\"><span class=\"ds-wm\">Niveshaay</span><span class=\"ds-app\">PE Desk</span></div><nav class=\"ds-tabs\"><button class=\"ds-tab\" aria-selected=\"true\">Pipeline <span class=\"ds-n\">44</span></button><button class=\"ds-tab\">Rejected <span class=\"ds-n\">441</span></button><button class=\"ds-tab\">Invested <span class=\"ds-n\">28</span></button></nav></div>",
+      "css": ".ds-band{background:var(--band);color:var(--band-ink)}.ds-band-top{display:flex;align-items:center;gap:14px;padding:16px 28px 4px}.ds-wm{font:500 21px/1 var(--display);letter-spacing:.2em;text-transform:uppercase}.ds-app{font:400 15px/22px var(--display);letter-spacing:.04em;color:var(--gold-fill);border-left:1px solid var(--band-rule);padding-left:14px}.ds-tabs{display:flex;gap:2px;padding:10px 22px 0;position:relative}.ds-tabs::after{content:\"\";position:absolute;left:0;right:0;bottom:0;height:7px;background:linear-gradient(var(--gold-fill),var(--gold-fill)) 0 0/100% 1px no-repeat,linear-gradient(var(--band-rule),var(--band-rule)) 0 3px/100% 1px no-repeat,linear-gradient(var(--band-rule),var(--band-rule)) 0 6px/100% 1px no-repeat}.ds-tab{background:none;border:0;color:var(--band-muted);padding:9px 12px 16px;font:500 14px var(--sans);position:relative;cursor:pointer;display:flex;gap:8px;align-items:baseline;transition:color .15s}.ds-tab:hover{color:var(--band-ink)}.ds-tab:focus-visible{outline:2px solid var(--gold-fill);outline-offset:2px}.ds-n{font-size:11.5px;font-weight:600;background:var(--band-rule);color:var(--band-muted);border-radius:999px;padding:1px 7px;line-height:16px}.ds-tab[aria-selected=true]{color:var(--band-ink);font-weight:600}.ds-tab[aria-selected=true] .ds-n{background:var(--band-ink);color:var(--band)}.ds-tab[aria-selected=true]::after{content:\"\";position:absolute;left:12px;right:12px;bottom:7px;height:3px;border-radius:2px 2px 0 0;background:var(--gold-fill)}"
+    },
+    {
+      "name": "Stage skyline",
+      "kind": "custom",
+      "refersTo": "stage-segment",
+      "description": "Six sea-glass setbacks rising left to right with large counts; zero stages are outlines.",
+      "html": "<div class=\"ds-sky\"><button class=\"ds-seg\" style=\"--c:var(--s0);--tc:var(--t0);min-height:62px\"><span class=\"ds-sn\">Not Assigned</span><span class=\"ds-sc\">6</span></button><button class=\"ds-seg\" style=\"--c:var(--s1);--tc:var(--t1);min-height:70px\"><span class=\"ds-sn\">Call Pending</span><span class=\"ds-sc\">21</span></button><button class=\"ds-seg\" style=\"--c:var(--s2);--tc:var(--t2);min-height:78px\"><span class=\"ds-sn\">Internal Discussion</span><span class=\"ds-sc\">13</span></button><button class=\"ds-seg\" aria-pressed=\"true\" style=\"--c:var(--s3);--tc:var(--t3);min-height:86px\"><span class=\"ds-sn\">Scuttlebutt</span><span class=\"ds-sc\">1</span></button><button class=\"ds-seg\" style=\"--c:var(--s4);--tc:var(--t4);min-height:94px\"><span class=\"ds-sn\">Allocation</span><span class=\"ds-sc\">3</span></button><button class=\"ds-seg ds-zero\" style=\"min-height:102px\"><span class=\"ds-sn\">Due Diligence</span><span class=\"ds-sc\">0</span></button></div>",
+      "css": ".ds-sky{display:flex;gap:3px;align-items:flex-end;border-bottom:2px solid var(--s5)}.ds-seg{flex:1 1 0;border:0;border-radius:8px 8px 0 0;padding:10px 14px 9px;text-align:left;background:var(--c);color:var(--tc);display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:box-shadow .15s,filter .15s}.ds-seg:hover{filter:brightness(1.05)}.ds-seg:focus-visible{outline:2px solid var(--green);outline-offset:2px}.ds-seg[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--ink),0 -6px 18px rgba(0,0,0,.10)}.ds-sn{font:600 12px var(--sans);opacity:.92}.ds-sc{font:500 30px/1 var(--display);letter-spacing:-.01em;margin-top:8px}.ds-zero{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1px var(--rule)}"
+    },
+    {
+      "name": "PE card",
+      "kind": "chip",
+      "refersTo": "pe-card",
+      "description": "A person with initials, name and count; filters the list.",
+      "html": "<button class=\"ds-pe\" aria-pressed=\"false\"><span class=\"ds-av\">AB</span><span class=\"ds-pn\">Sample person</span><span class=\"ds-pc\">13</span></button>",
+      "css": ".ds-pe{width:170px;border:0;background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px 8px 8px;display:grid;grid-template-columns:32px 1fr;column-gap:10px;align-items:center;text-align:left;box-shadow:inset 0 0 0 1px var(--rule);cursor:pointer}.ds-pe:hover{background:var(--hover)}.ds-pe:focus-visible{outline:2px solid var(--green);outline-offset:2px}.ds-pe[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--green);background:var(--green-soft)}.ds-av{grid-row:1/3;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:600 12px var(--display);letter-spacing:.06em;background:var(--green-soft);color:var(--green)}.ds-pe[aria-pressed=true] .ds-av{background:var(--green);color:var(--on-green)}.ds-pn{font:600 12.5px var(--sans)}.ds-pc{font:500 19px/1 var(--display)}"
+    },
+    {
+      "name": "Priority pill",
+      "kind": "chip",
+      "refersTo": "priority-p1",
+      "description": "Inline priority select; P1 is solid brass.",
+      "html": "<span class=\"ds-pri ds-p1\">P1</span> <span class=\"ds-pri ds-p2\">P2</span> <span class=\"ds-pri ds-p0\">Set</span>",
+      "css": ".ds-pri{display:inline-block;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;min-width:40px;font:700 12.5px var(--sans);letter-spacing:.02em}.ds-p1{background:var(--gold-fill);border-color:var(--gold-fill);color:var(--on-gold)}.ds-p2{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}.ds-p0{border-style:dashed;color:var(--faint);font-weight:500}"
+    },
+    {
+      "name": "Exit stamp",
+      "kind": "custom",
+      "refersTo": "stamp-rejected",
+      "description": "Rejected and invested deals keep their row with a tilted stamp.",
+      "html": "<div><span class=\"ds-stamp ds-rej\">Rejected</span><span class=\"ds-stamp-sub\">at Not Assigned</span></div><div><span class=\"ds-stamp ds-inv\">Invested</span><span class=\"ds-stamp-sub\">at Due Diligence</span></div>",
+      "css": ".ds-stamp{display:inline-block;font:600 11px var(--display);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px 1px;border:1.5px solid currentColor;border-radius:4px;transform:rotate(-3deg);margin:2px 0 4px}.ds-rej{color:var(--brick)}.ds-inv{color:var(--gold)}.ds-stamp-sub{display:block;font:400 12.5px var(--sans);color:var(--muted)}@media (prefers-reduced-motion:reduce){.ds-stamp{transform:none}}"
+    },
+    {
+      "name": "Search input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Toolbar search; teal border and halo on focus.",
+      "html": "<label class=\"ds-search\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><circle cx=\"6\" cy=\"6\" r=\"4.5\"/><path d=\"M9.5 9.5L13 13\" stroke-linecap=\"round\"/></svg><input placeholder=\"Search companies and comments\"></label>",
+      "css": ".ds-search{position:relative;display:block;width:260px}.ds-search svg{position:absolute;left:11px;top:11px;color:var(--faint)}.ds-search input{width:100%;height:36px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink);padding:0 10px 0 34px;font:400 13.5px var(--sans);transition:border-color .15s,box-shadow .15s}.ds-search input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}"
+    },
+    {
+      "name": "Deal card",
+      "kind": "card",
+      "refersTo": "deal-card",
+      "description": "Phone list item leading with the next step; the open card lifts.",
+      "html": "<article class=\"ds-dcard\"><div class=\"ds-dc-top\"><span class=\"ds-idx\">1</span><span class=\"ds-dc-name\">Sample company</span><span class=\"ds-pri ds-p1\" style=\"display:inline-block;border-radius:999px;padding:3px 10px;font:700 12.5px var(--sans);background:var(--gold-fill);color:var(--on-gold)\">P1</span></div><p class=\"ds-dc-next\">Plant visit to be planned</p><div class=\"ds-dc-foot\"><span>Received 28 Oct 2026</span><span class=\"ds-grow\"></span><span class=\"ds-days\">28<small>d</small></span></div></article>",
+      "css": ".ds-dcard{max-width:360px;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px 14px 12px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow-sm);transition:box-shadow .15s,transform .15s}.ds-dcard:hover{border-color:var(--green);background:var(--sel);box-shadow:var(--shadow-pop);transform:translateY(-1px)}.ds-dc-top{display:flex;align-items:flex-start;gap:6px}.ds-idx{min-width:22px;padding-top:3px;color:var(--faint);font:500 12px var(--sans)}.ds-dc-name{flex:1;font:600 16.5px/1.3 var(--sans);color:var(--ink)}.ds-dc-next{margin:0 0 0 28px;font:500 14.5px var(--sans);color:var(--ink)}.ds-dc-foot{display:flex;align-items:center;gap:10px;font:400 12.5px var(--sans);color:var(--muted);border-top:1px solid var(--rule-2);padding-top:9px}.ds-grow{flex:1}.ds-days{font:500 18px var(--display);color:var(--ink)}.ds-days small{font:400 11.5px var(--sans);color:var(--faint);margin-left:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Marine Drive Deal Desk",
+    "overview": "The desk is set in Mumbai's Art Deco financial district. A peacock-teal band carries the ivory wordmark and the tabs; below it the page is cool white, never cream, and the pipeline reads as a skyline of setbacks: six stage segments stepping up from left to right on a deep teal baseline, their counts set large in a geometric deco face. The rest of the screen is a working instrument, dense and quiet, so the band and the skyline carry the character and the table carries the data.\n\nColour is rationed by job. Coral belongs to the primary action alone. Brass marks P1, the active tab and the close of the band. Teal does the everyday work of links, focus, selection and ownership, and the sea-glass ramp tells stage progress from pale aqua to deep teal. Exits are not deletions: rejected and invested deals carry a tilted stamp where their stage used to be. The one ornament is the triple hairline. Light and dark both follow `prefers-color-scheme`; in dark the ground goes teal-black, the band deepens, and coral and sea-glass brighten.\n\nDensity follows the work: a wide table that fits every Pipeline column at 1440px on a desk, and lead-with-the-next-step cards on a phone with 40px touch targets and 16px gutters. The rejected category default is a grey dashboard with a single green or neon accent.",
+    "keyCharacteristics": [
+      "One teal band for header and tabs, closed by a brass rule and two faint hairlines.",
+      "A stepped stage bar whose heights rise with the stage and whose weight follows the count.",
+      "Coral used for the primary action only.",
+      "Jost for the wordmark, counts, titles and stamps; Hanken Grotesk with tabular figures for everything else.",
+      "Flat surfaces with a whisper shadow; the open row or card is the one thing that lifts.",
+      "Exit states stamp onto the row instead of disappearing."
+    ],
+    "rules": [
+      { "name": "The One Coral Rule", "body": "Coral marks the primary action and nothing else. If two coral things are on screen, one of them is wrong.", "section": "colors" },
+      { "name": "The Never Cream Rule", "body": "The page is cool paper with a teal cast. Warm off-white grounds belong to a different world.", "section": "colors" },
+      { "name": "The Brass Is Earned Rule", "body": "Brass is for P1, the active tab and the band's closing rule. It is never decoration.", "section": "colors" },
+      { "name": "The Figures Line Up Rule", "body": "Every number is tabular (`\"tnum\" 1` on body). Counts, amounts, days and dates must align in columns.", "section": "typography" },
+      { "name": "The Uppercase By CSS Rule", "body": "Copy is sentence case in the source. Only the wordmark and stamps are uppercased, and only through `text-transform`.", "section": "typography" },
+      { "name": "The Only The Open Lifts Rule", "body": "At rest everything sits flat. The open row is tinted and outlined in teal; the open card lifts 1px with the pop shadow. Nothing else rises.", "section": "elevation" },
+      { "name": "The Setback Rule", "body": "Progress is drawn as rising steps, never as a flat progress bar.", "section": "shapes" }
+    ],
+    "dos": [
+      "**Do** reach every colour through its CSS variable and define the dark value on the same token.",
+      "**Do** keep coral for the single primary action in a view, with on-coral text.",
+      "**Do** set counts and the drawer title in Jost and all data in Hanken Grotesk with tabular figures.",
+      "**Do** draw stage progress as rising setbacks on the sea-glass ramp.",
+      "**Do** stamp exit states onto the row instead of removing the deal.",
+      "**Do** keep 16px gutters and 40px touch targets below 760px, and honour reduced motion."
+    ],
+    "donts": [
+      "**Don't** use a cream or warm off-white page.",
+      "**Don't** use coral or brass as decoration or as fills for sections.",
+      "**Don't** add ornament beyond the triple hairline.",
+      "**Don't** write uppercase or title case in the copy; the wordmark and stamps are uppercased by CSS only.",
+      "**Don't** use em dashes in UI copy.",
+      "**Don't** lift anything at rest; only floating layers and the open row or card rise."
+    ]
+  },
+  "scope": {
+    "inSystem": ["Header band and tabs", "Stage skyline", "PE row", "Toolbar", "Pipeline, Rejected and Invested lists", "Phone deal cards", "Drawer and modal chrome"],
+    "pending": ["Events", "Funding", "Thesis (inherit tokens; not yet restyled, not part of the system)"],
+    "outsideWorld": ["Results document styles (fixed Niveshaay brand colours for a generated document)", "Excel and PDF exports"]
+  }
+}

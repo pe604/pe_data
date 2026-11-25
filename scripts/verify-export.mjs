@@ -14,7 +14,7 @@ await wb.xlsx.load(await res.body());
 const problems = [];
 const check = (cond, msg) => cond || problems.push(msg);
 
-check(/Niveshaay Deal Pipeline \d{4}-\d{2}-\d{2}\.xlsx/.test(decodeURIComponent(cd)), "filename: " + cd);
+check(/Niveshaay PE Desk \d{4}-\d{2}-\d{2}\.xlsx/.test(decodeURIComponent(cd)), "filename: " + cd);
 check(wb.worksheets.map((w) => w.name).join(",") === "Pipeline,Rejected,Invested", "sheet names");
 
 const expectHeaders = {
@@ -25,7 +25,7 @@ const expectHeaders = {
 
 for (const ws of wb.worksheets) {
   const t = ws.getCell("A1");
-  check(t.value === "Niveshaay Deal Pipeline: " + ws.name, `${ws.name} title`);
+  check(t.value === "Niveshaay PE Desk: " + ws.name, `${ws.name} title`);
   check(t.font?.name === "Times New Roman" && t.font?.size === 14 && t.font?.bold && t.font?.color?.argb === "FF004800", `${ws.name} title font`);
   check(/compan(y|ies)\. Exported on /.test(String(ws.getCell("A2").value)) && ws.getCell("A2").font?.italic, `${ws.name} subtitle`);
   const headers = ws.getRow(3).values.slice(1);

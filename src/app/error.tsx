@@ -7,7 +7,7 @@ export default function ErrorPage({ reset }: { error: Error & { digest?: string 
       <div className="signin-card">
         <div className="brand">
           <span className="wm">Niveshaay</span>
-          <span className="app">Deal pipeline</span>
+          <span className="app">PE Desk</span>
         </div>
         <p className="muted">Something went wrong loading the pipeline. Try again, and if it keeps happening, reload the page.</p>
         <button className="btn primary signin-btn" type="button" onClick={reset}>

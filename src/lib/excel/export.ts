@@ -100,7 +100,7 @@ function addSheet(wb: ExcelJS.Workbook, all: CompanyRow[], status: Status, title
   ws.mergeCells(2, 1, 2, cols.length);
 
   const t = ws.getCell(1, 1);
-  t.value = "Niveshaay Deal Pipeline: " + title;
+  t.value = "Niveshaay PE Desk: " + title;
   t.font = { name: FONT, size: 14, bold: true, color: { argb: DARK_GREEN } };
   t.alignment = { vertical: "middle" };
   ws.getRow(1).height = 26;
@@ -160,7 +160,7 @@ function addSheet(wb: ExcelJS.Workbook, all: CompanyRow[], status: Status, title
 export async function buildWorkbook(all: CompanyRow[]): Promise<Buffer> {
   const today = todayISO();
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Niveshaay Deal Pipeline";
+  wb.creator = "Niveshaay PE Desk";
   wb.created = new Date();
   addSheet(wb, all, "PIPELINE", "Pipeline", today);
   addSheet(wb, all, "REJECTED", "Rejected", today);
