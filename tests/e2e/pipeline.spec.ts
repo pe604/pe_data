@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
-import { addByName, openCompany, openTab, row, uniq } from "./helpers";
+import { addByName, openCompany, openTab, row, toTop, uniq } from "./helpers";
 import { addDays, todayISO } from "../../src/lib/domain/dates";
 import { lastEndedQuarter, quarterLabel, shiftQuarter } from "../../src/lib/domain/quarters";
 import ExcelJS from "exceljs";
@@ -77,6 +77,7 @@ test("a new PE name joins the PE team bar; PE and Research suggest separate name
   await input.fill(person);
   await pop.getByRole("option", { name: /as a new team member/ }).click();
   await pop.getByRole("button", { name: "Done" }).click();
+  await toTop(page);
   await expect(bar).toContainText(display);
   await page.reload();
   await expect(page.getByRole("group", { name: "PE team" })).toContainText(display);
@@ -818,6 +819,7 @@ test("WhatsApp panel: rename a person everywhere, delete them and their assignme
   await expect(row(page, name).locator("td.c-re")).toContainText(display);
 
   const open = async () => {
+    await toTop(page);
     await page.locator(".pe-lab").getByRole("button", { name: "WhatsApp" }).click();
     return page.getByRole("dialog");
   };
