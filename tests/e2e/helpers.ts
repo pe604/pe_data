@@ -2,6 +2,12 @@ import { expect, type Page } from "@playwright/test";
 
 export const uniq = (p: string) => `${p} ${Date.now().toString(36).slice(-5)}`;
 
+/** Scrolls the table back to the top, which brings back the stage bar and PE team (they fold away while it scrolls). */
+export async function toTop(page: Page) {
+  await page.locator(".table-wrap").evaluate((el) => el.scrollTo({ top: 0 }));
+  await expect(page.getByRole("group", { name: "PE team" })).toBeVisible();
+}
+
 export async function openTab(page: Page, name: "Pipeline" | "Rejected" | "Invested") {
   await page.getByRole("tab", { name: new RegExp("^" + name) }).click();
 }

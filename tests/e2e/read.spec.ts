@@ -188,18 +188,22 @@ test("read: the waiting list, and Load a read from a file", async ({ page }) => 
 
 test.describe("read on a phone, in dark mode, by keyboard", () => {
   test.use({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
-  test("no sideways page scroll; the Read cell opens the Read tab from the keyboard", async ({ page }) => {
+  test("no sideways page scroll; the company card opens the file and the Read tab works from the keyboard", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("button", { name: VOLTARIS, exact: true }).first()).toBeVisible();
+    // Phones show company cards instead of the table (SPEC §11).
+    const card = page.getByRole("list", { name: "Companies" }).getByRole("button", { name: VOLTARIS, exact: true });
+    await expect(card).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     expect(bg).not.toBe("rgb(255, 255, 255)");
-    const cell = page.getByRole("button", { name: /^Read for Voltaris Grid Systems/ });
-    await cell.focus();
-    await expect(cell).toBeFocused();
+    await card.focus();
+    await expect(card).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("tab", { name: "Read" })).toHaveAttribute("aria-selected", "true");
+    const readTab = page.getByRole("tab", { name: "Read" });
+    await readTab.focus();
+    await page.keyboard.press("Enter");
+    await expect(readTab).toHaveAttribute("aria-selected", "true");
     await expect(page.getByText(FIXED)).toBeVisible();
     await page.getByRole("heading", { name: "Sources", exact: true }).scrollIntoViewIfNeeded();
     const drawerOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

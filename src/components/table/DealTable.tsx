@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { updateCompany } from "@/actions/companies";
 import { STAGE_LABELS, STAGES, stageIndex, type PersonRole, type Stage } from "@/lib/domain/constants";
 import { ageClass, daysFor, fmtDate, todayISO } from "@/lib/domain/dates";
@@ -38,6 +38,8 @@ export function DealTable({ rows, view, setView, openId }: Props) {
   // Invested: no Priority, Stage at exit or Via; an Amount invested column instead.
   const invested = view.tab === "invested";
   const colCount = invested ? 8 : 12;
+  // Leaving the table (tab change, empty list) brings the stage bar and PE team back.
+  useEffect(() => () => document.getElementById("app")?.classList.remove("table-scrolled"), []);
 
   if (!rows.length) {
     const [h, p] = EMPTY[view.tab];
@@ -102,7 +104,7 @@ export function DealTable({ rows, view, setView, openId }: Props) {
       onStage={(c, s) => mutate(c.id, { stage: s }, () => updateCompany(c.id, { stage: s }))}
       onPriority={(c, p) => mutate(c.id, { priority: p }, () => updateCompany(c.id, { priority: p }))}
     />
-    <div className="table-wrap">
+    <div className="table-wrap" onScroll={foldTop}>
       <table className="grid">
         <thead>
           <tr>
@@ -575,6 +577,20 @@ function ReadCell({ c, open }: { c: CompanyRow; open: () => void }) {
       {r.stale && <small className="rd-stale">Out of date</small>}
     </button>
   );
+}
+
+/**
+ * Scrolling down the table folds away the stage bar and the PE team so the list gets the height (desktop; phones
+ * scroll the page). They come back at the top of the list. Only when the list is long enough that folding can't
+ * snap it back to the top, which would make the bars flicker in and out.
+ */
+function foldTop(e: React.UIEvent<HTMLDivElement>) {
+  const el = e.currentTarget;
+  const app = document.getElementById("app");
+  if (!app) return;
+  const folded = app.classList.contains("table-scrolled");
+  if (!folded && el.scrollTop > 40 && el.scrollHeight - el.clientHeight > 320) app.classList.add("table-scrolled");
+  else if (folded && el.scrollTop === 0) app.classList.remove("table-scrolled");
 }
 
 /** Drawer tab the Comment column opens: Summary (Rejected), Updates (Invested), else Comments. */

@@ -1391,3 +1391,6 @@ table.grid{min-width:1240px}
   .dtabs::-webkit-scrollbar{display:none}
   .dtab{white-space:nowrap;flex:none}
 }
+
+/* Scrolling the table folds the stage bar and PE team away, so the list gets the height (desktop only; DealTable foldTop) */
+@media (min-width:761px){#app.table-scrolled .strip-stages,#app.table-scrolled .strip.pe{display:none}}
