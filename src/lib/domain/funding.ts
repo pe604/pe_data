@@ -499,6 +499,154 @@ export function mergeDeal(
   return out;
 }
 
+// ─── Filling gaps from a web search (SPEC §15.16) ───
+
+/** What a round is missing that a search can fill; empty when nothing. */
+export function gapsOf(d: Pick<DealRowData, "amountUsdM" | "round" | "lead" | "what">): ("amount" | "round" | "lead" | "what")[] {
+  const out: ("amount" | "round" | "lead" | "what")[] = [];
+  if (d.amountUsdM == null) out.push("amount");
+  if (d.round === "Undisclosed round") out.push("round");
+  if (!d.lead) out.push("lead");
+  if (!d.what) out.push("what");
+  return out;
+}
+
+/** One search result as the model saw it. */
+export interface FillResult {
+  url: string;
+  title: string;
+  content: string;
+}
+
+/** What the model read from the search results for one round. */
+export interface FillAnswer {
+  what: string;
+  amount: number | null;
+  currency: Currency;
+  /** The exact words in a result that state the amount */
+  amountQuote: string;
+  round: string;
+  lead: string | null;
+}
+
+const OUTLETS: [RegExp, string][] = [
+  [/economictimes|indiatimes/, "ET"],
+  [/livemint/, "Mint"],
+  [/vccircle/, "VCCircle"],
+  [/entrackr/, "Entrackr"],
+  [/inc42/, "Inc42"],
+  [/yourstory/, "YourStory"],
+  [/thehindubusinessline/, "BusinessLine"],
+  [/thehindu\./, "The Hindu"],
+  [/moneycontrol/, "Moneycontrol"],
+  [/business-standard/, "Business Standard"],
+  [/financialexpress/, "Financial Express"],
+  [/dealstreetasia/, "DealStreetAsia"],
+  [/techcrunch/, "TechCrunch"],
+  [/businesstoday/, "Business Today"],
+];
+
+/** A short outlet name from a web address: "https://www.vccircle.com/x" → "VCCircle". */
+export function outletFromUrl(url: string): string {
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "Web";
+  }
+  const known = OUTLETS.find(([re]) => re.test(host));
+  if (known) return known[1];
+  const label = host.split(".")[0] ?? "";
+  return label ? label.charAt(0).toUpperCase() + label.slice(1, 40) : "Web";
+}
+
+/** Lower case, rupee signs as "rs", no commas, single spaces: so a quote matches however the page wrote it. */
+export const normFill = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/₹|\brs\.?|\binr\b/g, " rs ")
+    .replace(/(\d),(?=\d)/g, "$1")
+    .replace(/[^\p{L}\p{N}$%.' ]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Does this text name the company? Its distinctive name, as a whole word ("TASE Global" → "tase"). */
+export function namesCompany(text: string, company: string): boolean {
+  const core = normFill(company.replace(/\.(ai|com|in|io|co)\b/gi, " ").replace(SUFFIX_WORDS, " "));
+  const name = core || normFill(company);
+  if (!name) return false;
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${esc}($|[^\\p{L}\\p{N}])`, "u").test(normFill(text));
+}
+const SUFFIX_WORDS = /\b(private|pvt|limited|ltd|llp|inc|technologies|technology|labs|solutions|ventures)\b\.?/gi;
+
+/** The numbers written in a quote ("Rs 300 crore ($31.9 million)" → [300, 31.9]). */
+const numbersIn = (s: string) => [...normFill(s).matchAll(/\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+
+/**
+ * The fields a search may fill, checked against the results (SPEC §15.16). Never overwrites a value the round has.
+ * - amount: the quote must appear word for word in a result that names the company and one of the round's investors
+ *   (or the lead the search found), state the number given, and use the currency given;
+ * - round and lead: the result text must name them; what: kept when given (at most 8 words);
+ * - sources: results that name the company, added after the existing ones (up to 6).
+ */
+export function fillPatch(
+  d: Pick<DealRowData, "company" | "amountUsdM" | "round" | "lead" | "what" | "investors" | "sources">,
+  a: FillAnswer,
+  results: FillResult[],
+): { patch: Partial<DealRowData>; filled: ("amount" | "round" | "lead" | "what")[] } {
+  const patch: Partial<DealRowData> = {};
+  const filled: ("amount" | "round" | "lead" | "what")[] = [];
+  const about = results.filter((r) => namesCompany(`${r.title} ${r.content}`, d.company));
+  const texts = about.map((r) => normFill(`${r.title} ${r.content}`));
+  const inAny = (s: string) => !!s.trim() && texts.some((t) => t.includes(normFill(s)));
+
+  if (!d.lead && a.lead && a.lead.trim().length <= 80 && inAny(a.lead)) {
+    patch.lead = a.lead.trim();
+    filled.push("lead");
+  }
+  const names = [...d.investors, d.lead ?? "", patch.lead ?? ""].map((n) => normFill(n)).filter((n) => n.length >= 3);
+  if (d.amountUsdM == null && a.amount != null && a.currency !== "NONE" && a.amountQuote.trim()) {
+    const q = normFill(a.amountQuote);
+    const unitOk = a.currency === "INR_CR" ? /\b(crore|cr)\b/.test(q) : a.currency === "USD" ? /\$|\b(usd|dollars?)\b/.test(q) && /\b(million|mn|m|billion|bn)\b/.test(q) : /€|\beur|euros?\b/.test(q);
+    const numOk = numbersIn(a.amountQuote).some((n) => Math.abs(n - (a.amount ?? NaN)) < 0.051);
+    const backed = texts.some((t) => t.includes(q) && (!names.length || names.some((n) => t.includes(n))));
+    const usd = toUsdM(a.amount, a.currency);
+    if (unitOk && numOk && backed && usd != null) {
+      patch.amountUsdM = usd;
+      filled.push("amount");
+    }
+  }
+  if (d.round === "Undisclosed round") {
+    const raw = cleanRound(a.round);
+    const r = raw.charAt(0).toUpperCase() + raw.slice(1); // sentence case: "growth equity" → "Growth equity"
+    if (r !== "Undisclosed round" && inAny(r)) {
+      patch.round = r;
+      patch.stage = stageFor(r);
+      filled.push("round");
+    }
+  }
+  if (!d.what) {
+    const w = a.what.trim().split(/\s+/).filter(Boolean).slice(0, 8).join(" ").slice(0, 120);
+    if (w) {
+      patch.what = w;
+      filled.push("what");
+    }
+  }
+  if (filled.length) {
+    const sources = [...d.sources];
+    for (const r of about) {
+      if (sources.length >= 6) break;
+      const outlet = outletFromUrl(r.url);
+      // One link per outlet: the round may already carry that outlet's story from the news read.
+      if (!sources.some((s) => s.url === r.url || s.outlet === outlet)) sources.push({ outlet, url: r.url, title: r.title.slice(0, 200) });
+    }
+    if (sources.length !== d.sources.length) patch.sources = sources;
+  }
+  return { patch, filled };
+}
+
 /** Another outlet's monthly total from its report headline: "Indian startup funding nosedives 47.5% to $678 Mn in October". */
 export function parseBenchmark(title: string, month: string): { totalUsdM: number; changePct: number | null } | null {
   if (!new RegExp(`\\b${monthName(month)}\\b`, "i").test(title)) return null;
