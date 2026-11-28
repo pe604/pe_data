@@ -3,6 +3,11 @@ import {
   allowedFigures,
   cleanRound,
   dollarFigures,
+  fillPatch,
+  gapsOf,
+  namesCompany,
+  outletFromUrl,
+  unnamedCompany,
   fundingKey,
   lastFullWeek,
   linkPieces,
@@ -176,5 +181,91 @@ describe("funding: figures", () => {
       { t: "Zed", href: null },
       { t: " too.", href: null },
     ]);
+  });
+});
+
+describe("filling gaps from a web search (SPEC §15.16)", () => {
+  // Made-up round and pages.
+  const base = { company: "Zorvex Global", amountUsdM: null, round: "Undisclosed round", lead: "Quillstone Fund", what: null, investors: ["Quillstone Fund"], sources: [{ outlet: "VCCircle", url: "https://www.vccircle.com/a", title: "Quillstone Fund invests in Zorvex Global" }] };
+  const page = (url: string, content: string, title = "Zorvex Global raises funding") => ({ url, title, content });
+  const results = [
+    page("https://www.thehindu.com/b", "Zorvex Global, a precision parts maker, will receive Rs 300 crore from Quillstone Fund in a Series B round."),
+    page("https://www.dealstreetasia.com/c", "Quillstone Fund invests $32m in Zorvex Global."),
+    page("https://example.com/other", "An unrelated company raised money.", "Other news"),
+  ];
+  const ans = { company: "", companyQuote: "", what: "precision parts maker for aerospace and defence buyers today", amount: 300, currency: "INR_CR" as const, amountQuote: "Rs 300 crore", round: "Series B", lead: "Quillstone Fund" };
+
+  it("lists the gaps", () => {
+    expect(gapsOf(base)).toEqual(["amount", "round", "what"]);
+    expect(gapsOf({ ...base, company: "Indian consumer-focused firm" })[0]).toBe("company");
+    expect(gapsOf({ ...base, amountUsdM: 3, round: "Seed", what: "x" })).toEqual([]);
+  });
+  it("fills what the results back, and adds the sources that name the company", () => {
+    const { patch, filled } = fillPatch(base, ans, results);
+    expect(filled.sort()).toEqual(["amount", "round", "what"]);
+    expect(patch.amountUsdM).toBe(33.3);
+    expect(patch.round).toBe("Series B");
+    expect(patch.stage).toBe("GROWTH");
+    expect(patch.what).toBe("precision parts maker for aerospace and defence buyers");
+    expect(patch.sources?.map((s) => s.outlet)).toEqual(["VCCircle", "The Hindu", "DealStreetAsia"]);
+  });
+  it("adds one link per outlet and writes rounds in sentence case", () => {
+    const more = [...results, page("https://www.vccircle.com/z", "Quillstone Fund invests Rs 300 crore in Zorvex Global, a growth equity round.")];
+    const { patch } = fillPatch({ ...base }, { ...ans, round: "growth equity" }, more);
+    expect(patch.sources?.filter((s) => s.outlet === "VCCircle")).toHaveLength(1);
+    expect(patch.round).toBe("Growth equity");
+  });
+  it("keeps no amount the results don't state word for word, in the stated currency", () => {
+    expect(fillPatch(base, { ...ans, amountQuote: "Rs 350 crore", amount: 350 }, results).patch.amountUsdM).toBeUndefined();
+    expect(fillPatch(base, { ...ans, amount: 310 }, results).patch.amountUsdM).toBeUndefined(); // number not in the quote
+    expect(fillPatch(base, { ...ans, currency: "USD" }, results).patch.amountUsdM).toBeUndefined(); // quote is in crore
+  });
+  it("keeps no amount from a page that doesn't name the round's investors (an earlier round)", () => {
+    const old = [page("https://x.com/old", "Zorvex Global raised Rs 300 crore from Brightwater Capital in 2023.")];
+    expect(fillPatch(base, ans, old).patch.amountUsdM).toBeUndefined();
+  });
+  it("never overwrites a value the round already has", () => {
+    const { patch, filled } = fillPatch({ ...base, amountUsdM: 30, round: "Series A", what: "parts" }, ans, results);
+    expect(filled).toEqual([]);
+    expect(patch).toEqual({});
+  });
+  it("needs a lead or round the results name", () => {
+    const noLead = { ...base, lead: null, investors: [] };
+    expect(fillPatch(noLead, { ...ans, lead: "Made Up Partners" }, results).patch.lead).toBeUndefined();
+    expect(fillPatch(noLead, ans, results).patch.lead).toBe("Quillstone Fund");
+    expect(fillPatch(base, { ...ans, round: "Series C" }, results).patch.round).toBeUndefined();
+  });
+  it("tells a described company from a named one", () => {
+    expect(unnamedCompany("Indian consumer-focused firm")).toBe(true);
+    expect(unnamedCompany("a Bengaluru-based fintech startup")).toBe(true);
+    expect(unnamedCompany("Zorvex Global")).toBe(false);
+    expect(unnamedCompany("Acme Platform")).toBe(false);
+    expect(unnamedCompany("Hical Technologies")).toBe(false);
+  });
+  it("names a described company only when a result names it with an investor, and replaces the description", () => {
+    const described = { ...base, company: "Indian consumer-focused firm", what: "consumer-focused firm", amountUsdM: 145, round: "Series C" };
+    const pages = [page("https://www.vccircle.com/k", "Quillstone Fund invested about $145 million in Zorvex Learning Pvt Ltd, VCCircle has reported.", "Quillstone Fund injects $145 mn into Indian consumer-focused firm")];
+    const named = { ...ans, company: "Zorvex Learning Pvt Ltd", companyQuote: "invested about $145 million in Zorvex Learning Pvt Ltd", what: "preschool and school chain" };
+    const { patch, filled } = fillPatch(described, named, pages);
+    expect(filled).toContain("company");
+    expect(patch.company).toBe("Zorvex Learning");
+    expect(patch.key).toBe(fundingKey("Zorvex Learning"));
+    expect(patch.what).toBe("preschool and school chain");
+    // Not in any result, or not with the investor: kept as it was
+    expect(fillPatch(described, { ...named, companyQuote: "Zorvex Learning raised money" }, pages).patch.company).toBeUndefined();
+    const noInvestor = [page("https://x.com/a", "Someone invested about $145 million in Zorvex Learning Pvt Ltd.")];
+    expect(fillPatch(described, named, noInvestor).patch.company).toBeUndefined();
+  });
+  it("names companies by their distinctive name, as whole words", () => {
+    expect(namesCompany("TASE GLOBAL secures funding", "TASE Global")).toBe(true);
+    expect(namesCompany("Refroid raises Rs 50 crore", "Refroid Technologies Pvt. Ltd.")).toBe(true);
+    expect(namesCompany("database startup raises", "Tase Global")).toBe(false);
+  });
+  it("names outlets from their web address", () => {
+    expect(outletFromUrl("https://www.thehindubusinessline.com/x")).toBe("BusinessLine");
+    expect(outletFromUrl("https://www.thehindu.com/x")).toBe("The Hindu");
+    expect(outletFromUrl("https://economictimes.indiatimes.com/x")).toBe("ET");
+    expect(outletFromUrl("https://www.sparkcapital.in/x.pdf")).toBe("Sparkcapital");
+    expect(outletFromUrl("not a url")).toBe("Web");
   });
 });

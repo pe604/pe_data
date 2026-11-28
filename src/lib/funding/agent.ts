@@ -33,6 +33,7 @@ import { parseGoogleNewsRss } from "@/lib/domain/news";
 import { aiConfigured, appUrl, fundingModel, fundingWhatsappTo, whatsappConfigured } from "@/lib/env";
 import { sendDocument, sendText } from "@/lib/whatsapp/evolution";
 import { dealsBetween, ourSectorCounts } from "./data";
+import { fillGaps } from "./fill";
 import { letterCaption, letterFileName, renderLetter } from "./letter";
 import { loadLetter } from "./letterData";
 
@@ -147,11 +148,12 @@ function addDaysISO(iso: string, n: number): string {
   return new Date(day(iso).getTime() + n * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** The last few days, twice a day. */
+/** The last few days, twice a day, then the gaps those rounds left. */
 export async function collectRecent(now = new Date()): Promise<void> {
   const today = todayISO(now);
   const r = await readAndStore(await headlines([{ days: 3 }], addDaysISO(today, -4), addDaysISO(today, 1)));
   console.log(`[funding] recent: ${r.read} read, ${r.added} added, ${r.merged} merged, ${r.dropped} dropped`);
+  await fillGaps(today);
 }
 
 /** A whole month, a week at a time (Google News returns about 100 items a search). */

@@ -121,6 +121,52 @@ class OpenRouterProvider implements AiProvider {
   }
 }
 
+/**
+ * A JSON answer from a web search (OpenRouter's web plugin, Exa engine), with the results the model read, so code can
+ * check every figure against them. For public facts only (funding news, SPEC §15.16): never send deck content here.
+ */
+export async function webSearchJson(req: { system: string; prompt: string; jsonSchema: unknown; model: string; maxResults?: number }): Promise<{
+  text: string;
+  results: { url: string; title: string; content: string }[];
+}> {
+  if (!aiConfigured) throw new AiError("not_configured", "AI is not set up.");
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}`, "Content-Type": "application/json", "X-Title": "Niveshaay PE Desk" },
+    body: JSON.stringify({
+      model: req.model,
+      messages: [
+        { role: "system", content: req.system },
+        { role: "user", content: req.prompt },
+      ],
+      plugins: [{ id: "web", engine: "exa", max_results: req.maxResults ?? 5 }],
+      response_format: { type: "json_schema", json_schema: { name: "answer", strict: true, schema: req.jsonSchema } },
+      provider: { data_collection: "deny" },
+      usage: { include: true },
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    choices?: { message?: { content?: string | null; annotations?: { type?: string; url_citation?: { url?: string; title?: string; content?: string } }[] } }[];
+    error?: { code?: number; metadata?: { scope?: string } };
+    usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
+  } | null;
+  if (body?.usage) {
+    aiUsage.calls++;
+    aiUsage.tokensIn += body.usage.prompt_tokens ?? 0;
+    aiUsage.tokensOut += body.usage.completion_tokens ?? 0;
+    aiUsage.costUsd += body.usage.cost ?? 0;
+  }
+  if (res.status === 402 || (res.status === 403 && body?.error?.metadata?.scope === "key_limit")) throw new AiError("no_credits", "The AI key is out of credit.", res.status);
+  if (!res.ok || body?.error) throw new AiError("failed", "The search failed.", body?.error?.code ?? res.status);
+  const msg = body?.choices?.[0]?.message;
+  if (!msg?.content) throw new AiError("empty", "The search came back empty.");
+  const results = (msg.annotations ?? []).flatMap((a) =>
+    a.url_citation?.url ? [{ url: a.url_citation.url, title: a.url_citation.title ?? "", content: a.url_citation.content ?? "" }] : [],
+  );
+  return { text: msg.content, results };
+}
+
 let provider: AiProvider | null = null;
 
 export function aiProvider(): AiProvider {
