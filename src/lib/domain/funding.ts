@@ -501,9 +501,25 @@ export function mergeDeal(
 
 // ─── Filling gaps from a web search (SPEC §15.16) ───
 
+export type FillField = "company" | "amount" | "round" | "lead" | "what";
+
+const PLACE_WORDS = new Set(["indian", "india", "india-based", "homegrown", "domestic", "a", "an", "the", "us-based", "global", "bengaluru-based", "mumbai-based", "delhi-based", "gurugram-based", "pune-based", "chennai-based", "hyderabad-based", "noida-based"]);
+const GENERIC_NOUNS = /(firm|company|startup|start-up|platform|player|maker|brand|business|unit|entity|provider|operator|manufacturer|chain|group|venture|outfit)s?$/i;
+/**
+ * A "company" the headline only described: "Indian consumer-focused firm", "a Bengaluru-based fintech startup". Every
+ * word is lower case (place words like "Indian" aside) and it ends in a generic noun. A real name has a capital.
+ */
+export function unnamedCompany(name: string): boolean {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  if (!GENERIC_NOUNS.test(words[words.length - 1] ?? "")) return false;
+  return words.every((w) => PLACE_WORDS.has(w.toLowerCase()) || w === w.toLowerCase());
+}
+
 /** What a round is missing that a search can fill; empty when nothing. */
-export function gapsOf(d: Pick<DealRowData, "amountUsdM" | "round" | "lead" | "what">): ("amount" | "round" | "lead" | "what")[] {
-  const out: ("amount" | "round" | "lead" | "what")[] = [];
+export function gapsOf(d: Pick<DealRowData, "company" | "amountUsdM" | "round" | "lead" | "what">): FillField[] {
+  const out: FillField[] = [];
+  if (unnamedCompany(d.company)) out.push("company");
   if (d.amountUsdM == null) out.push("amount");
   if (d.round === "Undisclosed round") out.push("round");
   if (!d.lead) out.push("lead");
@@ -520,6 +536,10 @@ export interface FillResult {
 
 /** What the model read from the search results for one round. */
 export interface FillAnswer {
+  /** The company's name, when the headline only described it; else empty */
+  company: string;
+  /** The exact words in a result that name the company with an investor */
+  companyQuote: string;
   what: string;
   amount: number | null;
   currency: Currency;
@@ -595,10 +615,32 @@ export function fillPatch(
   d: Pick<DealRowData, "company" | "amountUsdM" | "round" | "lead" | "what" | "investors" | "sources">,
   a: FillAnswer,
   results: FillResult[],
-): { patch: Partial<DealRowData>; filled: ("amount" | "round" | "lead" | "what")[] } {
+): { patch: Partial<DealRowData>; filled: FillField[] } {
   const patch: Partial<DealRowData> = {};
-  const filled: ("amount" | "round" | "lead" | "what")[] = [];
-  const about = results.filter((r) => namesCompany(`${r.title} ${r.content}`, d.company));
+  const filled: FillField[] = [];
+  const investorsOf = (extra: string[] = []) => [...d.investors, d.lead ?? "", ...extra].map((n) => normFill(n)).filter((n) => n.length >= 3);
+
+  // A described-only company gets its name when a result's own words name it together with one of the investors.
+  let name = d.company;
+  if (unnamedCompany(d.company)) {
+    const c = a.company.trim();
+    const q = normFill(a.companyQuote);
+    const inv = investorsOf();
+    // The quote, the full name and an investor all on one page (the quote may use a short form: "EuroKids operator Lighthouse").
+    const backed = results.some((r) => {
+      const raw = `${r.title} ${r.content}`;
+      const t = normFill(raw);
+      return !!q && t.includes(q) && namesCompany(raw, c) && inv.some((n) => t.includes(n));
+    });
+    if (c && c.length <= 80 && !unnamedCompany(c) && backed) {
+      name = c.replace(/\s+(private|pvt\.?)\s+(limited|ltd\.?)$/i, "").trim();
+      patch.company = name;
+      patch.key = fundingKey(name);
+      filled.push("company");
+    }
+  }
+
+  const about = results.filter((r) => namesCompany(`${r.title} ${r.content}`, name));
   const texts = about.map((r) => normFill(`${r.title} ${r.content}`));
   const inAny = (s: string) => !!s.trim() && texts.some((t) => t.includes(normFill(s)));
 
@@ -606,7 +648,7 @@ export function fillPatch(
     patch.lead = a.lead.trim();
     filled.push("lead");
   }
-  const names = [...d.investors, d.lead ?? "", patch.lead ?? ""].map((n) => normFill(n)).filter((n) => n.length >= 3);
+  const names = investorsOf([patch.lead ?? ""]);
   if (d.amountUsdM == null && a.amount != null && a.currency !== "NONE" && a.amountQuote.trim()) {
     const q = normFill(a.amountQuote);
     const unitOk = a.currency === "INR_CR" ? /\b(crore|cr)\b/.test(q) : a.currency === "USD" ? /\$|\b(usd|dollars?)\b/.test(q) && /\b(million|mn|m|billion|bn)\b/.test(q) : /€|\beur|euros?\b/.test(q);
@@ -627,7 +669,8 @@ export function fillPatch(
       filled.push("round");
     }
   }
-  if (!d.what) {
+  // A described-only company's "what" was only the description: replace it once the name is found.
+  if (!d.what || (filled.includes("company") && normFill(d.what) !== "" && normFill(d.company).includes(normFill(d.what)))) {
     const w = a.what.trim().split(/\s+/).filter(Boolean).slice(0, 8).join(" ").slice(0, 120);
     if (w) {
       patch.what = w;

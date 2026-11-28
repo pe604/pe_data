@@ -7,6 +7,7 @@ import {
   gapsOf,
   namesCompany,
   outletFromUrl,
+  unnamedCompany,
   fundingKey,
   lastFullWeek,
   linkPieces,
@@ -192,10 +193,11 @@ describe("filling gaps from a web search (SPEC §15.16)", () => {
     page("https://www.dealstreetasia.com/c", "Quillstone Fund invests $32m in Zorvex Global."),
     page("https://example.com/other", "An unrelated company raised money.", "Other news"),
   ];
-  const ans = { what: "precision parts maker for aerospace and defence buyers today", amount: 300, currency: "INR_CR" as const, amountQuote: "Rs 300 crore", round: "Series B", lead: "Quillstone Fund" };
+  const ans = { company: "", companyQuote: "", what: "precision parts maker for aerospace and defence buyers today", amount: 300, currency: "INR_CR" as const, amountQuote: "Rs 300 crore", round: "Series B", lead: "Quillstone Fund" };
 
   it("lists the gaps", () => {
     expect(gapsOf(base)).toEqual(["amount", "round", "what"]);
+    expect(gapsOf({ ...base, company: "Indian consumer-focused firm" })[0]).toBe("company");
     expect(gapsOf({ ...base, amountUsdM: 3, round: "Seed", what: "x" })).toEqual([]);
   });
   it("fills what the results back, and adds the sources that name the company", () => {
@@ -232,6 +234,27 @@ describe("filling gaps from a web search (SPEC §15.16)", () => {
     expect(fillPatch(noLead, { ...ans, lead: "Made Up Partners" }, results).patch.lead).toBeUndefined();
     expect(fillPatch(noLead, ans, results).patch.lead).toBe("Quillstone Fund");
     expect(fillPatch(base, { ...ans, round: "Series C" }, results).patch.round).toBeUndefined();
+  });
+  it("tells a described company from a named one", () => {
+    expect(unnamedCompany("Indian consumer-focused firm")).toBe(true);
+    expect(unnamedCompany("a Bengaluru-based fintech startup")).toBe(true);
+    expect(unnamedCompany("Zorvex Global")).toBe(false);
+    expect(unnamedCompany("Acme Platform")).toBe(false);
+    expect(unnamedCompany("Hical Technologies")).toBe(false);
+  });
+  it("names a described company only when a result names it with an investor, and replaces the description", () => {
+    const described = { ...base, company: "Indian consumer-focused firm", what: "consumer-focused firm", amountUsdM: 145, round: "Series C" };
+    const pages = [page("https://www.vccircle.com/k", "Quillstone Fund invested about $145 million in Zorvex Learning Pvt Ltd, VCCircle has reported.", "Quillstone Fund injects $145 mn into Indian consumer-focused firm")];
+    const named = { ...ans, company: "Zorvex Learning Pvt Ltd", companyQuote: "invested about $145 million in Zorvex Learning Pvt Ltd", what: "preschool and school chain" };
+    const { patch, filled } = fillPatch(described, named, pages);
+    expect(filled).toContain("company");
+    expect(patch.company).toBe("Zorvex Learning");
+    expect(patch.key).toBe(fundingKey("Zorvex Learning"));
+    expect(patch.what).toBe("preschool and school chain");
+    // Not in any result, or not with the investor: kept as it was
+    expect(fillPatch(described, { ...named, companyQuote: "Zorvex Learning raised money" }, pages).patch.company).toBeUndefined();
+    const noInvestor = [page("https://x.com/a", "Someone invested about $145 million in Zorvex Learning Pvt Ltd.")];
+    expect(fillPatch(described, named, noInvestor).patch.company).toBeUndefined();
   });
   it("names companies by their distinctive name, as whole words", () => {
     expect(namesCompany("TASE GLOBAL secures funding", "TASE Global")).toBe(true);
